@@ -1,102 +1,234 @@
-# [Horizon UI TailwindCSS React Typescript ⚡️](https://horizon-ui.com/horizon-tailwind-react-ts) [![Tweet](https://img.shields.io/twitter/url/http/shields.io.svg?style=social&logo=twitter)](https://twitter.com/intent/tweet?text=Check%20Horizon%20UI,%20the%20trendiest%20open-source%20admin%20template%20for%20%23tailwindcss%20and%20%23react!%0A%0Ahorizon-ui.com%20)
+# 🏦 Premium Nasiya Admin Panel
 
-![version](https://img.shields.io/badge/version-2.0.0-brightgreen.svg)
-![license](https://img.shields.io/badge/license-MIT-blue.svg)
-[![GitHub issues open](https://img.shields.io/github/issues/horizon-ui/horizon-tailwind-react-ts.svg?maxAge=2592000)](https://github.com/horizon-ui/horizon-tailwind-react-ts/issues?q=is%3Aopen+is%3Aissue)
+<div align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="version" />
+  <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="license" />
+  <img src="https://img.shields.io/badge/React-18.x-61dafb.svg" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178c6.svg" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-3.x-38bdf8.svg" alt="Tailwind" />
+</div>
 
-<p>&nbsp;</p>
+<p align="center">
+  <b>Zamonaviy nasiya xizmatlarini boshqarish uchun professional admin panel</b>
+</p>
 
-[<img alt="Horizon UI - Tailwind CSS React Admin dashboard template" src="https://i.ibb.co/1zhBQ2J/horizon-ui-tailwind-2.png" />](https://github.com/horizon-ui/horizon-tailwind-react-ts)
-
-<p>&nbsp;</p>
-
-Get started and build your dream web app with Horizon UI, the trendiest & innovative Open Source Admin Template for Tailwind CSS & React!
+<p align="center">
+  <a href="https://premiumnasiya.uz" target="_blank">🌐 Asosiy sayt</a> •
+  <a href="#-xususiyatlar">✨ Xususiyatlar</a> •
+  <a href="#-kurulum">📦 O'rnatish</a> •
+  <a href="#-texnologiyalar">⚙️ Texnologiyalar</a>
+</p>
 
 ---
 
-### Introduction
+## 📸 Screenshot
 
-Designed for those who like modern UI elements and beautiful websites. Made of hundred of elements, designed blocks and fully coded pages, Horizon UI is ready to help you create stunning websites and webapps.
+<div align="center">
+  <img src="https://via.placeholder.com/1200x600/4F46E5/ffffff?text=Premium+Nasiya+Admin+Dashboard" alt="Dashboard Preview" />
+</div>
 
-Save hundreds of hours trying to create and develop a dashboard from scratch.
-The fastest, most responsive & trendiest dashboard for Tailwind CSS is here. Seriously.
+---
 
-With Horizon UI you will find many examples for pages like NFTs Pages,
-Authentication Pages, Profile and so on. Just choose between a Basic Design or a cover and you are good to go!
+## ✨ Xususiyatlar
 
-### 🎉 [NEW] Horizon UI Components
+### 📊 Dashboard
+- **Real-time statistika** - Jami arizalar, tasdiqlangan summa, operatorlar soni
+- **Grafik vizualizatsiya** - ApexCharts yordamida interaktiv grafiklar
+- **Filtr tizimi** - Sana, hudud va filial bo'yicha filtrlash
 
-All the main components from both versions, this will help you to see and interact with all & the latest added components of Horizon (also, new components are on the way, stay tuned)! ⚡️
-<a href="https://horizon-ui.com/components/?ref=readme-horizon-tailwind-react-ts" target="_blank">See all components</a>
+### 👥 Foydalanuvchilar (Operatorlar)
+- Operatorlarni boshqarish
+- Rol va huquqlarni nazorat qilish
+- Ish holati (Faol/Bloklangan)
+- Filial va merchant ma'lumotlari
 
-### Documentation
+### 📝 Arizalar
+- Arizalarni ko'rish va boshqarish
+- **Tovarlar summasi** va **To'lov summasi** ajratilgan
+- Holat ko'rsatkichlari (Tasdiqlangan, Rad etilgan, Kutilmoqda)
+- Muddatli to'lov imkoniyati (3, 6, 9, 12 oy)
+- Hujjatlarni yuklab olish (PDF format)
 
-Each element is well presented in a very complex documentation. You can read more about the <a href="https://horizon-ui.com/docs-tailwind/docs/react/installation?ref=readme-horizon-tailwind-react-ts" target="_blank">documentation here.</a>
+### 🏢 Filiallar
+- Filiallarni CRUD operatsiyalari
+- Bank ma'lumotlari (INN, NDS, Hisob raqam, MFO)
+- Direktor ma'lumotlari
+- Hudud bo'yicha guruplash
+- Excel ga eksport
 
-### Quick Start
+### 🔍 Global Qidiruv
+- Operator, Ariza va Filiallarni qidirish
+- Real-time natijalar
+- Modal oynada batafsil ma'lumot
 
-Install Horizon UI by running either of the following:
+### 🌓 Dark Mode
+- To'liq dark mode qo'llab-quvvatlash
+- Avtomatik tema o'zgartirish
 
-- Install NodeJS LTS from [NodeJs Official Page](https://nodejs.org/en/?ref=horizon-documentation) (NOTE: Product only works with LTS version).
+### 🌐 Lokalizatsiya
+- To'liq O'zbek tilida interfeys
+- Sana va vaqt formatlari (24 soatlik)
+- Pul birligi (so'm)
 
-Clone the repository with the following command:
+---
 
+## 📦 O'rnatish
+
+### Talablar
+- Node.js 16.x yoki yuqori
+- npm yoki yarn
+
+### Qadamlar
+
+1. **Repository ni klonlash**
 ```bash
-git clone https://github.com/horizon-ui/horizon-tailwind-react-ts.git
+git clone https://github.com/khurshid28/premium-nasiya-admin.git
+cd premium-nasiya-admin
 ```
 
-Run in terminal this command:
-
+2. **Paketlarni o'rnatish**
 ```bash
 npm install
 ```
 
-Then run this command to start your local server
-
+3. **Development serverini ishga tushirish**
 ```bash
 npm start
 ```
 
-### Example Pages
+Server `http://localhost:3000` da ishga tushadi.
 
-If you want to get inspiration or just show something directly to your clients, you can jump start your development with our pre-built example pages. You will be able to quickly set up the basic structure for your web project.
-
-View <a href="https://horizon-ui.com/horizon-tailwind-react-ts/?ref=readme-horizon-tailwind-react-ts" target="_blank">example pages here.</a>
-
-### Versions
-
-| Free Version                                                                                                                                             | PRO Version                                                                                                                                                       |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![Horizon UI Tailwind CSS React](https://i.ibb.co/1zhBQ2J/horizon-ui-tailwind-2.png)](https://www.horizon-ui.com/?ref=readme-horizon-tailwind-react-ts) | [![Horizon UI Tailwind CSS React PRO](https://i.ibb.co/d0cVzKB/horizon-ui-pro-tailwind.png)](https://www.horizon-ui.com/pro?ref=readme-horizon-tailwind-react-ts) |
-
-### Figma Version
-
-Horizon UI is available in Figma format as well! Check it out on Figma
-Community! 🎨
-[See the Horizon UI Figma design files](https://bit.ly/horizon-figma)
-
-### Reporting Issues
-
-We use GitHub Issues as the official bug tracker for the Horizon UI. Here are
-some advices for our users that want to report an issue:
-
-1. Make sure that you are using the latest version of the Horizon UI Dashbaord.
-   Check the CHANGELOG from your dashboard on our
-   [CHANGE LOG File](https://github.com/horizon-ui/horizon-tailwind-react-ts/blob/main/CHANGELOG.md?ref=readme-horizon-tailwind-react-ts).
-2. Providing us reproducible steps for the issue will shorten the time it takes
-   for it to be fixed.
-3. Some issues may be browser specific, so specifying in what browser you
-   encountered the issue might help.
+4. **Production build**
+```bash
+npm run build
+```
 
 ---
 
-### Community
+## ⚙️ Texnologiyalar
 
-Connect with the community! Feel free to ask questions, report issues, and meet new people that already use Horizon UI!
+### Frontend
+- **React 18** - UI library
+- **TypeScript** - Type safety
+- **Tailwind CSS** - Utility-first CSS framework
+- **React Router** - Client-side routing
 
-💬 [Join the #HorizonUI Discord Community!](https://discord.gg/f6tEKFBd4m)
+### UI Komponentlar
+- **ApexCharts** - Grafik vizualizatsiya
+- **React Icons** - Icon library
+- **Tabler Icons** - Modern ikonlar
 
-### Copyright and license
+### State Management
+- React Context API
+- Local Storage
+
+### Boshqa
+- **Mock API** - Development uchun mock data
+- **Excel Export** - XLSX kutubxonasi
+
+---
+
+## 🗂️ Loyiha Strukturasi
+
+```
+src/
+├── assets/           # Rasmlar va CSS
+├── components/       # Qayta ishlatish mumkin bo'lgan komponentlar
+│   ├── card/        # Card komponentlari
+│   ├── charts/      # Grafik komponentlari
+│   ├── modal/       # Modal oynalar
+│   ├── navbar/      # Navbar (LTR/RTL)
+│   └── sidebar/     # Sidebar navigatsiya
+├── contexts/        # React Context
+├── layouts/         # Layout komponentlari
+├── lib/            # Utility funksiyalar va Mock API
+├── types/          # TypeScript type definitions
+├── views/          # Sahifalar
+│   ├── admin/
+│   │   ├── default/        # Dashboard
+│   │   ├── applications/   # Arizalar
+│   │   ├── users/          # Operatorlar
+│   │   └── fillials/       # Filiallar
+│   └── auth/              # Autentifikatsiya
+└── routes.tsx      # Route konfiguratsiyasi
+```
+
+---
+
+## 🚀 Asosiy Funksiyalar
+
+### Dashboard
+```typescript
+// Real-time statistika
+- Jami arizalar: 250+
+- Tasdiqlangan summa: 150M+ so'm
+- Jami operatorlar: 45+
+- Jami filiallar: 35+
+```
+
+### Arizalar Tizimi
+- **Tovarlar summasi**: Mahsulotlar umumiy narxi
+- **To'lov summasi**: Klient to'laydigan summa (foiz bilan)
+- **Muddatli to'lov**: 3, 6, 9, 12 oylik rejalar
+- **Hujjat yaratish**: PDF formatida shartnoma
+
+### Filiallar Boshqaruvi
+- INN, NDS, Bank ma'lumotlari
+- Direktor va telefon ma'lumotlari
+- Hisob raqam va MFO
+- Hudud bo'yicha statistika
+
+---
+
+## 🎨 Dizayn Tizimi
+
+### Ranglar
+- **Brand**: `#4F46E5` (Indigo)
+- **Success**: `#10B981` (Green)
+- **Error**: `#EF4444` (Red)
+- **Warning**: `#F59E0B` (Amber)
+
+### Dark Mode
+Barcha komponentlar dark mode ni qo'llab-quvvatlaydi:
+- `dark:bg-navy-800` - Asosiy fon
+- `dark:text-white` - Matn rangi
+- `dark:border-gray-600` - Chegara rangi
+
+---
+
+## 🔐 Autentifikatsiya
+
+Demo login ma'lumotlari:
+- **Telefon**: `+998900000001`
+- **Parol**: `aJk#2025`
+
+---
+
+## 📝 License
+
+MIT License - [LICENSE.md](LICENSE.md)
+
+---
+
+## 👥 Muallif
+
+**Khurshid**
+- GitHub: [@khurshid28](https://github.com/khurshid28)
+- Repository: [premium-nasiya-admin](https://github.com/khurshid28/premium-nasiya-admin)
+
+---
+
+## 🌐 Aloqa
+
+- **Website**: [premiumnasiya.uz](https://premiumnasiya.uz)
+- **Email**: info@premiumnasiya.uz
+
+---
+
+<div align="center">
+  <p>Made with ❤️ for Premium Nasiya</p>
+  <p>© 2025 Premium Nasiya. All rights reserved.</p>
+</div>
 
 ⭐️ [Copyright 2023 Horizon UI ](https://www.horizon-ui.com/?ref=readme-horizon-tailwind-react-ts)
 
