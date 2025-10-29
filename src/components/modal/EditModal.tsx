@@ -1,6 +1,6 @@
 import React from "react";
 import DetailModal from "./DetailModalNew";
-import api from "lib/mockApi";
+import api from "lib/api";
 import PhoneInput from "components/PhoneInput";
 import CustomSelect from "components/dropdown/CustomSelect";
 import CustomFileInput from "components/input/CustomFileInput";
@@ -32,7 +32,6 @@ const REGIONS = [
 
 export default function EditModal({ isOpen, onClose, onSave, initial, type }: Props) {
   const [form, setForm] = React.useState<any>(initial ?? {});
-  const [merchants, setMerchants] = React.useState<any[]>([]);
   const [fillials, setFillials] = React.useState<any[]>([]);
   // focus flags removed — we keep input simple with separate prefix
 
@@ -51,10 +50,6 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
 
   React.useEffect(() => {
     let mounted = true;
-    api.listMerchants().then((m: any[]) => {
-      if (!mounted) return;
-      setMerchants(m);
-    });
     api.listFillials({ page: 1, pageSize: 200 }).then((r) => {
       if (!mounted) return;
       setFillials(r.items);
@@ -138,13 +133,14 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
                 value={form.fillial_id ?? (form.fillial?.id ?? "")}
                 onChange={(value) => {
                   const v = value === "" ? null : Number(value);
-                  const f = fillials.find((x) => x.id === v) ?? null;
+                  const fillialsList = Array.isArray(fillials) ? fillials : [];
+                  const f = fillialsList.find((x) => x.id === v) ?? null;
                   update("fillial_id", v);
                   update("fillial", f);
                 }}
                 options={[
                   { value: "", label: "-- select fillial --" },
-                  ...fillials.map((f) => ({ value: f.id.toString(), label: f.name }))
+                  ...(Array.isArray(fillials) ? fillials : []).map((f) => ({ value: f.id.toString(), label: f.name }))
                 ]}
               />
             </div>
@@ -158,17 +154,6 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
             <div>
               <label className="block text-sm font-medium text-gray-700">Address</label>
               <input value={form.address ?? ""} onChange={(e) => update("address", e.target.value)} className="mt-1 block w-full rounded-md border px-3 py-2" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Merchant</label>
-              <CustomSelect
-                value={form.merchant_id ?? (form.merchant?.id ?? "")}
-                onChange={(value) => update("merchant_id", Number(value) || null)}
-                options={[
-                  { value: "", label: "-- select merchant --" },
-                  ...merchants.map((m) => ({ value: m.id.toString(), label: m.name }))
-                ]}
-              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Region</label>

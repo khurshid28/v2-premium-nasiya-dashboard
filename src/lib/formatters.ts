@@ -44,12 +44,54 @@ export function statusBadge(status?: string | null) {
   return { label: s || "-", className: "inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300" };
 }
 
+// Helper functions to check application status category
+export function isApproved(status?: string | null): boolean {
+  const s = (status ?? "").toUpperCase();
+  return s === "CONFIRMED" || s === "FINISHED";
+}
+
+export function isRejected(status?: string | null): boolean {
+  const s = (status ?? "").toUpperCase();
+  return s === "CANCELED_BY_SCORING" || s === "CANCELED_BY_CLIENT" || s === "CANCELED_BY_DAILY";
+}
+
+export function isLimit(status?: string | null): boolean {
+  const s = (status ?? "").toUpperCase();
+  return s === "LIMIT";
+}
+
+export function isPending(status?: string | null): boolean {
+  return !isApproved(status) && !isRejected(status) && !isLimit(status);
+}
+
 export function appStatusBadge(status?: string | null) {
   const s = (status ?? "").toUpperCase();
+  
+  // Approved statuses
+  if (s === "CONFIRMED") return { label: "TASDIQLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
+  if (s === "FINISHED") return { label: "YAKUNLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
+  
+  // Rejected statuses
+  if (s === "CANCELED_BY_SCORING") return { label: "SCORING RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  if (s === "CANCELED_BY_CLIENT") return { label: "MIJOZ RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  if (s === "CANCELED_BY_DAILY") return { label: "DAILY RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  
+  // Limit status
+  if (s === "LIMIT") return { label: "LIMIT BERILDI", className: "inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-800 dark:text-purple-300" };
+  
+  // Pending statuses
   if (s === "CREATED") return { label: "YARATILDI", className: "inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300" };
+  if (s === "ADDED_DETAIL") return { label: "MA'LUMOT QO'SHILDI", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  if (s === "WAITING_SCORING") return { label: "SCORING KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  if (s === "ADDED_PRODUCT") return { label: "MAHSULOT QO'SHILDI", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  if (s === "WAITING_BANK_UPDATE") return { label: "BANK YANGILANISHI KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  if (s === "WAITING_BANK_CONFIRM") return { label: "BANK TASDIG'I KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  
+  // Old statuses for backward compatibility
   if (s === "APPROVED") return { label: "TASDIQLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
   if (s === "REJECTED") return { label: "RAD ETILDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
   if (s === "PENDING") return { label: "KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
+  
   return { label: status ?? "-", className: "inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300" };
 }
 

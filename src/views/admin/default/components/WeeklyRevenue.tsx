@@ -4,11 +4,36 @@ import BarChart from "components/charts/BarChart";
 import {
   barChartOptionsWeeklyRevenue,
 } from "variables/charts";
-import api from "lib/mockApi";
+import api from "lib/api";
 import { MdBarChart } from "react-icons/md";
+import { isApproved, isRejected } from "lib/formatters";
 
-const WeeklyRevenue = () => {
-  const [chartData, setChartData] = React.useState([]);
+interface WeeklyRevenueProps {
+  startDate?: string;
+  endDate?: string;
+  fillialId?: number | "all";
+  region?: string;
+  search?: string;
+  fillials?: any[];
+}
+
+const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({ 
+  startDate = "", 
+  endDate = "", 
+  fillialId = "all", 
+  region = "all",
+  search = "",
+  fillials = []
+}) => {
+  const [chartData, setChartData] = React.useState([{
+    name: "Rad etilgan",
+    data: [0, 0, 0, 0, 0, 0, 0],
+    color: "#EF4444"
+  }, {
+    name: "Tasdiqlangan",
+    data: [0, 0, 0, 0, 0, 0, 0],
+    color: "#10B981"
+  }]);
   const [chartOptions, setChartOptions] = React.useState(barChartOptionsWeeklyRevenue);
   const [loading, setLoading] = React.useState(true);
 
@@ -16,7 +41,39 @@ const WeeklyRevenue = () => {
     const loadWeeklyData = async () => {
       try {
         const response = await api.listApplications({ page: 1, pageSize: 10000 });
-        const applications = response.items || [];
+        let applications = response?.items || [];
+        
+        // Ensure fillials is an array
+        const fillialsList = Array.isArray(fillials) ? fillials : [];
+        
+        // Apply filters
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          applications = applications.filter(app => {
+            if (!app.createdAt) return false;
+            const appDate = new Date(app.createdAt);
+            return appDate >= start && appDate <= end;
+          });
+        }
+
+        if (fillialId !== "all") {
+          applications = applications.filter(app => app.fillial_id === fillialId);
+        } else if (region !== "all") {
+          const regionFillials = fillialsList.filter(f => f.region === region);
+          const regionFillialIds = regionFillials.map(f => f.id);
+          applications = applications.filter(app => regionFillialIds.includes(app.fillial_id));
+        }
+
+        if (search.trim()) {
+          const searchLower = search.toLowerCase();
+          const matchingFillials = fillialsList.filter(f => 
+            f.name?.toLowerCase().includes(searchLower) || 
+            f.address?.toLowerCase().includes(searchLower)
+          );
+          const matchingFillialIds = matchingFillials.map(f => f.id);
+          applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+        }
         
         // Group by last 7 days (today first, then backwards)
         const today = new Date();
@@ -28,10 +85,12 @@ const WeeklyRevenue = () => {
             return appDate.toDateString() === date.toDateString();
           });
           
+          const dayLabel = date.toLocaleDateString('uz-UZ', { weekday: 'short' }) || date.toLocaleDateString('en-US', { weekday: 'short' });
+          
           return {
-            rejected: dayApps.filter(app => app.status === "REJECTED").length,
-            approved: dayApps.filter(app => app.status === "APPROVED").length,
-            date: date.toLocaleDateString('uz-UZ', { weekday: 'short' }) // Add day label
+            rejected: dayApps.filter(app => isRejected(app.status)).length,
+            approved: dayApps.filter(app => isApproved(app.status)).length,
+            date: dayLabel
           };
         }); // No reverse needed - already in chronological order
         
@@ -64,7 +123,8 @@ const WeeklyRevenue = () => {
         // Set default data if error occurs
         setChartData([{
           name: "Daily Applications",
-          data: [0, 0, 0, 0, 0, 0, 0]
+          data: [0, 0, 0, 0, 0, 0, 0],
+          color: "#10B981"
         }]);
       } finally {
         setLoading(false);
@@ -72,7 +132,7 @@ const WeeklyRevenue = () => {
     };
 
     loadWeeklyData();
-  }, []);
+  }, [startDate, endDate, fillialId, region, search, fillials]);
 
   return (
     <Card extra="flex flex-col bg-white w-full rounded-3xl py-6 px-2 text-center">
@@ -91,11 +151,16 @@ const WeeklyRevenue = () => {
             <div className="flex items-center justify-center h-[220px]">
               <div className="text-gray-500 dark:text-gray-400">Yuklanmoqda...</div>
             </div>
-          ) : (
+          ) : chartData && chartData.length > 0 ? (
             <BarChart
+              key="weekly-bar-chart"
               chartData={chartData}
               chartOptions={chartOptions}
             />
+          ) : (
+            <div className="flex items-center justify-center h-[220px]">
+              <div className="text-gray-500 dark:text-gray-400">Ma'lumot topilmadi</div>
+            </div>
           )}
         </div>
       </div>

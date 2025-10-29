@@ -1,6 +1,6 @@
 import React from "react";
 import Dropdown from "components/dropdown";
-import { FiAlignJustify } from "react-icons/fi";
+import { FiAlignJustify, FiUser } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "contexts/UserContext";
 
@@ -9,8 +9,7 @@ import { RiMoonFill, RiSunFill } from "react-icons/ri";
 import {
   IoMdInformationCircleOutline,
 } from "react-icons/io";
-import avatar from "assets/img/avatars/avatar4.png";
-import api from "lib/mockApi";
+import api from "lib/api";
 import DetailModal from "components/modal/DetailModalNew";
 
 const Navbar = (props: {
@@ -234,24 +233,36 @@ const Navbar = (props: {
         {/* Profile & Dropdown */}
         <Dropdown
           button={
-            <img
-              className="h-10 w-10 rounded-full object-cover"
-              src={user?.image || avatar}
-              alt={user?.fullname || "User"}
-              title={`${user?.fullname ?? "User"}${user?.phone ? " • " + user.phone : ""}`}
-            />
+            user?.image ? (
+              <img
+                className="h-10 w-10 rounded-full object-cover"
+                src={user.image}
+                alt={user?.fullname || "User"}
+                title={`${user?.fullname ?? "User"}${user?.phone ? " • " + user.phone : ""}`}
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white font-semibold text-sm">
+                <FiUser className="h-5 w-5" />
+              </div>
+            )
           }
           children={
             <div className="flex w-60 flex-col rounded-[20px] bg-white shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
               {/* User info */}
               <div className="flex items-center gap-3 p-4">
-                <img
-                  className="h-10 w-10 rounded-full object-cover"
-                  src={user?.image || avatar}
-                  alt={user?.fullname || "User"}
-                />
+                {user?.image ? (
+                  <img
+                    className="h-10 w-10 rounded-full object-cover"
+                    src={user.image}
+                    alt={user?.fullname || "User"}
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white">
+                    <FiUser className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-navy-700 dark:text-white">{user?.fullname || "Anonim"}</div>
+                  <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{user?.fullname || "Anonim"}</div>
                   {user?.phone ? (
                     <div className="truncate text-xs text-gray-600 dark:text-gray-300">{user.phone}</div>
                   ) : null}
@@ -371,13 +382,13 @@ const Navbar = (props: {
                 {selected.raw.amount && (
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Tovarlar summasi</p>
-                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.amount.toLocaleString()} so'm</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{(selected.raw.amount || 0).toLocaleString()} so'm</p>
                   </div>
                 )}
                 {selected.raw.payment_amount && (
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">To'lov summasi</p>
-                    <p className="text-sm font-bold text-brand-500 dark:text-brand-400">{selected.raw.payment_amount.toLocaleString()} so'm</p>
+                    <p className="text-sm font-bold text-brand-500 dark:text-brand-400">{(selected.raw.payment_amount || 0).toLocaleString()} so'm</p>
                   </div>
                 )}
               </div>
@@ -385,13 +396,13 @@ const Navbar = (props: {
                 {selected.raw.percent && (
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Foiz</p>
-                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.percent}%</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.percent || 0}%</p>
                   </div>
                 )}
                 {selected.raw.expired_month && (
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Muddat</p>
-                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.expired_month} oy</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.expired_month || 0} oy</p>
                   </div>
                 )}
               </div>

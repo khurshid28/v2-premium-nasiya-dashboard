@@ -1,7 +1,7 @@
 import React from "react";
 import DetailModal from "components/modal/DetailModalNew";
 import EditModal from "components/modal/EditModal";
-import api from "lib/mockApi";
+import api from "lib/api";
 import { exportSingleTable } from "lib/exportExcel";
 import { formatPhone } from "lib/formatters";
 import Pagination from "components/pagination";
@@ -115,8 +115,11 @@ const Fillials = (): JSX.Element => {
   const [data, setData] = React.useState<Fillial[]>(initialData);
   const [search, setSearch] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState("all");
-  const [pageSize, setPageSize] = React.useState<number>(5);
+  
+  // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+  
   const [selected, setSelected] = React.useState<Fillial | null>(null);
   const [open, setOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
@@ -127,13 +130,15 @@ const Fillials = (): JSX.Element => {
 
   const regions = React.useMemo(() => {
     const set = new Set<string>();
-    data.forEach((d) => { if (d.region) set.add(d.region); });
+    const fillials = Array.isArray(data) ? data : [];
+    fillials.forEach((d) => { if (d.region) set.add(d.region); });
     return Array.from(set).sort();
   }, [data]);
 
   const filtered = React.useMemo(() => {
     const s = search.trim().toLowerCase();
-    return data.filter((d) => {
+    const fillials = Array.isArray(data) ? data : [];
+    return fillials.filter((d) => {
       const matchesSearch =
         !s || d.name.toLowerCase().includes(s) || (d.region ?? "").toLowerCase().includes(s);
       const matchesRegion = regionFilter === "all" || d.region === regionFilter;
@@ -144,23 +149,36 @@ const Fillials = (): JSX.Element => {
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Reset to page 1 when filters change
   React.useEffect(() => {
-    // reset to first page when filters or pageSize change
     setPage(1);
-  }, [search, regionFilter, pageSize]);
+  }, [search, regionFilter]);
 
-  // placeholder: replace with api.listFillials when ready
   React.useEffect(() => {
     let mounted = true;
-    api.listFillials({ page, pageSize, search }).then((res) => {
-      if (!mounted) return;
-      setData(res.items);
-    });
+    console.log('Fetching fillials from API...');
+    api.listFillials({})
+      .then((res) => {
+        if (!mounted) return;
+        console.log('Fillials response:', res);
+        setData(res?.items || []);
+      })
+      .catch((err) => {
+        if (!mounted) return;
+        console.error("Error fetching fillials:", err);
+        console.error("Error details:", {
+          message: err.message,
+          status: err.status,
+          body: err.body
+        });
+        setData([]);
+      });
     return () => {
       mounted = false;
     };
-  }, [page, pageSize, search]);
+  }, []);
 
+  // Paginate filtered data
   const pageData = React.useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -173,13 +191,18 @@ const Fillials = (): JSX.Element => {
           <h2 className="text-2xl font-semibold">Filiallar</h2>
         </div>
         <div className="flex gap-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 rounded-md border border-gray-300 px-3 dark:border-gray-600 bg-white dark:bg-navy-700 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder="Nom yoki hudud bo'yicha qidirish"
-          />
-          <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-10 rounded bg-green-600 hover:bg-green-700 px-3 text-white">Filial qo'shish</button>
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              placeholder="Nom yoki hudud bo'yicha qidirish"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200">Filial qo'shish</button>
           <CustomSelect
             value={regionFilter}
             onChange={setRegionFilter}
@@ -189,19 +212,22 @@ const Fillials = (): JSX.Element => {
             ]}
             className="min-w-[140px]"
           />
+          
           <CustomSelect
             value={String(pageSize)}
             onChange={(value) => setPageSize(Number(value))}
             options={[
-              { value: "5", label: "5 / sahifa" },
-              { value: "10", label: "10 / sahifa" },
-              { value: "25", label: "25 / sahifa" }
+              { value: "5", label: "5 ta" },
+              { value: "10", label: "10 ta" },
+              { value: "25", label: "25 ta" },
+              { value: "50", label: "50 ta" }
             ]}
-            className="min-w-[110px]"
+            className="min-w-[120px]"
           />
+          
           <button
             onClick={async () => {
-              const res = await api.listFillials({ page: 1, pageSize: 10000 });
+              const res = await api.listFillials({});
               const rows = (res.items ?? []).map((f: any) => ({
                 ID: f.id,
                 Name: f.name,
@@ -314,8 +340,8 @@ const Fillials = (): JSX.Element => {
                 } else {
                   await api.createFillial(payload);
                 }
-                const res = await api.listFillials({ page, pageSize, search });
-                setData(res.items);
+                const res = await api.listFillials({});
+                setData(res.items || []);
               }}
             />
             <Toast message={toastMessage} isOpen={toastOpen} onClose={() => setToastOpen(false)} type={toastType} />
@@ -331,10 +357,8 @@ const Fillials = (): JSX.Element => {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600 dark:text-gray-400">{`${pageData.length} dan ${total} ta ko'rsatilmoqda`}</div>
-        <div className="flex items-center gap-2">
-          <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
       </div>
     </div>
   );

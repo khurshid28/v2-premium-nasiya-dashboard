@@ -1,6 +1,6 @@
 import React from "react";
 import { Range } from "react-range";
-import api from "lib/mockApi";
+import api from "lib/api";
 import Pagination from "components/pagination";
 import DetailModal from "components/modal/DetailModalNew";
 import AvatarName from "components/AvatarName";
@@ -18,7 +18,7 @@ type Application = {
   passport?: string | null;
   limit?: number | null;
   canceled_reason?: string | null;
-  expired_month?: number | null;
+  expired_month?: string | null;
   percent?: number | null;
   amount?: number | null;
   payment_amount?: number | null;
@@ -51,35 +51,65 @@ const Applications = (): JSX.Element => {
   const [amountRange, setAmountRange] = React.useState<[number, number]>([0, 50000000]);
   const [startDate, setStartDate] = React.useState<string>("");
   const [endDate, setEndDate] = React.useState<string>("");
-  const [pageSize, setPageSize] = React.useState<number>(5);
-  const [page, setPage] = React.useState<number>(1);
   const [selected, setSelected] = React.useState<Application | null>(null);
   const [open, setOpen] = React.useState(false);
+  
+  // Client-side pagination state
+  const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+  
   const SLIDER_MIN = 0;
   const SLIDER_MAX = 50000000; // 50 million UZS
   const SLIDER_STEP = 10000;
 
   const statuses = React.useMemo(() => {
-    const set = new Set<string>();
-    applications.forEach((a) => set.add(a.status));
-    return ["all", ...Array.from(set).sort()];
-  }, [applications]);
+    return [
+      { value: "all", label: "Barcha holatlar" },
+      { value: "APPROVED", label: "Tasdiqlangan" },
+      { value: "REJECTED", label: "Rad etilgan" },
+      { value: "PENDING", label: "Kutilmoqda" },
+      { value: "CANCELED", label: "Bekor qilingan" }
+    ];
+  }, []);
 
   const regions = React.useMemo(() => {
     const s = new Set<string>();
-    fillialsList.forEach((f) => { if (f.region) s.add(f.region); });
+    const fillials = Array.isArray(fillialsList) ? fillialsList : [];
+    fillials.forEach((f) => { if (f.region) s.add(f.region); });
     return ["all", ...Array.from(s)];
   }, [fillialsList]);
 
   React.useEffect(() => {
     let mounted = true;
-    api.listApplications({ page: 1, pageSize: 1000 }).then((res) => {
+    console.log('Fetching applications from API...');
+    api.listApplications({}).then((res) => {
       if (!mounted) return;
-      setApplications(res.items);
+      console.log('Applications response:', res);
+      setApplications(res?.items || []);
+    }).catch((err) => {
+      if (!mounted) return;
+      console.error("Error fetching applications:", err);
+      console.error("Error details:", {
+        message: err.message,
+        status: err.status,
+        body: err.body
+      });
+      setApplications([]);
     });
-    api.listFillials({ page: 1, pageSize: 1000 }).then((res) => {
+    console.log('Fetching fillials from API...');
+    api.listFillials({}).then((res) => {
       if (!mounted) return;
-      setFillialsList(res.items);
+      console.log('Fillials for applications:', res);
+      setFillialsList(res?.items || []);
+    }).catch((err) => {
+      if (!mounted) return;
+      console.error("Error fetching fillials:", err);
+      console.error("Error details:", {
+        message: err.message,
+        status: err.status,
+        body: err.body
+      });
+      setFillialsList([]);
     });
     return () => {
       mounted = false;
@@ -92,7 +122,8 @@ const Applications = (): JSX.Element => {
     const end = endDate ? new Date(endDate) : null;
     if (end) end.setHours(23, 59, 59, 999);
 
-    return applications.filter((a) => {
+    const apps = Array.isArray(applications) ? applications : [];
+    return apps.filter((a) => {
       const fullname = (a.fullname ?? "").toLowerCase();
       const phone = (a.phone ?? "").toLowerCase();
       const passport = (a.passport ?? "").toLowerCase();
@@ -101,10 +132,11 @@ const Applications = (): JSX.Element => {
   const matchesPaid = paidFilter === "all" || (paidFilter === "paid" ? a.paid === true : a.paid === false || a.paid == null);
       const matchesFillial = fillialFilter === "all" || a.fillial_id === Number(fillialFilter);
       // region may be stored on the fillial object; lookup in fillialsList
-      const fillialObj = fillialsList.find((f) => f.id === (a.fillial?.id ?? a.fillial_id));
+      const fillials = Array.isArray(fillialsList) ? fillialsList : [];
+      const fillialObj = fillials.find((f) => f.id === (a.fillial?.id ?? a.fillial_id));
       const fillialRegion = fillialObj?.region ?? (a.fillial && (a.fillial as any).region) ?? null;
       const matchesRegion = regionFilter === "all" || (!fillialRegion && regionFilter === "all") || fillialRegion === regionFilter;
-      const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && a.expired_month === Number(expiredMonthFilter));
+      const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && a.expired_month === String(expiredMonthFilter));
   const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
   const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
 
@@ -120,9 +152,6 @@ const Applications = (): JSX.Element => {
     });
   }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList]);
 
-  const total = filtered.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-
   const stats = React.useMemo(() => {
     const items = filtered;
     const totalCount = items.length;
@@ -134,8 +163,16 @@ const Applications = (): JSX.Element => {
     return { totalCount, approvedAmount, approvedPaidAmount, approvedUnpaidAmount };
   }, [filtered]);
 
-  React.useEffect(() => setPage(1), [search, statusFilter, pageSize]);
+  // Client-side pagination
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate]);
 
+  // Slice data for current page
   const pageData = React.useMemo(() => {
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -159,20 +196,25 @@ const Applications = (): JSX.Element => {
       </div>
       <div className="flex items-center justify-start">
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 rounded-md border border-gray-300 dark:border-gray-600 px-3 w-80 md:w-96 bg-white dark:bg-navy-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder="Ism yoki telefon raqam bo'yicha qidirish"
-            title="Ism yoki telefon raqam bo'yicha qidirish"
-            aria-label="Ism yoki telefon raqam bo'yicha qidirish"
-          />
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 md:w-96 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              placeholder="Ism yoki telefon raqam bo'yicha qidirish"
+              title="Ism yoki telefon raqam bo'yicha qidirish"
+              aria-label="Ism yoki telefon raqam bo'yicha qidirish"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
             <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
           <CustomSelect
             value={statusFilter}
             onChange={setStatusFilter}
-            options={statuses.map(s => ({ value: s, label: s }))}
-            className="min-w-[120px]"
+            options={statuses}
+            className="min-w-[140px]"
           />
           <CustomSelect
             value={paidFilter}
@@ -190,7 +232,7 @@ const Applications = (): JSX.Element => {
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
             options={[
               { value: "all", label: "Barcha filiallar" },
-              ...fillialsList.map(f => ({ value: String(f.id), label: f.name }))
+              ...(Array.isArray(fillialsList) ? fillialsList : []).map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="min-w-[150px]"
           />
@@ -226,11 +268,13 @@ const Applications = (): JSX.Element => {
           value={String(pageSize)}
           onChange={(value) => setPageSize(Number(value))}
           options={[
-            { value: "5", label: "5 / page" },
-            { value: "10", label: "10 / page" },
-            { value: "25", label: "25 / page" }
+            { value: "5", label: "5 ta" },
+            { value: "10", label: "10 ta" },
+            { value: "25", label: "25 ta" },
+            { value: "50", label: "50 ta" },
+            { value: "100", label: "100 ta" }
           ]}
-          className="min-w-[110px]"
+          className="min-w-[120px]"
         />
         
         <button
@@ -464,14 +508,36 @@ const Applications = (): JSX.Element => {
             >
               {selected ? (
                 <div className="space-y-3">
-                  <div><strong className="text-gray-900 dark:text-white">To'liq ismi:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fullname}</span></div>
+                  <div>
+                    <strong className="text-gray-900 dark:text-white block mb-2">Ariza beruvchi:</strong>
+                    <AvatarName
+                      image={(selected as any).image ?? null}
+                      name={selected.fullname}
+                      subtitle={selected.passport ?? undefined}
+                      size="md"
+                    />
+                  </div>
                   <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.phone)}</span></div>
-                  <div><strong className="text-gray-900 dark:text-white">Pasport:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.passport ?? "-"}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">Tovarlar summasi:</strong> <span className="text-gray-700 dark:text-gray-300">{formatMoney(selected.amount)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov summasi:</strong> <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(selected.payment_amount || selected.amount)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov:</strong> {selected.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</div>
                   <div><strong className="text-gray-900 dark:text-white">Filial:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fillial?.name ?? "-"}</span></div>
-                  <div><strong className="text-gray-900 dark:text-white">Operator:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.user?.fullname ?? "-"}</span></div>
+                  {selected.user && (
+                    <>
+                      <div>
+                        <strong className="text-gray-900 dark:text-white block mb-2">Operator:</strong>
+                        <AvatarName
+                          image={(selected.user as any).image ?? null}
+                          name={selected.user.fullname}
+                          subtitle={`ID: ${selected.user.id}`}
+                          size="sm"
+                        />
+                      </div>
+                      {(selected.user as any).phone && (
+                        <div><strong className="text-gray-900 dark:text-white">Operator telefoni:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone((selected.user as any).phone)}</span></div>
+                      )}
+                    </>
+                  )}
                   <div><strong className="text-gray-900 dark:text-white">Holat:</strong> {(() => { const b = appStatusBadge(selected.status); return <span className={b.className}>{b.label}</span>; })()}</div>
                   <div>
                     <strong className="text-gray-900 dark:text-white">Mahsulotlar:</strong>
@@ -516,9 +582,7 @@ const Applications = (): JSX.Element => {
 
       <div className="mt-4 flex items-center justify-between">
         <div className="text-sm text-gray-600 dark:text-gray-400">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
-        <div className="flex items-center gap-2">
-          <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-        </div>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
       </div>
     </div>
   );

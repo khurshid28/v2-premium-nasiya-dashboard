@@ -1,5 +1,5 @@
 import React from "react";
-import api from "lib/mockApi";
+import api from "lib/api";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
 // formatShortMoney removed (unused in this view)
@@ -20,21 +20,38 @@ const Dashboard = (): JSX.Element => {
   const [approvedAmount, setApprovedAmount] = React.useState<number>(0);
   const [pendingCount, setPendingCount] = React.useState<number>(0);
   const [totalProducts, setTotalProducts] = React.useState<number>(0);
+  const [activeFilialsCount, setActiveFilialsCount] = React.useState<number>(0);
   const [search, setSearch] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
   const [selectedFillialId, setSelectedFillialId] = React.useState<number | "all">("all");
   const [selectedRegion, setSelectedRegion] = React.useState<string>("all");
+  const [selectedExpiredMonth, setSelectedExpiredMonth] = React.useState<number | "all">("all");
   // charts removed: barData, pieData, lineData
   // pagination state for fillial cards removed
 
   React.useEffect(() => {
     let mounted = true;
-  api.listFillials({ page: 1, pageSize: 100 }).then((res) => { if (!mounted) return; setFillials(res.items); });
-    return () => { mounted = false; };
+    const controller = new AbortController();
+    
+    api.listFillials({ page: 1, pageSize: 100 })
+      .then((res) => { 
+        if (!mounted) return; 
+        setFillials(res?.items || []); 
+      })
+      .catch((err) => {
+        if (!mounted || err.name === 'AbortError') return;
+        console.error("Failed to load fillials:", err);
+        setFillials([]);
+      });
+    
+    return () => { 
+      mounted = false; 
+      controller.abort();
+    };
   }, []);
 
-  // fetch global counts for dashboard widgets
+  // fetch global counts for dashboard widgets with filters applied
   React.useEffect(() => {
     let mounted = true;
     (async () => {
@@ -42,25 +59,109 @@ const Dashboard = (): JSX.Element => {
         const apps = await api.listApplications({ page: 1, pageSize: 10000 });
         const users = await api.listUsers({ page: 1, pageSize: 10000 });
         if (!mounted) return;
-        setApplicationsCount(apps.items.length);
-        setUsersCount(users.items.length);
-        const approved = apps.items.filter((a:any) => a.status === "APPROVED");
-        setApprovedAmount(approved.reduce((s:any, a:any) => s + (a.amount ?? 0), 0));
-        const pending = apps.items.filter((a:any) => a.status !== "APPROVED");
+
+        // Apply filters to applications
+        let filteredApps = apps?.items || [];
+        
+        // Ensure fillials is an array for filtering
+        const fillialsList = Array.isArray(fillials) ? fillials : [];
+
+        // Filter by date range
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          filteredApps = filteredApps.filter((a: any) => {
+            if (!a.createdAt) return false;
+            const appDate = new Date(a.createdAt);
+            return appDate >= start && appDate <= end;
+          });
+        }
+
+        // Filter by fillial
+        if (selectedFillialId !== "all") {
+          filteredApps = filteredApps.filter((a: any) => a.fillial_id === selectedFillialId);
+        } else if (selectedRegion !== "all") {
+          // Filter by region if no specific fillial is selected
+          const regionFillials = fillialsList.filter(f => f.region === selectedRegion);
+          const regionFillialIds = regionFillials.map(f => f.id);
+          filteredApps = filteredApps.filter((a: any) => regionFillialIds.includes(a.fillial_id));
+        }
+
+        // Filter by search (search in fillial names)
+        if (search.trim()) {
+          const searchLower = search.toLowerCase();
+          const matchingFillials = fillialsList.filter(f => 
+            f.name?.toLowerCase().includes(searchLower) || 
+            f.address?.toLowerCase().includes(searchLower)
+          );
+          const matchingFillialIds = matchingFillials.map(f => f.id);
+          filteredApps = filteredApps.filter((a: any) => matchingFillialIds.includes(a.fillial_id));
+        }
+
+        // Filter by expired month
+        if (selectedExpiredMonth !== "all") {
+          filteredApps = filteredApps.filter((a: any) => a.expired_month === selectedExpiredMonth);
+        }
+
+        // Filter users by fillial
+        let filteredUsers = users?.items || [];
+        if (selectedFillialId !== "all") {
+          filteredUsers = filteredUsers.filter((u: any) => u.fillial_id === selectedFillialId);
+        } else if (selectedRegion !== "all") {
+          const regionFillials = fillialsList.filter(f => f.region === selectedRegion);
+          const regionFillialIds = regionFillials.map(f => f.id);
+          filteredUsers = filteredUsers.filter((u: any) => regionFillialIds.includes(u.fillial_id));
+        }
+        if (search.trim()) {
+          const searchLower = search.toLowerCase();
+          const matchingFillials = fillialsList.filter(f => 
+            f.name?.toLowerCase().includes(searchLower) || 
+            f.address?.toLowerCase().includes(searchLower)
+          );
+          const matchingFillialIds = matchingFillials.map(f => f.id);
+          filteredUsers = filteredUsers.filter((u: any) => matchingFillialIds.includes(u.fillial_id));
+        }
+
+        // Filter fillials for count
+        let filteredFillials = fillialsList;
+        if (selectedRegion !== "all") {
+          filteredFillials = filteredFillials.filter(f => f.region === selectedRegion);
+        }
+        if (search.trim()) {
+          const searchLower = search.toLowerCase();
+          filteredFillials = filteredFillials.filter(f => 
+            f.name?.toLowerCase().includes(searchLower) || 
+            f.address?.toLowerCase().includes(searchLower)
+          );
+        }
+        if (selectedFillialId !== "all") {
+          filteredFillials = filteredFillials.filter(f => f.id === selectedFillialId);
+        }
+
+        // Calculate stats from filtered data
+        setApplicationsCount(filteredApps.length);
+        setUsersCount(filteredUsers.length);
+        setActiveFilialsCount(filteredFillials.length);
+        
+        const approved = filteredApps.filter((a: any) => a.status === "APPROVED");
+        setApprovedAmount(approved.reduce((s: any, a: any) => s + (a.amount ?? 0), 0));
+        
+        const pending = filteredApps.filter((a: any) => a.status !== "APPROVED");
         setPendingCount(pending.length);
-        // compute total products across all applications
-        const prodCount = apps.items.reduce((acc:any, a:any) => {
-          if (Array.isArray(a.products)) return acc + a.products.reduce((s:any, p:any) => s + (p.count ?? 1), 0);
+        
+        // compute total products across filtered applications
+        const prodCount = filteredApps.reduce((acc: any, a: any) => {
+          if (Array.isArray(a.products)) return acc + a.products.reduce((s: any, p: any) => s + (p.count ?? 1), 0);
           return acc;
         }, 0);
         setTotalProducts(prodCount);
-        // daily purchases and system health tracking removed (unused)
+
       } catch (e) {
-        // ignore for now
+        console.error("Error loading dashboard data:", e);
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth]);
 
   // metrics are provided by the reusable dashboard components in ./components
 
@@ -75,19 +176,40 @@ const Dashboard = (): JSX.Element => {
 
   const regions = React.useMemo(() => {
     const s = new Set<string>();
-    fillials.forEach((f) => { if (f.region) s.add(f.region); });
+    if (fillials && Array.isArray(fillials)) {
+      fillials.forEach((f) => { if (f.region) s.add(f.region); });
+    }
     return ["all", ...Array.from(s)];
   }, [fillials]);
 
+  const expiredMonths = React.useMemo(() => {
+    // Common month options for installment plans
+    return ["all", 3, 6, 9, 12, 18, 24, 36];
+  }, []);
+
   return (
     <div>
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold dark:text-white">Admin</h2>
-          <div className="text-sm text-gray-500 dark:text-gray-300">Asosiy ko'rsatkichlar va tizim holati</div>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold dark:text-white">Admin</h2>
+            <div className="text-sm text-gray-500 dark:text-gray-300">Asosiy ko'rsatkichlar va tizim holati</div>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Filial yoki manzil bo'yicha qidirish" className="rounded-md border border-gray-300 dark:border-gray-600 px-3 py-2 w-64 bg-white dark:bg-navy-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400" />
+        
+        {/* Filters row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative">
+            <input 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              placeholder="Filial yoki manzil bo'yicha qidirish" 
+              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-72 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
           <DateRangePicker startDate={startDate} endDate={endDate} onStartChange={setStartDate} onEndChange={setEndDate} />
           <CustomSelect
             value={selectedRegion}
@@ -96,49 +218,86 @@ const Dashboard = (): JSX.Element => {
               value: r, 
               label: r === "all" ? "Barcha hududlar" : r 
             }))}
-            className="min-w-[140px]"
+            className="min-w-[160px]"
           />
           <CustomSelect
             value={String(selectedFillialId)}
             onChange={(value) => { setSelectedFillialId(value === "all" ? "all" : Number(value)); }}
             options={[
               { value: "all", label: "Barcha filiallar" },
-              ...fillials.filter((f) => selectedRegion === "all" || f.region === selectedRegion).map((f) => ({ 
+              ...(Array.isArray(fillials) ? fillials : []).filter((f) => selectedRegion === "all" || f.region === selectedRegion).map((f) => ({ 
                 value: String(f.id), 
                 label: f.name 
               }))
             ]}
-            className="min-w-[150px]"
+            className="min-w-[160px]"
+          />
+          <CustomSelect
+            value={String(selectedExpiredMonth)}
+            onChange={(value) => { setSelectedExpiredMonth(value === "all" ? "all" : Number(value)); }}
+            options={expiredMonths.map(m => ({ 
+              value: String(m), 
+              label: m === "all" ? "Barcha muddatlar" : `${m} oy` 
+            }))}
+            className="min-w-[160px]"
           />
         </div>
       </div>
 
       {/* Widget grid (top) */}
     <div className="mt-3 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-3 3xl:grid-cols-6">
-    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Jami arizalar"} subtitle={String(applicationsCount)} />
-    <Widget icon={<IoDocuments className="h-6 w-6" />} title={"Tasdiqlangan summa"} subtitle={`${approvedAmount.toLocaleString()} UZS`} />
-    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Jami operatorlar"} subtitle={String(usersCount)} />
-    <Widget icon={<MdDashboard className="h-6 w-6" />} title={"Faol filiallar"} subtitle={String(fillials.length)} />
-    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Kutilayotgan arizalar"} subtitle={String(pendingCount)} />
-    <Widget icon={<IoMdHome className="h-6 w-6" />} title={"Jami mahsulotlar"} subtitle={String(totalProducts)} />
+    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Jami arizalar"} subtitle={String(applicationsCount || 0)} />
+    <Widget icon={<IoDocuments className="h-6 w-6" />} title={"Tasdiqlangan summa"} subtitle={`${(approvedAmount || 0).toLocaleString()} UZS`} />
+    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Jami operatorlar"} subtitle={String(usersCount || 0)} />
+    <Widget icon={<MdDashboard className="h-6 w-6" />} title={"Faol filiallar"} subtitle={String(activeFilialsCount || 0)} />
+    <Widget icon={<MdBarChart className="h-7 w-7" />} title={"Kutilayotgan arizalar"} subtitle={String(pendingCount || 0)} />
+    <Widget icon={<IoMdHome className="h-6 w-6" />} title={"Jami mahsulotlar"} subtitle={String(totalProducts || 0)} />
   </div>
 
-      {/* Top template cards */}
+      {/* Top template cards - Date filter NOT applied to charts */}
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 items-stretch auto-rows-min">
         <ErrorBoundary>
-          <TotalSpent />
+          <TotalSpent 
+            startDate="" 
+            endDate="" 
+            fillialId={selectedFillialId} 
+            region={selectedRegion}
+            search={search}
+            fillials={fillials}
+          />
         </ErrorBoundary>
 
         <ErrorBoundary>
-          <WeeklyRevenue />
+          <WeeklyRevenue 
+            startDate="" 
+            endDate="" 
+            fillialId={selectedFillialId} 
+            region={selectedRegion}
+            search={search}
+            fillials={fillials}
+          />
         </ErrorBoundary>
 
         <ErrorBoundary>
-          <PieChartCard />
+          <PieChartCard 
+            startDate="" 
+            endDate="" 
+            fillialId={selectedFillialId} 
+            region={selectedRegion}
+            search={search}
+            fillials={fillials}
+          />
         </ErrorBoundary>
 
         <ErrorBoundary>
-          <DailyTraffic />
+          <DailyTraffic 
+            startDate="" 
+            endDate="" 
+            fillialId={selectedFillialId} 
+            region={selectedRegion}
+            search={search}
+            fillials={fillials}
+          />
         </ErrorBoundary>
       </div>
 

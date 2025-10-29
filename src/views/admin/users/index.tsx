@@ -6,7 +6,7 @@ import AvatarName from "components/AvatarName";
 import Pagination from "components/pagination";
 import PasswordModal from "components/PasswordModal";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/mockApi";
+import api from "lib/api";
 import { formatPhone, statusBadge, formatDateShort } from "lib/formatters";
 import { exportSingleTable } from "lib/exportExcel";
 
@@ -31,8 +31,11 @@ const Users = (): JSX.Element => {
   const [search, setSearch] = React.useState("");
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [fillialFilter, setFillialFilter] = React.useState<number | "all">("all");
-  const [pageSize, setPageSize] = React.useState<number>(5);
+  
+  // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
+  const [pageSize, setPageSize] = React.useState<number>(10);
+  
   const [selected, setSelected] = React.useState<User | null>(null);
   const [open, setOpen] = React.useState(false);
   const [passwordOpen, setPasswordOpen] = React.useState(false);
@@ -41,27 +44,55 @@ const Users = (): JSX.Element => {
   const [toastOpen, setToastOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState("");
   const [toastType, setToastType] = React.useState<"main" | "success" | "error">("main");
-  const [total, setTotal] = React.useState<number>(0);
 
-  // roles removed — all mock users are USER
+  // Filter users
+  const filtered = React.useMemo(() => {
+    const s = search.trim().toLowerCase();
+    const usersList = Array.isArray(users) ? users : [];
+    return usersList.filter((u) => {
+      const matchesSearch = !s || 
+        u.fullname?.toLowerCase().includes(s) || 
+        u.phone?.toLowerCase().includes(s);
+      const matchesFillial = fillialFilter === "all" || u.fillial?.id === fillialFilter;
+      return matchesSearch && matchesFillial;
+    });
+  }, [users, search, fillialFilter]);
 
+  const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // Reset to page 1 when filters change
   React.useEffect(() => {
-    // Fetch page from mock API whenever paging, filters or search change
+    setPage(1);
+  }, [search, fillialFilter]);
+
+  // Paginate filtered data
+  const pageData = React.useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
+
+  React.useEffect(() => {
+    // Fetch all users from API
     let mounted = true;
     
+    console.log('Fetching users from API...');
     api
-      .listUsers({ page, pageSize, search, fillialId: fillialFilter })
+      .listUsers({})
       .then((res) => {
         if (!mounted) return;
-        setUsers(res.items);
-        setTotal(res.total);
+        console.log('Users response:', res);
+        setUsers(res.items || []);
       })
-      .catch(() => {
+      .catch((err) => {
         if (!mounted) return;
+        console.error("Error fetching users:", err);
+        console.error("Error details:", {
+          message: err.message,
+          status: err.status,
+          body: err.body
+        });
         setUsers([]);
-        setTotal(0);
       })
       .finally(() => {
         return;
@@ -70,18 +101,16 @@ const Users = (): JSX.Element => {
     return () => {
       mounted = false;
     };
-  }, [page, pageSize, search, fillialFilter]);
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
-    api.listFillials({ page: 1, pageSize: 100 }).then((res) => {
+    api.listFillials({}).then((res) => {
       if (!mounted) return;
-      setFillials(res.items);
+      setFillials(res.items || []);
     });
     return () => { mounted = false; };
   }, []);
-
-  const pageData = users;
 
   return (
     <div>
@@ -90,35 +119,43 @@ const Users = (): JSX.Element => {
           <h2 className="text-2xl font-semibold dark:text-white">Operatorlar</h2>
         </div>
           <div className="flex gap-3">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-10 rounded-md border border-gray-300 dark:border-gray-600 px-3 bg-white dark:bg-navy-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-            placeholder="Ism yoki telefon bo'yicha qidirish"
-          />
-          <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-10 rounded bg-green-600 hover:bg-green-700 px-3 text-white">Operator Qo'shish</button>
+          <div className="relative">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-4 pl-10 w-80 text-sm font-medium text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+              placeholder="Ism yoki telefon bo'yicha qidirish"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button onClick={() => { setEditInitial(null); setEditOpen(true); }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200">Operator Qo'shish</button>
           <CustomSelect
             value={String(fillialFilter)}
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
             options={[
               { value: "all", label: "Barcha filiallar" },
-              ...fillials.map(f => ({ value: String(f.id), label: f.name }))
+              ...(Array.isArray(fillials) ? fillials : []).map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="min-w-[150px]"
           />
+          
           <CustomSelect
             value={String(pageSize)}
             onChange={(value) => setPageSize(Number(value))}
             options={[
-              { value: "5", label: "5 / page" },
-              { value: "10", label: "10 / page" },
-              { value: "25", label: "25 / page" }
+              { value: "5", label: "5 ta" },
+              { value: "10", label: "10 ta" },
+              { value: "25", label: "25 ta" },
+              { value: "50", label: "50 ta" }
             ]}
-            className="min-w-[110px]"
+            className="min-w-[120px]"
           />
+          
           <button
             onClick={async () => {
-              const res = await api.listUsers({ page: 1, pageSize: 10000 });
+              const res = await api.listUsers({});
               const rows = (res.items ?? []).map((u: any) => ({
                 ID: u.id,
                 Fullname: u.fullname,
@@ -249,9 +286,8 @@ const Users = (): JSX.Element => {
                 } else {
                   await api.createUser(payload);
                 }
-                const res = await api.listUsers({ page, pageSize, search, fillialId: fillialFilter });
-                setUsers(res.items);
-                setTotal(res.total);
+                const res = await api.listUsers({});
+                setUsers(res.items || []);
                 setToastType("success");
                 setToastMessage("Saved");
                 setToastOpen(true);
@@ -269,13 +305,8 @@ const Users = (): JSX.Element => {
       </div>
 
       <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600">{`Showing ${pageData.length} of ${total} items`}</div>
-        <div className="flex items-center gap-2">
-          {/* Smart pagination component */}
-          <React.Suspense fallback={null}>
-            <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
-          </React.Suspense>
-        </div>
+        <div className="text-sm text-gray-600 dark:text-gray-400">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>
+        <Pagination page={page} totalPages={totalPages} onPageChange={(p) => setPage(p)} />
       </div>
   <Toast message={toastMessage} isOpen={toastOpen} onClose={() => setToastOpen(false)} type={toastType} />
     </div>

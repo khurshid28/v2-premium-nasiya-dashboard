@@ -36,18 +36,38 @@ class PieChart extends React.Component<ChartProps, ChartState> {
   render() {
     const minHeight = this.props.minHeight || 220;
     const heightProp = this.props.height || minHeight;
-    const safeSeries = Array.isArray(this.state.chartData) && this.state.chartData.length ? this.state.chartData : [0];
+
+    // Don't render until we have valid data and options
+    if (!this.state.chartData || !Array.isArray(this.state.chartData) || this.state.chartData.length === 0 || !this.state.chartOptions) {
+      return <div style={{ minHeight }} className="apexchart-wrapper" />;
+    }
+
+    // Ensure we have valid numeric values - pie charts need array of numbers
+    const safeSeries = this.state.chartData.map(val => {
+      const num = typeof val === 'number' ? val : 0;
+      return !isNaN(num) && isFinite(num) ? Math.max(0, num) : 0;
+    });
+    
+    // If all values are 0, show a minimal chart with placeholder data
+    const hasData = safeSeries.some(val => val > 0);
+    const finalSeries = hasData ? safeSeries : [100, 0, 0];
+
     const isDark = typeof window !== "undefined" && (document.documentElement.classList.contains("dark") || (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches));
     const mergedOptions = { ...(this.state.chartOptions || {}) };
     mergedOptions.chart = { ...(mergedOptions.chart || {}), background: "transparent" };
     mergedOptions.theme = { ...(mergedOptions.theme || {}), mode: isDark ? "dark" : "light" };
     mergedOptions.tooltip = { ...(mergedOptions.tooltip || {}), theme: isDark ? "dark" : "light" };
+    
+    // Ensure labels exist and match series length
+    if (!mergedOptions.labels || !Array.isArray(mergedOptions.labels) || mergedOptions.labels.length !== finalSeries.length) {
+      mergedOptions.labels = finalSeries.map((_, i) => `Item ${i + 1}`);
+    }
 
     return (
       <div style={{ minHeight }} className="apexchart-wrapper">
         <ReactApexChart
           options={mergedOptions}
-          series={safeSeries}
+          series={finalSeries}
           type="pie"
           width="100%"
           height={heightProp}
