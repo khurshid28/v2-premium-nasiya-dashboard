@@ -139,6 +139,13 @@ Server `http://localhost:3000` da ishga tushadi.
 Authorization: Bearer {access_token}
 ```
 
+#### Xatoliklar va Qayta Urinishlar
+
+API so'rovlari avtomatik qayta urinish mexanizmi bilan jihozlangan:
+- **Tarmoq xatoliklari**: Avtomatik 2 marta qayta urinadi (exponential backoff bilan)
+- **Xato xabarlari**: O'zbek tilida aniq xato xabarlari
+- **Xavfsizlik**: Barcha xato xabarlari foydalanuvchi uchun tushunarli formatda
+
 4. **Production build**
 ```bash
 npm run build

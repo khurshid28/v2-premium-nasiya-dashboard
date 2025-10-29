@@ -47,6 +47,40 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return body as T;
 }
 
+async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 2): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const res = await fetch(url, options);
+      return res;
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry if it's not a network error
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        // Network error - retry
+        if (i < retries) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+          continue;
+        }
+      }
+      
+      // If it's not a network error or we've exhausted retries, throw
+      break;
+    }
+  }
+  
+  // If we get here, all retries failed
+  const err = new Error(
+    `Server aloqasi o'rnatilmadi. Iltimos, internetingizni tekshiring yoki keyinroq qayta urinib ko'ring. ${lastError?.message || ''}`
+  );
+  // @ts-ignore
+  err.originalError = lastError;
+  throw err;
+}
+
 function qs(params?: Record<string, any>) {
   if (!params) return "";
   const q = new URLSearchParams();
@@ -61,7 +95,7 @@ function qs(params?: Record<string, any>) {
 
 // Auth
 export async function login(login: string, password: string): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const res = await fetchWithRetry(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ login, password }),
@@ -114,7 +148,7 @@ export async function listUsers(opts?: {
     params.fillialId = opts.fillialId;
   }
   const url = `${API_BASE}/user/all${qs(params)}`;
-  const res = await fetch(url, { 
+  const res = await fetchWithRetry(url, { 
     headers: { 
       "Content-Type": "application/json", 
       "Cache-Control": "no-cache",
@@ -125,12 +159,12 @@ export async function listUsers(opts?: {
 }
 
 export async function getUser(id: number): Promise<User> {
-  const res = await fetch(`${API_BASE}/user/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/user/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<User>(res);
 }
 
 export async function createUser(payload: Partial<User>): Promise<User> {
-  const res = await fetch(`${API_BASE}/user`, {
+  const res = await fetchWithRetry(`${API_BASE}/user`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -139,7 +173,7 @@ export async function createUser(payload: Partial<User>): Promise<User> {
 }
 
 export async function updateUser(id: number, payload: Partial<User>): Promise<User> {
-  const res = await fetch(`${API_BASE}/user/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/user/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -148,7 +182,7 @@ export async function updateUser(id: number, payload: Partial<User>): Promise<Us
 }
 
 export async function deleteUser(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/user/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/user/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json", ...authHeaders() },
   });
@@ -163,7 +197,7 @@ export async function listFillials(opts?: { page?: number; pageSize?: number; se
   if (opts?.search) params.search = opts.search;
   if (opts?.region) params.region = opts.region;
   const url = `${API_BASE}/fillial/all${qs(params)}`;
-  const res = await fetch(url, { 
+  const res = await fetchWithRetry(url, { 
     headers: { 
       "Content-Type": "application/json", 
       "Cache-Control": "no-cache",
@@ -174,12 +208,12 @@ export async function listFillials(opts?: { page?: number; pageSize?: number; se
 }
 
 export async function getFillial(id: number): Promise<Fillial> {
-  const res = await fetch(`${API_BASE}/fillial/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/fillial/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Fillial>(res);
 }
 
 export async function createFillial(payload: Partial<Fillial>): Promise<Fillial> {
-  const res = await fetch(`${API_BASE}/fillial`, {
+  const res = await fetchWithRetry(`${API_BASE}/fillial`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -188,7 +222,7 @@ export async function createFillial(payload: Partial<Fillial>): Promise<Fillial>
 }
 
 export async function updateFillial(id: number, payload: Partial<Fillial>): Promise<Fillial> {
-  const res = await fetch(`${API_BASE}/fillial/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/fillial/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -197,7 +231,7 @@ export async function updateFillial(id: number, payload: Partial<Fillial>): Prom
 }
 
 export async function deleteFillial(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/fillial/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/fillial/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json", ...authHeaders() },
   });
@@ -212,7 +246,7 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
   if (opts?.search) params.search = opts.search;
   if (opts?.status) params.status = opts.status;
   const url = `${API_BASE}/app/all${qs(params)}`;
-  const res = await fetch(url, { 
+  const res = await fetchWithRetry(url, { 
     headers: { 
       "Content-Type": "application/json", 
       "Cache-Control": "no-cache",
@@ -223,12 +257,12 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {
-  const res = await fetch(`${API_BASE}/app/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Zayavka>(res);
 }
 
 export async function createZayavka(payload: Partial<Zayavka>): Promise<Zayavka> {
-  const res = await fetch(`${API_BASE}/app`, {
+  const res = await fetchWithRetry(`${API_BASE}/app`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -237,7 +271,7 @@ export async function createZayavka(payload: Partial<Zayavka>): Promise<Zayavka>
 }
 
 export async function updateZayavka(id: number, payload: Partial<Zayavka>): Promise<Zayavka> {
-  const res = await fetch(`${API_BASE}/app/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -246,7 +280,7 @@ export async function updateZayavka(id: number, payload: Partial<Zayavka>): Prom
 }
 
 export async function deleteZayavka(id: number): Promise<void> {
-  const res = await fetch(`${API_BASE}/app/${id}`, {
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json", ...authHeaders() },
   });
