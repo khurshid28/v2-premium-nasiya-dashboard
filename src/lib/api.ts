@@ -86,7 +86,7 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
   const err = new Error(
     `Server aloqasi o'rnatilmadi. Iltimos, internetingizni tekshiring yoki keyinroq qayta urinib ko'ring. ${lastError?.message || ''}`
   ) as ApiError;
-  err.originalError = lastError;
+  err.originalError = lastError ?? undefined;
   throw err;
 }
 
