@@ -20,6 +20,13 @@ function authHeaders() {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Custom error type for API errors
+interface ApiError extends Error {
+  status?: number;
+  body?: any;
+  originalError?: Error;
+}
+
 async function handleResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   const contentType = res.headers.get("content-type") || "";
@@ -37,10 +44,8 @@ async function handleResponse<T>(res: Response): Promise<T> {
       errorMessage = res.statusText || "Request failed";
     }
     
-    const err = new Error(errorMessage);
-    // @ts-ignore
+    const err = new Error(errorMessage) as ApiError;
     err.status = res.status;
-    // @ts-ignore
     err.body = body;
     throw err;
   }
@@ -57,17 +62,19 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
     } catch (error) {
       lastError = error as Error;
       
-      // Don't retry if it's not a network error
-      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        // Network error - retry
-        if (i < retries) {
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
-          continue;
-        }
+      // Check if this is a network error (TypeError from fetch API)
+      const isNetworkError = error instanceof TypeError && 
+        (error.message.includes('Failed to fetch') || 
+         error.message.includes('NetworkError') ||
+         error.message.includes('Network request failed'));
+      
+      if (isNetworkError && i < retries) {
+        // Network error - retry with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+        continue;
       }
       
-      // If it's not a network error or we've exhausted retries, throw
+      // If it's not a network error or we've exhausted retries, break
       break;
     }
   }
@@ -75,9 +82,8 @@ async function fetchWithRetry(url: string, options: RequestInit = {}, retries = 
   // If we get here, all retries failed
   const err = new Error(
     `Server aloqasi o'rnatilmadi. Iltimos, internetingizni tekshiring yoki keyinroq qayta urinib ko'ring. ${lastError?.message || ''}`
-  );
-  // @ts-ignore
-  err.originalError = lastError;
+  ) as ApiError;
+  err.originalError = lastError || undefined;
   throw err;
 }
 
