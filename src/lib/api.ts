@@ -105,23 +105,36 @@ export async function listUsers(opts?: {
   role?: string;
   fillialId?: number | "all";
 }): Promise<Paginated<User>> {
-  const params: any = {};
-  if (opts?.page !== undefined) params.page = opts.page;
-  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
-  if (opts?.search) params.search = opts.search;
-  if (opts?.role) params.role = opts.role;
-  if (opts?.fillialId && opts.fillialId !== "all") {
-    params.fillialId = opts.fillialId;
+  try {
+    const params: any = {};
+    if (opts?.page !== undefined) params.page = opts.page;
+    if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+    if (opts?.search) params.search = opts.search;
+    if (opts?.role) params.role = opts.role;
+    if (opts?.fillialId && opts.fillialId !== "all") {
+      params.fillialId = opts.fillialId;
+    }
+    const url = `${API_BASE}/user/all${qs(params)}`;
+    console.log('Fetching users from:', url);
+    const res = await fetch(url, { 
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { 
+        "Content-Type": "application/json",
+        ...authHeaders() 
+      } 
+    });
+    console.log('Users fetch response status:', res.status);
+    const data = await handleResponse<any>(res);
+    // Backend returns array directly, not { items: [] }
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length } as Paginated<User>;
+    }
+    return data as Paginated<User>;
+  } catch (error) {
+    console.error('Users fetch error:', error);
+    throw new Error(`Failed to fetch users: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
-  const url = `${API_BASE}/user/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
-  });
-  return handleResponse<Paginated<User>>(res);
 }
 
 export async function getUser(id: number): Promise<User> {
@@ -157,20 +170,33 @@ export async function deleteUser(id: number): Promise<void> {
 
 // Fillials
 export async function listFillials(opts?: { page?: number; pageSize?: number; search?: string; region?: string }): Promise<Paginated<Fillial>> {
-  const params: any = {};
-  if (opts?.page !== undefined) params.page = opts.page;
-  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
-  if (opts?.search) params.search = opts.search;
-  if (opts?.region) params.region = opts.region;
-  const url = `${API_BASE}/fillial/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
-  });
-  return handleResponse<Paginated<Fillial>>(res);
+  try {
+    const params: any = {};
+    if (opts?.page !== undefined) params.page = opts.page;
+    if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+    if (opts?.search) params.search = opts.search;
+    if (opts?.region) params.region = opts.region;
+    const url = `${API_BASE}/fillial/all${qs(params)}`;
+    console.log('Fetching fillials from:', url);
+    const res = await fetch(url, { 
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { 
+        "Content-Type": "application/json",
+        ...authHeaders() 
+      } 
+    });
+    console.log('Fillials fetch response status:', res.status);
+    const data = await handleResponse<any>(res);
+    // Backend returns array directly, not { items: [] }
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length } as Paginated<Fillial>;
+    }
+    return data as Paginated<Fillial>;
+  } catch (error) {
+    console.error('Fillials fetch error:', error);
+    throw new Error(`Failed to fetch fillials: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function getFillial(id: number): Promise<Fillial> {
@@ -206,20 +232,33 @@ export async function deleteFillial(id: number): Promise<void> {
 
 // Zayavkalar (applications)
 export async function listZayavkalar(opts?: { page?: number; pageSize?: number; search?: string; status?: string }): Promise<Paginated<Zayavka>> {
-  const params: any = {};
-  if (opts?.page !== undefined) params.page = opts.page;
-  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
-  if (opts?.search) params.search = opts.search;
-  if (opts?.status) params.status = opts.status;
-  const url = `${API_BASE}/app/all${qs(params)}`;
-  const res = await fetch(url, { 
-    headers: { 
-      "Content-Type": "application/json", 
-      "Cache-Control": "no-cache",
-      ...authHeaders() 
-    } 
-  });
-  return handleResponse<Paginated<Zayavka>>(res);
+  try {
+    const params: any = {};
+    if (opts?.page !== undefined) params.page = opts.page;
+    if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+    if (opts?.search) params.search = opts.search;
+    if (opts?.status) params.status = opts.status;
+    const url = `${API_BASE}/app/all${qs(params)}`;
+    console.log('Fetching applications from:', url);
+    const res = await fetch(url, { 
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { 
+        "Content-Type": "application/json",
+        ...authHeaders() 
+      } 
+    });
+    console.log('Applications fetch response status:', res.status);
+    const data = await handleResponse<any>(res);
+    // Backend returns array directly, not { items: [] }
+    if (Array.isArray(data)) {
+      return { items: data, total: data.length } as Paginated<Zayavka>;
+    }
+    return data as Paginated<Zayavka>;
+  } catch (error) {
+    console.error('Applications fetch error:', error);
+    throw new Error(`Failed to fetch applications: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {

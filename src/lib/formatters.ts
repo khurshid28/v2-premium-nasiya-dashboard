@@ -67,32 +67,18 @@ export function isPending(status?: string | null): boolean {
 export function appStatusBadge(status?: string | null) {
   const s = (status ?? "").toUpperCase();
   
-  // Approved statuses
-  if (s === "CONFIRMED") return { label: "TASDIQLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
-  if (s === "FINISHED") return { label: "YAKUNLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
+  // Tugatilgan - Approved statuses
+  if (s === "CONFIRMED" || s === "FINISHED") {
+    return { label: "TUGATILGAN", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
+  }
   
-  // Rejected statuses
-  if (s === "CANCELED_BY_SCORING") return { label: "SCORING RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
-  if (s === "CANCELED_BY_CLIENT") return { label: "MIJOZ RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
-  if (s === "CANCELED_BY_DAILY") return { label: "DAILY RAD ETDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  // Rad qilingan - Rejected statuses
+  if (s.includes("CANCELED") || s === "SCORING RAD ETDI" || s === "DAILY RAD ETDI" || s.includes("RAD")) {
+    return { label: "RAD QILINDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
+  }
   
-  // Limit status
-  if (s === "LIMIT") return { label: "LIMIT BERILDI", className: "inline-flex items-center rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-800 dark:text-purple-300" };
-  
-  // Pending statuses
-  if (s === "CREATED") return { label: "YARATILDI", className: "inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300" };
-  if (s === "ADDED_DETAIL") return { label: "MA'LUMOT QO'SHILDI", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  if (s === "WAITING_SCORING") return { label: "SCORING KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  if (s === "ADDED_PRODUCT") return { label: "MAHSULOT QO'SHILDI", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  if (s === "WAITING_BANK_UPDATE") return { label: "BANK YANGILANISHI KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  if (s === "WAITING_BANK_CONFIRM") return { label: "BANK TASDIG'I KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  
-  // Old statuses for backward compatibility
-  if (s === "APPROVED") return { label: "TASDIQLANDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
-  if (s === "REJECTED") return { label: "RAD ETILDI", className: "inline-flex items-center rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300" };
-  if (s === "PENDING") return { label: "KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
-  
-  return { label: status ?? "-", className: "inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300" };
+  // Kutilmoqda - All other statuses (pending, waiting, etc)
+  return { label: "KUTILMOQDA", className: "inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300" };
 }
 
 export function formatDateNoSeconds(iso?: string | null) {
@@ -106,17 +92,44 @@ export function formatDateNoSeconds(iso?: string | null) {
   }
 }
 
+// 24-hour date formatter with Uzbek relative labels for today/yesterday
+// Rules:
+// - Today: "bugun HH:mm"
+// - Yesterday: "kecha HH:mm"
+// - Other: "Oct 19, 2025, 21:21"
 export function formatDate24Hour(iso?: string | null) {
   if (!iso) return "-";
   try {
     const d = new Date(iso);
-    // Custom format to ensure 24-hour time like "Oct 19, 2025, 21:21"
-    const month = d.toLocaleDateString('en-US', { month: 'short' });
-    const day = d.getDate();
-    const year = d.getFullYear();
+    const now = new Date();
+
+    // Get today's date at midnight
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Get yesterday's date at midnight
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Get the input date at midnight
+    const inputDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
     const hours = String(d.getHours()).padStart(2, '0');
     const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${month} ${day}, ${year}, ${hours}:${minutes}`;
+    const timeStr = `${hours}:${minutes}`;
+
+    if (inputDate.getTime() === today.getTime()) {
+      // Today: show time
+      return `Bugun ${timeStr}`;
+    } else if (inputDate.getTime() === yesterday.getTime()) {
+      // Yesterday: show label with time
+      return `Kecha ${timeStr}`;
+    } else {
+      // For other dates, use original format
+      const month = d.toLocaleDateString('en-US', { month: 'short' });
+      const day = d.getDate();
+      const year = d.getFullYear();
+      return `${month} ${day}, ${year}, ${timeStr}`;
+    }
   } catch (e) {
     return iso;
   }
@@ -134,3 +147,5 @@ export function formatDateShort(iso?: string | null) {
     return iso;
   }
 }
+
+// (Note) Only one export for formatDate24Hour must exist. Older duplicate removed above.

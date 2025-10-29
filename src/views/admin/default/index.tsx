@@ -143,10 +143,12 @@ const Dashboard = (): JSX.Element => {
         setUsersCount(filteredUsers.length);
         setActiveFilialsCount(filteredFillials.length);
         
-        const approved = filteredApps.filter((a: any) => a.status === "APPROVED");
+        // CONFIRMED or FINISHED are approved statuses
+        const approved = filteredApps.filter((a: any) => a.status === "CONFIRMED" || a.status === "FINISHED");
         setApprovedAmount(approved.reduce((s: any, a: any) => s + (a.amount ?? 0), 0));
         
-        const pending = filteredApps.filter((a: any) => a.status !== "APPROVED");
+        // Pending are all non-confirmed/finished statuses
+        const pending = filteredApps.filter((a: any) => a.status !== "CONFIRMED" && a.status !== "FINISHED");
         setPendingCount(pending.length);
         
         // compute total products across filtered applications

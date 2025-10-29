@@ -65,10 +65,9 @@ const Applications = (): JSX.Element => {
   const statuses = React.useMemo(() => {
     return [
       { value: "all", label: "Barcha holatlar" },
-      { value: "APPROVED", label: "Tasdiqlangan" },
-      { value: "REJECTED", label: "Rad etilgan" },
-      { value: "PENDING", label: "Kutilmoqda" },
-      { value: "CANCELED", label: "Bekor qilingan" }
+      { value: "CONFIRMED", label: "Tugatilgan" },
+      { value: "REJECTED", label: "Rad qilingan" },
+      { value: "PENDING", label: "Kutilmoqda" }
     ];
   }, []);
 
@@ -85,7 +84,15 @@ const Applications = (): JSX.Element => {
     api.listApplications({}).then((res) => {
       if (!mounted) return;
       console.log('Applications response:', res);
-      setApplications(res?.items || []);
+      const apps = res?.items || [];
+      console.log('Applications count:', apps.length);
+      if (apps.length > 0) {
+        const statuses = apps.map((a: any) => a.status);
+        console.log('Application statuses:', statuses);
+        const uniqueStatuses = [...new Set(statuses)];
+        console.log('Unique statuses:', uniqueStatuses);
+      }
+      setApplications(apps);
     }).catch((err) => {
       if (!mounted) return;
       console.error("Error fetching applications:", err);
@@ -128,7 +135,25 @@ const Applications = (): JSX.Element => {
       const phone = (a.phone ?? "").toLowerCase();
       const passport = (a.passport ?? "").toLowerCase();
       const matchesSearch = !s || fullname.includes(s) || phone.includes(s) || passport.includes(s);
-      const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+      
+      // Status filter with category matching
+      let matchesStatus = true;
+      if (statusFilter !== "all") {
+        const st = (a.status ?? "").toUpperCase();
+        if (statusFilter === "CONFIRMED") {
+          // Tugatilgan: CONFIRMED or FINISHED
+          matchesStatus = st === "CONFIRMED" || st === "FINISHED";
+        } else if (statusFilter === "REJECTED") {
+          // Rad qilingan: all CANCELED_ statuses
+          matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI";
+        } else if (statusFilter === "PENDING") {
+          // Kutilmoqda: CREATED, ADDED_DETAIL, WAITING_, etc
+          matchesStatus = st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || st === "ADDED_PRODUCT" || st === "LIMIT" || st === "PENDING";
+        } else {
+          matchesStatus = a.status === statusFilter;
+        }
+      }
+      
   const matchesPaid = paidFilter === "all" || (paidFilter === "paid" ? a.paid === true : a.paid === false || a.paid == null);
       const matchesFillial = fillialFilter === "all" || a.fillial_id === Number(fillialFilter);
       // region may be stored on the fillial object; lookup in fillialsList
@@ -155,8 +180,8 @@ const Applications = (): JSX.Element => {
   const stats = React.useMemo(() => {
     const items = filtered;
     const totalCount = items.length;
-    // Per request: for amount stats only include APPROVED applications
-    const approvedItems = items.filter((a) => a.status === "APPROVED");
+    // For amount stats include CONFIRMED or FINISHED applications
+    const approvedItems = items.filter((a) => a.status === "CONFIRMED" || a.status === "FINISHED");
     const approvedAmount = approvedItems.reduce((s, a) => s + (a.amount ?? 0), 0);
     const approvedPaidAmount = approvedItems.filter((a) => a.paid).reduce((s, a) => s + (a.amount ?? 0), 0);
     const approvedUnpaidAmount = approvedAmount - approvedPaidAmount;
