@@ -280,7 +280,7 @@ export async function listFillials(opts?: { page?: number; pageSize?: number; se
 }
 
 export async function getFillial(id: number): Promise<Fillial> {
-  const res = await fetchWithRetry(`${API_BASE}/fillial/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/fillial/${id}?include=merchant,users`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Fillial>(res);
 }
 
@@ -348,7 +348,7 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {
-  const res = await fetchWithRetry(`${API_BASE}/app/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Zayavka>(res);
 }
 

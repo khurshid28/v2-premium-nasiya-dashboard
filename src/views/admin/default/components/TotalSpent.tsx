@@ -19,6 +19,7 @@ interface TotalSpentProps {
   region?: string;
   search?: string;
   fillials?: any[];
+  expiredMonth?: number | "all";
 }
 
 const TotalSpent: React.FC<TotalSpentProps> = ({ 
@@ -27,7 +28,8 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
   fillialId = "all", 
   region = "all",
   search = "",
-  fillials = []
+  fillials = [],
+  expiredMonth = "all"
 }) => {
   const [totalData, setTotalData] = React.useState({
     count: 0,
@@ -79,6 +81,11 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
           applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+        }
+
+        // Filter by expired month
+        if (expiredMonth !== "all") {
+          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
         }
         
         // Calculate total count and amount for current period
@@ -214,7 +221,7 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
     };
 
     loadTotalData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials]);
+  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
   return (
     <Card extra="!p-[20px] text-center">
       <div className="flex justify-between">

@@ -5,7 +5,7 @@ import api from "lib/api";
 import { exportSingleTable } from "lib/exportExcel";
 import { formatPhone } from "lib/formatters";
 import Pagination from "components/pagination";
-import Toast from "components/toast/Toast";
+import Toast from "components/toast/ToastNew";
 import CustomSelect from "components/dropdown/CustomSelect";
 
 // Assumed Prisma model fields for Fillial/Branch. If your schema uses different names,
@@ -53,10 +53,11 @@ const Fillials = (): JSX.Element => {
   const [selected, setSelected] = React.useState<Fillial | null>(null);
   const [open, setOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
+  const [detailLoading, setDetailLoading] = React.useState(false);
   const [editInitial, setEditInitial] = React.useState<any>(null);
   const [toastOpen, setToastOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState("");
-  const [toastType, setToastType] = React.useState<"main" | "success" | "error">("main");
+  const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   // Create a ref to store the latest abort controller
   const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -318,9 +319,27 @@ const Fillials = (): JSX.Element => {
               <tr
                 key={row.id}
                 className="border-t border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-700"
-                onClick={() => {
-                  setSelected(row);
-                  setOpen(true);
+                onClick={async () => {
+                  try {
+                    setDetailLoading(true);
+                    // Fetch complete fillial data with all relations
+                    const fullFillial = await api.getFillial(row.id);
+                    console.log('Full fillial data:', fullFillial);
+                    setSelected(fullFillial);
+                    setOpen(true);
+                  } catch (err) {
+                    console.error("Error fetching fillial details:", err);
+                    // Show error message to user
+                    setToastType("error");
+                    setToastMessage("Filial tafsilotlarini yuklashda xatolik yuz berdi");
+                    setToastType('error');
+                    setToastOpen(true);
+                    // Fallback to existing data if API call fails
+                    setSelected(row);
+                    setOpen(true);
+                  } finally {
+                    setDetailLoading(false);
+                  }
                 }}
               >
                 <td className="px-6 py-3">{row.id}</td>
@@ -366,31 +385,113 @@ const Fillials = (): JSX.Element => {
                 setSelected(null);
               }}
             >
-      {selected ? (
+      {detailLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+          <span className="ml-3 text-gray-600 dark:text-gray-400">Ma'lumotlar yuklanmoqda...</span>
+        </div>
+      ) : selected ? (
         <div className="space-y-2">
                     <div className="flex items-start gap-4">
                       {selected.image ? (
                         <img src={selected.image} alt={selected.name} className="h-20 w-20 rounded object-cover" />
                       ) : null}
-                      <div>
-                        <div><strong className="text-gray-700 dark:text-gray-300">Hudud:</strong> <span className="text-gray-900 dark:text-white">{selected.region ?? "-"}</span></div>
+                      <div className="flex-1">
+                        <div><strong className="text-gray-900 dark:text-white">Hudud:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.region ?? "-"}</span></div>
+                        <div><strong className="text-gray-900 dark:text-white">Manzil:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.address ?? "-"}</span></div>
                       </div>
                     </div>
-                    <div><strong className="text-gray-700 dark:text-gray-300">Direktor:</strong> <span className="text-gray-900 dark:text-white">{selected.director_name ?? "-"} ({formatPhone(selected.director_phone)})</span></div>
-                    <div><strong className="text-gray-700 dark:text-gray-300">Bank:</strong> <span className="text-gray-900 dark:text-white">{selected.bank_name ?? "-"} {selected.mfo ? `MFO:${selected.mfo}` : ""}</span></div>
-                    <div><strong className="text-gray-700 dark:text-gray-300">Hisob raqam:</strong> <span className="text-gray-900 dark:text-white">{selected.hisob_raqam ?? "-"}</span></div>
-                    <div><strong className="text-gray-700 dark:text-gray-300">NDS:</strong> <span className="text-gray-900 dark:text-white">{selected.nds ?? "-"}</span></div>
+                    
+                    {/* Director info */}
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Direktor ma'lumotlari</h4>
+                      <div><strong className="text-gray-900 dark:text-white">Ism-familiya:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.director_name ?? "-"}</span></div>
+                      <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.director_phone)}</span></div>
+                    </div>
+                    
+                    {/* Financial info */}
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Moliyaviy ma'lumotlar</h4>
+                      <div><strong className="text-gray-900 dark:text-white">Bank:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.bank_name ?? "-"}</span></div>
+                      <div><strong className="text-gray-900 dark:text-white">MFO:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.mfo ?? "-"}</span></div>
+                      <div><strong className="text-gray-900 dark:text-white">Hisob raqam:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.hisob_raqam ?? "-"}</span></div>
+                      <div><strong className="text-gray-900 dark:text-white">INN:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.inn ?? "-"}</span></div>
+                      <div><strong className="text-gray-900 dark:text-white">NDS:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.nds ?? "-"}</span></div>
+                    </div>
+
+                    {/* Expired months */}
+                    {selected.expired_months && Array.isArray(selected.expired_months) && selected.expired_months.length > 0 && (
+                      <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Muddatli to'lov rejalari</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {selected.expired_months.map((item: any, index: number) => (
+                            <div 
+                              key={index} 
+                              className={`p-3 rounded-lg border ${
+                                item.active 
+                                  ? 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20' 
+                                  : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/20'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-medium text-gray-900 dark:text-white">
+                                  {item.month} oy
+                                </span>
+                                <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                  item.active 
+                                    ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
+                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                }`}>
+                                  {item.active ? 'Aktiv' : 'Nofaol'}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                Foiz: <span className="font-medium text-gray-900 dark:text-white">{item.percent}%</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Merchant info */}
+                    {selected.merchant && (
+                      <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Merchant ma'lumotlari</h4>
+                        <div><strong className="text-gray-900 dark:text-white">Nomi:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.merchant.name}</span></div>
+                        <div><strong className="text-gray-900 dark:text-white">ID:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.merchant.id}</span></div>
+                      </div>
+                    )}
+
+                    {/* Status and dates */}
+                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Holat va sana</h4>
+                      <div><strong className="text-gray-900 dark:text-white">Ish holati:</strong> 
+                        {selected.work_status === "WORKING" ? (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-green-100 dark:bg-green-800 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-100">Ishlaydi</span>
+                        ) : selected.work_status === "BLOCKED" ? (
+                          <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-800 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-100">Bloklangan</span>
+                        ) : (
+                          <span className="ml-2 text-gray-700 dark:text-gray-300">{selected.work_status ?? "-"}</span>
+                        )}
+                      </div>
+                      <div><strong className="text-gray-900 dark:text-white">Yaratilgan:</strong> 
+                        <span className="text-gray-700 dark:text-gray-300 ml-2">
+                          {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('en-GB') : "-"}
+                        </span>
+                      </div>
+                    </div>
                     <div className="mt-4 flex gap-2">
                       <button
                         className="rounded bg-gray-200 dark:bg-gray-600 px-3 py-1 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-500"
                         onClick={() => {
                           const payload = `Nomi: ${selected.name}\nManzil: ${selected.address ?? "-"}\nHudud: ${selected.region ?? "-"}\nNDS: ${selected.nds ?? "-"}\nHisob raqam: ${selected.hisob_raqam ?? "-"}\nBank: ${selected.bank_name ?? "-"} ${selected.mfo ? `MFO:${selected.mfo}` : ""}\nINN: ${selected.inn ?? "-"}\nDirektor: ${selected.director_name ?? "-"} (${selected.director_phone ?? "-"})`;
                           navigator.clipboard.writeText(payload).then(() => {
-                            setToastType("main");
+                            setToastType('success');
                             setToastMessage("Ma'lumotlar clipboard'ga ko'chirildi");
                             setToastOpen(true);
                           }).catch(() => {
-                            setToastType("error");
+                            setToastType('error');
                             setToastMessage("Ko'chirishda xatolik");
                             setToastOpen(true);
                           });
@@ -401,7 +502,11 @@ const Fillials = (): JSX.Element => {
                       <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { setEditInitial(selected); setEditOpen(true); }}>Tahrirlash</button>
                     </div>
                   </div>
-              ) : null}
+              ) : (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  Ma'lumot topilmadi
+                </div>
+              )}
             </DetailModal>
             <EditModal
               isOpen={editOpen}

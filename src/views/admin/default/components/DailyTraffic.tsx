@@ -13,6 +13,7 @@ interface DailyTrafficProps {
   region?: string;
   search?: string;
   fillials?: any[];
+  expiredMonth?: number | "all";
 }
 
 const DailyTraffic: React.FC<DailyTrafficProps> = ({ 
@@ -21,7 +22,8 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
   fillialId = "all", 
   region = "all",
   search = "",
-  fillials = []
+  fillials = [],
+  expiredMonth = "all"
 }) => {
   const [chartData, setChartData] = React.useState<any[]>([]);
   const [dailyAmount, setDailyAmount] = React.useState(0);
@@ -64,7 +66,14 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
           applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
-        }        // Get today's approved applications
+        }
+
+        // Filter by expired month
+        if (expiredMonth !== "all") {
+          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+        }
+        
+        // Get today's approved applications
         const today = new Date();
         const todayApprovedApps = applications.filter(app => {
           if (!app.createdAt || !isApproved(app.status)) return false;
@@ -132,7 +141,7 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
     };
 
     loadDailyData();
-  }, [startDate, endDate, fillialId, region, search, fillials]);
+  }, [startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
   return (
     <Card extra="pb-7 p-[20px]">
       <div className="flex flex-row justify-between">

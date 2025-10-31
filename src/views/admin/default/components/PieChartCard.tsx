@@ -4,7 +4,7 @@ import { pieChartOptions } from "variables/charts";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
 import api from "lib/api";
-import { isApproved, isRejected, isPending } from "lib/formatters";
+import { isApproved, isConfirmed, isRejected, isPending } from "lib/formatters";
 
 interface PieChartCardProps {
   startDate?: string;
@@ -13,6 +13,7 @@ interface PieChartCardProps {
   region?: string;
   search?: string;
   fillials?: any[];
+  expiredMonth?: number | "all";
 }
 
 const PieChartCard: React.FC<PieChartCardProps> = ({ 
@@ -21,13 +22,14 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
   fillialId = "all", 
   region = "all",
   search = "",
-  fillials = []
+  fillials = [],
+  expiredMonth = "all"
 }) => {
-  const [timePeriod, setTimePeriod] = React.useState("monthly");
+  const [timePeriod, setTimePeriod] = React.useState("daily");
   const [statusDistribution, setStatusDistribution] = React.useState({
     approved: 0,
-    rejected: 0,
     pending: 0,
+    rejected: 0,
     total: 0
   });
   const [loading, setLoading] = React.useState(true);
@@ -69,6 +71,11 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
           const matchingFillialIds = matchingFillials.map(f => f.id);
           applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
         }
+
+        // Filter by expired month
+        if (expiredMonth !== "all") {
+          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+        }
         
         // Filter by time period
         const now = new Date();
@@ -77,6 +84,11 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
           const createdDate = new Date(app.createdAt);
           
           switch (timePeriod) {
+            case "daily":
+              const today = new Date();
+              const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+              const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+              return createdDate >= todayStart && createdDate < todayEnd;
             case "weekly":
               const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
               return createdDate >= weekAgo;
@@ -92,9 +104,9 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         });
         
         const counts = {
-          approved: filtered.filter(app => isApproved(app.status)).length,
-          rejected: filtered.filter(app => isRejected(app.status)).length,
+          approved: filtered.filter(app => isApproved(app.status) || isConfirmed(app.status)).length,
           pending: filtered.filter(app => isPending(app.status)).length,
+          rejected: filtered.filter(app => isRejected(app.status)).length,
           total: filtered.length
         };
         
@@ -114,7 +126,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
     };
 
     loadStatusData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials]);
+  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
 
   const approvedPercent = statusDistribution.total > 0 
     ? Math.round((statusDistribution.approved / statusDistribution.total) * 100) 
@@ -126,20 +138,20 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
     ? Math.round((statusDistribution.pending / statusDistribution.total) * 100) 
     : 0;
 
-  // Create dynamic chart data with Rejected, Approved, and Pending
+  // Create dynamic chart data with 3 statuses: Rejected, Approved, Pending
   const dynamicChartData = [rejectedPercent, approvedPercent, pendingPercent];
   
   // Ensure we have valid data - if all are 0, show placeholder data
   const hasValidData = dynamicChartData.some(val => val > 0);
-  const safeChartData = hasValidData ? dynamicChartData : [100, 0, 0];
+  const safeChartData = hasValidData ? dynamicChartData : [33, 33, 34];
   
   const dynamicChartOptions = {
     ...pieChartOptions,
-    labels: ["Rad etilgan", "Tasdiqlangan", "Kutilayotgan"],
+    labels: ["Rad qilingan", "Tugatilgan", "Kutilmoqda"],
     colors: ["#EF4444", "#10B981", "#F59E0B"], // Red, Green, Yellow
     fill: {
       ...pieChartOptions.fill,
-      colors: ["#EF4444", "#10B981", "#F59E0B"] // Override fill colors too
+      colors: ["#EF4444", "#10B981", "#F59E0B"] // Match with colors array
     },
     // Add safety options for chart rendering
     chart: {
@@ -164,6 +176,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
             value={timePeriod}
             onChange={setTimePeriod}
             options={[
+              { value: "daily", label: "Kunlik" },
               { value: "weekly", label: "Haftalik" },
               { value: "monthly", label: "Oylik" },
               { value: "yearly", label: "Yillik" }
@@ -191,13 +204,13 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
           </div>
         )}
       </div>
-      <div className="flex flex-row !justify-between rounded-2xl px-6 py-3 shadow-2xl shadow-shadow-500 dark:!bg-navy-700 dark:shadow-none">
+      <div className="flex flex-row !justify-between rounded-2xl px-2 py-3 shadow-2xl shadow-shadow-500 dark:!bg-navy-700 dark:shadow-none">
         <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-red-500" />
-            <p className="ml-1 text-sm font-normal text-gray-600 dark:text-gray-300">Rad etilgan</p>
+            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Rad qilingan</p>
           </div>
-          <p className="mt-px text-xl font-bold text-navy-700 dark:text-white">
+          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
             {rejectedPercent}%
           </p>
         </div>
@@ -207,9 +220,9 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-green-500" />
-            <p className="ml-1 text-sm font-normal text-gray-600 dark:text-gray-300">Tasdiqlangan</p>
+            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Tugatilgan</p>
           </div>
-          <p className="mt-px text-xl font-bold text-navy-700  dark:text-white">
+          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
             {approvedPercent}%
           </p>
         </div>
@@ -219,9 +232,9 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
             <div className="h-2 w-2 rounded-full bg-yellow-500" />
-            <p className="ml-1 text-sm font-normal text-gray-600 dark:text-gray-300">Kutilayotgan</p>
+            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Kutilmoqda</p>
           </div>
-          <p className="mt-px text-xl font-bold text-navy-700 dark:text-white">
+          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
             {pendingPercent}%
           </p>
         </div>

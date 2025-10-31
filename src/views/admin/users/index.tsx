@@ -1,6 +1,6 @@
 import React from "react";
 import DetailModal from "components/modal/DetailModalNew";
-import Toast from "components/toast/Toast";
+import Toast from "components/toast/ToastNew";
 import EditModal from "components/modal/EditModal";
 import AvatarName from "components/AvatarName";
 import Pagination from "components/pagination";
@@ -43,7 +43,7 @@ const Users = (): JSX.Element => {
   const [editInitial, setEditInitial] = React.useState<any>(null);
   const [toastOpen, setToastOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState("");
-  const [toastType, setToastType] = React.useState<"main" | "success" | "error">("main");
+  const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   // Filter users
   const filtered = React.useMemo(() => {
@@ -230,12 +230,12 @@ const Users = (): JSX.Element => {
                           .writeText(payload)
                           .then(() => {
                             // Show fullname, login (phone), fillial and password in the toast on separate lines (demo only)
-                            setToastType("main");
+                            setToastType('success');
                             setToastMessage(payload);
                             setToastOpen(true);
                           })
                           .catch(() => {
-                            setToastType("error");
+                            setToastType('error');
                             setToastMessage(`Copy failed for ${u.fullname}\nLogin: ${u.phone ?? "-"}`);
                             setToastOpen(true);
                           });
@@ -276,7 +276,7 @@ const Users = (): JSX.Element => {
             <PasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} onSave={async (newPassword) => {
               if (!selected) return;
               await api.updateUser(selected.id, { password: newPassword });
-              setToastType("success");
+              setToastType('success');
               setToastMessage("Password updated");
               setToastOpen(true);
             }} />
@@ -293,7 +293,7 @@ const Users = (): JSX.Element => {
                 }
                 const res = await api.listUsers({});
                 setUsers(res.items || []);
-                setToastType("success");
+                setToastType('success');
                 setToastMessage("Saved");
                 setToastOpen(true);
               }}

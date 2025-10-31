@@ -12,6 +12,7 @@ import Widget from "components/widget/Widget";
 import { MdBarChart, MdDashboard } from "react-icons/md";
 import { IoDocuments } from "react-icons/io5";
 import { IoMdHome } from "react-icons/io";
+import { isApproved, isPending } from "lib/formatters";
 
 const Dashboard = (): JSX.Element => {
   const [fillials, setFillials] = React.useState<any[]>([]);
@@ -108,7 +109,16 @@ const Dashboard = (): JSX.Element => {
 
         // Filter by expired month
         if (selectedExpiredMonth !== "all") {
-          filteredApps = filteredApps.filter((a: any) => a.expired_month === selectedExpiredMonth);
+          console.log(`DEBUG: Filtering by expired month: ${selectedExpiredMonth}`);
+          console.log(`DEBUG: Before month filter: ${filteredApps.length} apps`);
+          // Log first few apps' expired_month values for debugging
+          const sampleApps = filteredApps.slice(0, 5);
+          console.log(`DEBUG: Sample expired_month values:`, sampleApps.map(a => ({ id: a.id, expired_month: a.expired_month })));
+          const monthlyApps = filteredApps.filter((a: any) => a.expired_month && a.expired_month === String(selectedExpiredMonth));
+          console.log(`DEBUG: After month filter: ${monthlyApps.length} apps`);
+          filteredApps = monthlyApps;
+        } else {
+          console.log(`DEBUG: No month filter applied, ${filteredApps.length} apps`);
         }
 
         // Filter users by fillial
@@ -151,12 +161,12 @@ const Dashboard = (): JSX.Element => {
         setUsersCount(filteredUsers.length);
         setActiveFilialsCount(filteredFillials.length);
         
-        // CONFIRMED or FINISHED are approved statuses
-        const approved = filteredApps.filter((a: any) => a.status === "CONFIRMED" || a.status === "FINISHED");
+        // Calculate approved amount from FINISHED apps only
+        const approved = filteredApps.filter((a: any) => isApproved(a.status));
         setApprovedAmount(approved.reduce((s: any, a: any) => s + (a.amount ?? 0), 0));
         
-        // Pending are all non-confirmed/finished statuses
-        const pending = filteredApps.filter((a: any) => a.status !== "CONFIRMED" && a.status !== "FINISHED");
+        // Pending are apps that are not approved, not confirmed, not rejected, not limit
+        const pending = filteredApps.filter((a: any) => isPending(a.status));
         setPendingCount(pending.length);
         
         // compute total products across filtered applications
@@ -202,8 +212,8 @@ const Dashboard = (): JSX.Element => {
   }, [fillials]);
 
   const expiredMonths = React.useMemo(() => {
-    // Common month options for installment plans
-    return ["all", 3, 6, 9, 12, 18, 24, 36];
+    // Only 3, 6, 9, 12 months allowed
+    return ["all", 3, 6, 9, 12];
   }, []);
 
   return (
@@ -283,6 +293,7 @@ const Dashboard = (): JSX.Element => {
             region={selectedRegion}
             search={search}
             fillials={fillials}
+            expiredMonth={selectedExpiredMonth}
           />
         </ErrorBoundary>
 
@@ -294,6 +305,7 @@ const Dashboard = (): JSX.Element => {
             region={selectedRegion}
             search={search}
             fillials={fillials}
+            expiredMonth={selectedExpiredMonth}
           />
         </ErrorBoundary>
 
@@ -305,6 +317,7 @@ const Dashboard = (): JSX.Element => {
             region={selectedRegion}
             search={search}
             fillials={fillials}
+            expiredMonth={selectedExpiredMonth}
           />
         </ErrorBoundary>
 
@@ -316,6 +329,7 @@ const Dashboard = (): JSX.Element => {
             region={selectedRegion}
             search={search}
             fillials={fillials}
+            expiredMonth={selectedExpiredMonth}
           />
         </ErrorBoundary>
       </div>

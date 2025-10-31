@@ -54,6 +54,7 @@ const Applications = (): JSX.Element => {
   const [endDate, setEndDate] = React.useState<string>("");
   const [selected, setSelected] = React.useState<Application | null>(null);
   const [open, setOpen] = React.useState(false);
+  const [detailLoading, setDetailLoading] = React.useState(false);
   
   // Client-side pagination state
   const [page, setPage] = React.useState<number>(1);
@@ -62,6 +63,10 @@ const Applications = (): JSX.Element => {
   // Toast state
   const [toastMessage, setToastMessage] = React.useState<string>("");
   const [toastOpen, setToastOpen] = React.useState<boolean>(false);
+  const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
+  
+  // Download loading state
+  const [downloadLoading, setDownloadLoading] = React.useState<{[key: string]: boolean}>({});
   
   const SLIDER_MIN = 0;
   const SLIDER_MAX = 50000000; // 50 million UZS
@@ -70,7 +75,8 @@ const Applications = (): JSX.Element => {
   const statuses = React.useMemo(() => {
     return [
       { value: "all", label: "Barcha holatlar" },
-      { value: "CONFIRMED", label: "Tugatilgan" },
+      { value: "CONFIRMED", label: "Tasdiqlangan" },
+      { value: "FINISHED", label: "Tugatilgan" },
       { value: "PENDING", label: "Kutilmoqda" },
       { value: "REJECTED", label: "Rad qilingan" },
       { value: "LIMIT", label: "Limit" }
@@ -153,26 +159,56 @@ const Applications = (): JSX.Element => {
       let matchesStatus = true;
       if (statusFilter !== "all") {
         const st = (a.status ?? "").toUpperCase();
+        
         if (statusFilter === "CONFIRMED") {
-          // Tugatilgan: CONFIRMED, FINISHED, COMPLETED, ACTIVE
-          matchesStatus = st === "CONFIRMED" || st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+          // Tasdiqlangan: faqat CONFIRMED status
+          matchesStatus = st === "CONFIRMED";
+          console.log(`DEBUG: Ariza ${a.id} (${st}) CONFIRMED filterida: ${matchesStatus}`);
+        } else if (statusFilter === "FINISHED") {
+          // Tugatilgan: FINISHED, COMPLETED, ACTIVE statuslari
+          matchesStatus = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+          console.log(`DEBUG: Ariza ${a.id} (${st}) FINISHED filterida: ${matchesStatus}`);
         } else if (statusFilter === "REJECTED") {
-          // Rad qilingan: all CANCELED_ statuses, REJECTED, SCORING
-          matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || st === "REJECTED" || st.includes("RAD") || st.includes("SCORING");
+          // Rad qilingan: all rejection statuses - more precise matching
+          matchesStatus = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || 
+                         st === "REJECTED" || st.includes("RAD") || st.includes("SCORING") ||
+                         st === "DECLINED" || st === "REFUSED";
+          console.log(`DEBUG: Ariza ${a.id} (${st}) REJECTED filterida: ${matchesStatus}`);
         } else if (statusFilter === "LIMIT") {
           // Limit: LIMIT statuses
           matchesStatus = st === "LIMIT" || st.includes("LIMIT");
         } else if (statusFilter === "PENDING") {
-          // Kutilmoqda: CREATED, ADDED_DETAIL, WAITING_, etc (excluding LIMIT and others)
-          matchesStatus = st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || st === "ADDED_PRODUCT" || st === "PENDING" || 
-                         (!st.includes("CANCELED") && st !== "CONFIRMED" && st !== "FINISHED" && st !== "COMPLETED" && st !== "ACTIVE" && 
-                          st !== "REJECTED" && st !== "LIMIT" && !st.includes("RAD"));
+          // Kutilmoqda: only truly pending statuses, exclude confirmed/finished/rejected
+          const isConfirmed = st === "CONFIRMED";
+          const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+          const isRejected = st.includes("CANCELED") || st === "SCORING RAD ETDI" || st === "DAILY RAD ETDI" || 
+                            st === "REJECTED" || st.includes("RAD") || st.includes("SCORING") ||
+                            st === "DECLINED" || st === "REFUSED";
+          
+          // Only truly pending if not in other categories
+          matchesStatus = !isConfirmed && !isFinished && !isRejected && 
+                         (st === "CREATED" || st === "ADDED_DETAIL" || st.includes("WAITING") || 
+                          st === "ADDED_PRODUCT" || st === "PENDING" || st === "NEW" || st === "PROCESSING");
+          console.log(`DEBUG: Ariza ${a.id} (${st}) PENDING filterida: ${matchesStatus} (confirmed:${isConfirmed}, finished:${isFinished}, rejected:${isRejected})`);
         } else {
           matchesStatus = a.status === statusFilter;
         }
       }
       
-  const matchesPaid = paidFilter === "all" || (paidFilter === "paid" ? a.paid === true : a.paid === false || a.paid == null);
+      // Payment filter: only applies to finished/completed applications
+      let matchesPaid = true;
+      if (paidFilter !== "all") {
+        const st = (a.status ?? "").toUpperCase();
+        const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+        
+        if (paidFilter === "paid") {
+          // To'landi: only finished applications that are paid
+          matchesPaid = isFinished && a.paid === true;
+        } else if (paidFilter === "unpaid") {
+          // To'lanmadi: only finished applications that are not paid
+          matchesPaid = isFinished && (a.paid === false || a.paid == null);
+        }
+      }
       const matchesFillial = fillialFilter === "all" || a.fillial_id === Number(fillialFilter);
       // region may be stored on the fillial object; lookup in fillialsList
       const fillials = Array.isArray(fillialsList) ? fillialsList : [];
@@ -198,8 +234,8 @@ const Applications = (): JSX.Element => {
   const stats = React.useMemo(() => {
     const items = filtered;
     const totalCount = items.length;
-    // For amount stats include CONFIRMED or FINISHED applications
-    const approvedItems = items.filter((a) => a.status === "CONFIRMED" || a.status === "FINISHED");
+    // For amount stats use only current filtered items (based on status filter)
+    const approvedItems = items.filter((a) => a.status === "CONFIRMED" || a.status === "FINISHED" || a.status === "COMPLETED" || a.status === "ACTIVE");
     const approvedAmount = approvedItems.reduce((s, a) => s + (a.amount ?? 0), 0);
     const approvedPaidAmount = approvedItems.filter((a) => a.paid).reduce((s, a) => s + (a.amount ?? 0), 0);
     const approvedUnpaidAmount = approvedAmount - approvedPaidAmount;
@@ -392,29 +428,17 @@ const Applications = (): JSX.Element => {
         <table className="w-full table-auto min-w-[640px]">
           <thead className="bg-gray-50 dark:bg-navy-800 text-left text-sm text-gray-600 dark:text-gray-300">
             <tr>
-              {statusFilter === "approved" ? (
-                <>
-                  <th className="px-4 py-3">Tovarlar</th>
-                  <th className="px-4 py-3">To'lov summasi</th>
-                  <th className="px-4 py-3">Grafik</th>
-                  <th className="px-4 py-3">Muddati</th>
-                  <th className="px-4 py-3">Yaratildi</th>
-                </>
-              ) : (
-                <>
-                  <th className="px-4 py-3 text-center">ID</th>
-                  <th className="px-4 py-3">Ariza beruvchi</th>
-                  <th className="px-4 py-3 text-center min-w-[130px]">Telefon</th>
-                  <th className="px-4 py-3 text-center min-w-[140px]">Mahsulotlar / Summa (UZS)</th>
-                  <th className="px-4 py-3 text-center min-w-[160px]">To'lov / Limit (UZS)</th>
-                  <th className="px-4 py-3 text-center">To'lov</th>
-                  <th className="px-4 py-3 text-center min-w-[120px]">Filial</th>
-                  <th className="px-4 py-3 text-center">Grafik</th>
-                  <th className="px-6 py-3 text-center min-w-[160px]">Holat</th>
-                  <th className="px-4 py-3 text-center">Muddati</th>
-                  <th className="px-4 py-3 text-center">Yaratildi</th>
-                </>
-              )}
+              <th className="px-4 py-3 text-center">ID</th>
+              <th className="px-4 py-3">Ariza beruvchi</th>
+              <th className="px-4 py-3 text-center min-w-[130px]">Telefon</th>
+              <th className="px-4 py-3 text-center min-w-[140px]">Mahsulotlar / Summa (UZS)</th>
+              <th className="px-4 py-3 text-center min-w-[160px]">To'lov / Limit (UZS)</th>
+              <th className="px-4 py-3 text-center">To'lov</th>
+              <th className="px-4 py-3 text-center min-w-[120px]">Filial</th>
+              <th className="px-4 py-3 text-center">Grafik</th>
+              <th className="px-6 py-3 text-center min-w-[160px]">Holat</th>
+              <th className="px-4 py-3 text-center">Muddati</th>
+              <th className="px-4 py-3 text-center">Yaratildi</th>
             </tr>
           </thead>
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
@@ -422,154 +446,138 @@ const Applications = (): JSX.Element => {
               <tr
                 key={a.id}
                 className="border-t border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-700"
-                onClick={() => {
-                  setSelected(a);
-                  setOpen(true);
+                onClick={async () => {
+                  try {
+                    setDetailLoading(true);
+                    // Fetch complete application data with all relations
+                    const fullApplication = await api.getZayavka(a.id);
+                    console.log('Full application data:', fullApplication);
+                    setSelected(fullApplication);
+                    setOpen(true);
+                  } catch (err) {
+                    console.error("Error fetching application details:", err);
+                    // Show error message to user
+                    setToastMessage("Ariza tafsilotlarini yuklashda xatolik yuz berdi");
+                    setToastType('error');
+                    setToastOpen(true);
+                    // Fallback to existing data if API call fails
+                    setSelected(a);
+                    setOpen(true);
+                  } finally {
+                    setDetailLoading(false);
+                  }
                 }}
               >
-                {statusFilter === "approved" ? (
-                  <>
-                    <td className="px-4 py-2">{formatMoney(a.amount)}</td>
-                    <td className="px-4 py-2 font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</td>
-                    <td className="px-4 py-2">
-                      <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            const blob = await (api as any).getApplicationDocument(a.id, "pdf");
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement("a");
-                            link.href = url;
-                            link.download = `application_${a.id}.pdf`;
-                            document.body.appendChild(link);
-                            link.click();
-                            link.remove();
-                            URL.revokeObjectURL(url);
-                          } catch (err) {
-                            console.error(err);
-                            alert("Grafikni yuklab olishda xatolik yuz berdi");
+                <td className="px-4 py-2 text-center">{a.id}</td>
+                <td className="px-4 py-2">
+                  <AvatarName
+                    image={(a.user as any)?.image ?? null}
+                    name={a.fullname}
+                    subtitle={a.passport ?? undefined}
+                    size="md"
+                  />
+                </td>
+                <td className="px-4 py-2 text-center min-w-[130px] whitespace-nowrap">{formatPhone(a.phone)}</td>
+                <td className="px-4 py-2 text-center min-w-[140px] whitespace-nowrap">
+                  {(a.products && a.products.length > 0) || a.amount ? (
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">{a.products && a.products.length > 0 ? `${a.products.length} dona` : "-"}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{a.amount ? formatMoney(a.amount) : "-"}</span>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-center min-w-[160px] whitespace-nowrap">
+                  {(a.payment_amount || a.amount) && a.limit ? (
+                    <div className="flex flex-col gap-0">
+                      <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{formatMoney(a.limit)}</span>
+                    </div>
+                  ) : (a.payment_amount || a.amount) ? (
+                    <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</span>
+                  ) : a.limit ? (
+                    <span className="text-gray-700 dark:text-gray-300">{formatMoney(a.limit)}</span>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-center">{a.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</td>
+                <td className="px-4 py-2 text-center min-w-[120px] whitespace-nowrap">{a.fillial?.name ?? "-"}</td>
+                <td className="px-4 py-2 text-center">
+                  {isApproved(a.status) ? (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const downloadKey = `graph_${a.id}`;
+                        setDownloadLoading(prev => ({ ...prev, [downloadKey]: true }));
+                        try {
+                          const response = await fetch(`https://api.premiumnasiya.uz/api/v1/app/graph/${a.id}`, {
+                            method: 'GET',
+                            headers: {
+                              'Authorization': `Bearer ${localStorage.getItem('token')}`
+                            }
+                          });
+                          
+                          if (!response.ok) {
+                            throw new Error('Document yuklab olishda xatolik');
                           }
-                        }}
-                        className="inline-flex items-center gap-2 rounded border border-gray-300 dark:border-gray-600 px-2 py-1 text-sm hover:bg-gray-100 dark:hover:bg-navy-700 dark:text-gray-300"
-                        title="Hujjatni yuklab olish"
-                        type="button"
-                      >
+                          
+                          const blob = await response.blob();
+                          const url = URL.createObjectURL(blob);
+                          const link = document.createElement("a");
+                          link.href = url;
+                          link.download = `application_${a.id}.pdf`;
+                          document.body.appendChild(link);
+                          link.click();
+                          link.remove();
+                          URL.revokeObjectURL(url);
+                        } catch (err) {
+                          console.error(err);
+                          setToastMessage("Grafikni yuklab olishda xatolik yuz berdi");
+                          setToastType('error');
+                          setToastOpen(true);
+                        } finally {
+                          setDownloadLoading(prev => ({ ...prev, [downloadKey]: false }));
+                        }
+                      }}
+                      disabled={downloadLoading[`graph_${a.id}`]}
+                      className={`inline-flex items-center justify-center rounded border p-2 text-sm whitespace-nowrap transition-all duration-200 ${
+                        downloadLoading[`graph_${a.id}`] 
+                          ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-900/20 dark:text-blue-300 cursor-not-allowed' 
+                          : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-navy-700 dark:text-gray-300'
+                      }`}
+                      title="Grafikni yuklab olish"
+                      type="button"
+                    >
+                      {downloadLoading[`graph_${a.id}`] ? (
+                        <div className="relative">
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent shadow-sm"></div>
+                          <div className="absolute inset-0 h-4 w-4 animate-ping rounded-full border border-blue-300 opacity-20"></div>
+                        </div>
+                      ) : (
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
                           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                           <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        <span className="hidden sm:inline">Yuklab olish</span>
-                      </button>
-                    </td>
-                    <td className="px-4 py-2">
-                      {a.expired_month ? (
-                        <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
-                          {a.expired_month} oy
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500">-</span>
                       )}
-                    </td>
-                    <td className="px-4 py-2">{formatDate24Hour(a.createdAt)}</td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-4 py-2 text-center">{a.id}</td>
-                    <td className="px-4 py-2">
-                      <AvatarName
-                        image={(a.user as any)?.image ?? null}
-                        name={a.fullname}
-                        subtitle={a.passport ?? undefined}
-                        size="md"
-                      />
-                    </td>
-                    <td className="px-4 py-2 text-center min-w-[130px] whitespace-nowrap">{formatPhone(a.phone)}</td>
-                    <td className="px-4 py-2 text-center min-w-[140px] whitespace-nowrap">
-                      {(a.products && a.products.length > 0) || a.amount ? (
-                        <div className="flex flex-col gap-1">
-                          <span className="font-medium">{a.products && a.products.length > 0 ? `${a.products.length} dona` : "-"}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{a.amount ? formatMoney(a.amount) : "-"}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center min-w-[160px] whitespace-nowrap">
-                      {(a.payment_amount || a.amount) && a.limit ? (
-                        <div className="flex flex-col gap-0">
-                          <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">{formatMoney(a.limit)}</span>
-                        </div>
-                      ) : (a.payment_amount || a.amount) ? (
-                        <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(a.payment_amount || a.amount)}</span>
-                      ) : a.limit ? (
-                        <span className="text-gray-700 dark:text-gray-300">{formatMoney(a.limit)}</span>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center">{a.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</td>
-                    <td className="px-4 py-2 text-center min-w-[120px] whitespace-nowrap">{a.fillial?.name ?? "-"}</td>
-                    <td className="px-4 py-2 text-center">
-                      {isApproved(a.status) ? (
-                        <button
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            try {
-                              const response = await fetch(`https://api.premiumnasiya.uz/api/v1/app/graph/${a.id}`, {
-                                method: 'GET',
-                                headers: {
-                                  'Authorization': `Bearer ${localStorage.getItem('token')}`
-                                }
-                              });
-                              
-                              if (!response.ok) {
-                                throw new Error('Document yuklab olishda xatolik');
-                              }
-                              
-                              const blob = await response.blob();
-                              const url = URL.createObjectURL(blob);
-                              const link = document.createElement("a");
-                              link.href = url;
-                              link.download = `application_${a.id}.pdf`;
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                              URL.revokeObjectURL(url);
-                            } catch (err) {
-                              console.error(err);
-                              setToastMessage("Grafikni yuklab olishda xatolik yuz berdi");
-                              setToastOpen(true);
-                            }
-                          }}
-                          className="inline-flex items-center justify-center rounded border border-gray-300 dark:border-gray-600 p-2 text-sm hover:bg-gray-100 dark:hover:bg-navy-700 dark:text-gray-300 whitespace-nowrap"
-                          title="Grafikni yuklab olish"
-                          type="button"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            <polyline points="7 10 12 15 17 10" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                            <line x1="12" y1="15" x2="12" y2="3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-2 text-center min-w-[160px]">{(() => { const b = appStatusBadge(a.status, true); return <span className={b.className}>{b.label}</span>; })()}</td>
-                    <td className="px-4 py-2 text-center">
-                      {a.expired_month ? (
-                        <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
-                          {a.expired_month} oy
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 dark:text-gray-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 text-center">{formatDate24Hour(a.createdAt)}</td>
-                  </>
-                )}
+                    </button>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-2 text-center min-w-[160px]">{(() => { const b = appStatusBadge(a.status, true); return <span className={b.className}>{b.label}</span>; })()}</td>
+                <td className="px-4 py-2 text-center">
+                  {a.expired_month ? (
+                    <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
+                      {a.expired_month} oy
+                    </span>
+                  ) : (
+                    <span className="text-gray-400 dark:text-gray-500">-</span>
+                  )}
+                </td>
+                <td className="px-4 py-2 text-center">{formatDate24Hour(a.createdAt)}</td>
               </tr>
             ))}
             <DetailModal
@@ -580,7 +588,12 @@ const Applications = (): JSX.Element => {
                 setSelected(null);
               }}
             >
-              {selected ? (
+              {detailLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+                  <span className="ml-3 text-gray-600 dark:text-gray-400">Ma'lumotlar yuklanmoqda...</span>
+                </div>
+              ) : selected ? (
                 <div className="space-y-3">
                   <div>
                     <strong className="text-gray-900 dark:text-white block mb-2">Ariza beruvchi:</strong>
@@ -596,6 +609,24 @@ const Applications = (): JSX.Element => {
                   <div><strong className="text-gray-900 dark:text-white">To'lov summasi:</strong> <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(selected.payment_amount || selected.amount)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov:</strong> {selected.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</div>
                   <div><strong className="text-gray-900 dark:text-white">Filial:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fillial?.name ?? "-"}</span></div>
+                  {selected.phone2 && (
+                    <div><strong className="text-gray-900 dark:text-white">Qo'shimcha telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.phone2)}</span></div>
+                  )}
+                  {selected.limit && (
+                    <div><strong className="text-gray-900 dark:text-white">Limit:</strong> <span className="text-gray-700 dark:text-gray-300">{formatMoney(selected.limit)}</span></div>
+                  )}
+                  {selected.expired_month && (
+                    <div><strong className="text-gray-900 dark:text-white">Muddat (oy):</strong> <span className="text-gray-700 dark:text-gray-300">{selected.expired_month}</span></div>
+                  )}
+                  {selected.percent && (
+                    <div><strong className="text-gray-900 dark:text-white">Foiz:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.percent}%</span></div>
+                  )}
+                  {selected.createdAt && (
+                    <div><strong className="text-gray-900 dark:text-white">Yaratilgan sana:</strong> <span className="text-gray-700 dark:text-gray-300">{formatDateNoSeconds(selected.createdAt)}</span></div>
+                  )}
+                  {selected.canceled_reason && (
+                    <div><strong className="text-red-600 dark:text-red-400">Bekor qilish sababi:</strong> <span className="text-red-600 dark:text-red-400">{selected.canceled_reason}</span></div>
+                  )}
                   {selected.user && (
                     <>
                       <div>
@@ -641,11 +672,15 @@ const Applications = (): JSX.Element => {
                     )}
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                  Ma'lumot topilmadi
+                </div>
+              )}
             </DetailModal>
             {pageData.length === 0 && (
               <tr>
-                <td colSpan={statusFilter === "approved" ? 4 : 12} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td colSpan={11} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                   Hech qanday natija topilmadi
                 </td>
               </tr>
@@ -663,6 +698,7 @@ const Applications = (): JSX.Element => {
         message={toastMessage}
         isOpen={toastOpen}
         onClose={() => setToastOpen(false)}
+        type={toastType}
       />
     </div>
   );

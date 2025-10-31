@@ -60,21 +60,32 @@ export function statusBadge(status?: string | null) {
 // Helper functions to check application status category
 export function isApproved(status?: string | null): boolean {
   const s = (status ?? "").toUpperCase();
-  return s === "CONFIRMED" || s === "FINISHED";
+  // Tugatilgan: FINISHED, COMPLETED, ACTIVE
+  return s === "FINISHED" || s === "COMPLETED" || s === "ACTIVE";
+}
+
+export function isConfirmed(status?: string | null): boolean {
+  const s = (status ?? "").toUpperCase();
+  // Tasdiqlangan: CONFIRMED
+  return s === "CONFIRMED";
 }
 
 export function isRejected(status?: string | null): boolean {
   const s = (status ?? "").toUpperCase();
-  return s === "CANCELED_BY_SCORING" || s === "CANCELED_BY_CLIENT" || s === "CANCELED_BY_DAILY";
+  // Rad qilingan: all CANCELED_ statuses, REJECTED, SCORING
+  return s.includes("CANCELED") || s === "SCORING RAD ETDI" || s === "DAILY RAD ETDI" || s === "REJECTED" || s.includes("RAD") || s.includes("SCORING");
 }
 
 export function isLimit(status?: string | null): boolean {
   const s = (status ?? "").toUpperCase();
-  return s === "LIMIT";
+  // Limit: all LIMIT statuses
+  return s === "LIMIT" || s.includes("LIMIT");
 }
 
 export function isPending(status?: string | null): boolean {
-  return !isApproved(status) && !isRejected(status) && !isLimit(status);
+  const s = (status ?? "").toUpperCase();
+  // Kutilmoqda: faqat haqiqiy kutish statuslari
+  return s === "CREATED" || s === "ADDED_DETAIL" || s.includes("WAITING") || s === "ADDED_PRODUCT" || s === "PENDING";
 }
 
 export function appStatusBadge(status?: string | null, fullWidth: boolean = false) {
@@ -82,8 +93,13 @@ export function appStatusBadge(status?: string | null, fullWidth: boolean = fals
   const widthClass = fullWidth ? "w-full" : "";
   const flexClass = fullWidth ? "flex items-center justify-center" : "inline-flex items-center";
   
-  // Tugatilgan - Approved/Completed statuses
-  if (s === "CONFIRMED" || s === "FINISHED" || s === "COMPLETED" || s === "ACTIVE") {
+  // Tasdiqlangan - CONFIRMED status
+  if (s === "CONFIRMED") {
+    return { label: "TASDIQLANGAN", className: `${flexClass} rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300 ${widthClass}` };
+  }
+  
+  // Tugatilgan - FINISHED/Completed statuses
+  if (s === "FINISHED" || s === "COMPLETED" || s === "ACTIVE") {
     return { label: "TUGATILGAN", className: `${flexClass} rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300 ${widthClass}` };
   }
   
