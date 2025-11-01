@@ -91,12 +91,60 @@ cd premium-nasiya-admin
 npm install
 ```
 
-3. **Development serverini ishga tushirish**
+3. **Environment o'zgaruvchilarini sozlash**
+```bash
+# .env.example faylidan nusxa oling
+cp .env.example .env
+
+# .env faylini tahrirlang va API URL'ni kiriting
+REACT_APP_API_BASE=https://api.premiumnasiya.uz/api/v1
+```
+
+4. **Development serverini ishga tushirish**
 ```bash
 npm start
 ```
 
 Server `http://localhost:3000` da ishga tushadi.
+
+### API Konfiguratsiyasi
+
+**Base URL:** `https://api.premiumnasiya.uz/api/v1`
+
+**Login Endpoint:** `POST /auth/login`
+```json
+{
+  "login": "998950642827",
+  "password": "1234567890"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "id": 1,
+    "phone": "+998950642827",
+    "fullname": "Xurshid Ismoilov",
+    "image": null,
+    "role": "SUPER"
+  },
+  "access_token": "eyJhbGc...",
+  "message": "Logined successfully"
+}
+```
+
+**Barcha so'rovlar uchun Authorization header:**
+```
+Authorization: Bearer {access_token}
+```
+
+#### Xatoliklar va Qayta Urinishlar
+
+API so'rovlari avtomatik qayta urinish mexanizmi bilan jihozlangan:
+- **Tarmoq xatoliklari**: Avtomatik 2 marta qayta urinadi (exponential backoff bilan)
+- **Xato xabarlari**: O'zbek tilida aniq xato xabarlari
+- **Xavfsizlik**: Barcha xato xabarlari foydalanuvchi uchun tushunarli formatda
 
 4. **Production build**
 ```bash

@@ -10,6 +10,32 @@ const MOCK_USERS: User[] = [
   { id: 6, fullname: "Jasur Abdullayev", phone: "+998900000006", password: "fC(2025", role: "USER", work_status: "WORKING", merchant_id: 11, fillial_id: 3, fillial: { id: 3, name: "G'arb filiali" }, merchant: { id: 11, name: "Beta Corp" }, createdAt: new Date().toISOString() },
 ];
 
+// Auto-generate more users for better demo
+(() => {
+  const names = ["Aziza", "Dilshod", "Feruza", "Gulsara", "Husnora", "Jasurbek", "Kamila", "Laziz", "Madina", "Nodir", "Oysha", "Parviz", "Qodira", "Rustam", "Shaxnoza", "Toxir", "Umida", "Vali", "Yulduz", "Zarina"];
+  const surnames = ["Karimov", "Saidov", "Rahimov", "Toshev", "Nazarov", "Abdullayev", "Mahmudov", "Yusupov", "Akbarov", "Usmanov"];
+  
+  for (let i = 7; i <= 100; i++) {
+    const name = names[i % names.length];
+    const surname = surnames[i % surnames.length];
+    const fillialId = 1 + (i % 35); // Distribute across 35 fillials
+    const user: User = {
+      id: i,
+      fullname: `${name} ${surname}`,
+      phone: `+99890${(1000000 + i).toString().slice(-7)}`,
+      password: `pass${i}#2025`,
+      role: i % 15 === 0 ? "ADMIN" : "USER", // 1 admin per 15 users
+      work_status: i % 25 === 0 ? "BLOCKED" : "WORKING", // 4% blocked
+      merchant_id: i % 2 === 0 ? 10 : 11,
+      fillial_id: fillialId,
+      fillial: { id: fillialId, name: `Filial ${fillialId}` },
+      merchant: i % 2 === 0 ? { id: 10, name: "ACME Retail" } : { id: 11, name: "Beta Corp" },
+      createdAt: new Date(Date.now() - i * 86400000).toISOString()
+    };
+    MOCK_USERS.push(user);
+  }
+})();
+
 // Simple in-memory fillials
 const MOCK_FILLIALS: any[] = [
   { 
@@ -171,7 +197,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 10, name: "ACME Retail" },
     fillial: { id: 1, name: "Bosh filial" },
     fillial_id: 1,
-    user: { id: 1, fullname: "Alisher Karimov" },
+    user: { id: 1, fullname: "Alisher Karimov", phone: "+998900000001" },
     paid: false,
     products: [
       { id: 101, name: "Telefon qopqog'i", price: 15000, count: 2 },
@@ -192,7 +218,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 10, name: "ACME Retail" },
     fillial: { id: 2, name: "Sharq filiali" },
     fillial_id: 2,
-    user: { id: 2, fullname: "Bobur Saidov" },
+    user: { id: 2, fullname: "Bobur Saidov", phone: "+998900000002" },
     paid: false,
     products: [{ id: 103, name: "USB kabel", price: 10000, count: 1 }],
     createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
@@ -209,7 +235,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 11, name: "Beta Corp" },
     fillial: { id: 3, name: "West Branch" },
     fillial_id: 3,
-    user: { id: 3, fullname: "Charlie Day" },
+    user: { id: 3, fullname: "Charlie Day", phone: "+998900000003" },
     paid: false,
     products: [],
     createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(), // 45 days ago (older than month)
@@ -227,7 +253,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 10, name: "ACME Retail" },
     fillial: { id: 1, name: "Main Branch" },
     fillial_id: 1,
-    user: { id: 4, fullname: "Donna Reed" },
+    user: { id: 4, fullname: "Donna Reed", phone: "+998900000004" },
     paid: false,
     products: [
       { id: 104, name: "Bluetooth Speaker", price: 75000, count: 1 },
@@ -247,7 +273,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 11, name: "Beta Corp" },
     fillial: { id: 3, name: "West Branch" },
     fillial_id: 3,
-    user: { id: 5, fullname: "Eve Adams" },
+    user: { id: 5, fullname: "Eve Adams", phone: "+998900000005" },
     paid: true,
     products: [{ id: 106, name: "Smartwatch", price: 75000, count: 1 }],
     createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
@@ -263,7 +289,7 @@ const MOCK_APPLICATIONS: any[] = [
     merchant: { id: 10, name: "ACME Retail" },
     fillial: { id: 2, name: "East Branch" },
     fillial_id: 2,
-    user: { id: 6, fullname: "Frank Cole" },
+    user: { id: 6, fullname: "Frank Cole", phone: "+998900000006" },
     paid: false,
     products: [{ id: 107, name: "Charger", price: 30000, count: 1 }],
     createdAt: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), // 20 days ago
@@ -335,52 +361,163 @@ const MOCK_APPLICATIONS: any[] = [
   const TARGET_FILLIALS = 35;
   const existing = MOCK_FILLIALS.length;
   const now = Date.now();
+  
+  const regions = ["Toshkent", "Andijon", "Farg'ona", "Namangan", "Samarqand", "Buxoro", "Xorazm", "Qashqadaryo"];
+  const cities = ["Toshkent", "Andijon", "Farg'ona", "Namangan", "Samarqand", "Buxoro", "Urganch", "Qarshi"];
+  
   for (let i = existing + 1; i <= TARGET_FILLIALS; i++) {
+    const regionIdx = i % regions.length;
     const f = {
       id: i,
-      name: `Branch ${i}`,
-      address: `${i} Demo Street`,
+      name: `${cities[regionIdx]} filiali ${i}`,
+      address: `${cities[regionIdx]} sh, ${i}-ko'cha, ${i * 10}-uy`,
       image: "",
-      region: i % 5 === 0 ? "Tashkent" : "Region" + (i % 5),
-      work_status: i % 7 === 0 ? "BLOCKED" : "WORKING",
+      region: regions[regionIdx],
+      work_status: i % 10 === 0 ? "BLOCKED" : "WORKING", // 10% blocked
       merchant_id: i % 2 === 0 ? 10 : 11,
+      inn: `${200000000 + i * 111}`,
+      nds: 12 + (i % 4),
+      hisob_raqam: `2020800000000000${String(i).padStart(4, '0')}`,
+      bank_name: i % 3 === 0 ? "Xalq Banki" : i % 3 === 1 ? "Asaka Bank" : "Ipoteka Bank",
+      mfo: `000${14 + (i % 10)}`,
+      director_name: `Direktor ${i}`,
+      director_phone: `+99890${(1000000 + i).toString().slice(-7)}`,
       merchant: (i % 2 === 0) ? MOCK_MERCHANTS.find(m => m.id === 10) : MOCK_MERCHANTS.find(m => m.id === 11),
       createdAt: new Date(now - i * 86400000).toISOString(),
     };
     MOCK_FILLIALS.push(f);
 
-    // create a few applications for this fillial
-    const appsToCreate = 3 + (i % 4); // 3-6 apps each
+    // Create 8-15 applications per fillial for realistic data (more data for better stats)
+    const appsToCreate = 8 + (i % 8); // 8-15 apps each
     for (let j = 0; j < appsToCreate; j++) {
       const aid = MOCK_APPLICATIONS.reduce((mx, a) => Math.max(mx, a.id), 0) + 1;
-      const daysAgo = (i + j) % 30;
-      const createdAt = new Date(now - daysAgo * 86400000 - j * 3600000).toISOString();
-      // Make ~72% rejected, ~25% approved, ~3% created
-      let status = "REJECTED"; // Default to rejected (most common)
-      if (aid % 4 === 0) status = "APPROVED"; // ~25% approved  
-      else if (aid % 20 === 0) status = "CREATED"; // ~5% created
+      const daysAgo = Math.floor((i * 5 + j * 3) % 200); // Spread over 200 days (6+ months)
+      const hoursAgo = Math.floor(Math.random() * 24); // Random hour of day
+      const createdAt = new Date(now - daysAgo * 86400000 - hoursAgo * 3600000).toISOString();
+      
+      // Status distribution: 55% APPROVED, 25% REJECTED, 20% PENDING
+      let status = "APPROVED";
+      const rand = (aid * 7) % 100;
+      if (rand < 25) status = "REJECTED"; // 25%
+      else if (rand < 45) status = "PENDING"; // 20%
+      // else APPROVED 55%
+      
       // Random expired_month from [3, 6, 9, 12]
       const expiredMonths = [3, 6, 9, 12];
       const expired_month = expiredMonths[aid % 4];
       
+      // Random amounts between 500K - 25M UZS for realistic variety
+      const baseAmount = 500000 + ((aid * 12347) % 24500000);
+      const amount = Math.floor(baseAmount / 100000) * 100000; // Round to nearest 100K
+      
+      // More products for variety (1-5 products)
+      const productCount = 1 + (aid % 5);
+      const products = [];
+      for (let p = 0; p < productCount; p++) {
+        products.push({
+          id: 1000 + aid * 10 + p,
+          name: `Mahsulot ${aid}-${p}`,
+          price: 50000 + ((aid * 100 + p * 1000) % 950000),
+          count: 1 + (p % 4)
+        });
+      }
+      
+      const userId = 1 + (aid % 100);
+      const operator = MOCK_USERS.find(u => u.id === userId);
+      
       MOCK_APPLICATIONS.push({
         id: aid,
-        fullname: `Client ${i}-${j}`,
-        phone: `+99890${(100000 + aid).toString().slice(-6)}`,
-        passport: `P${100000 + aid}`,
-        amount: 1000000 + ((aid * 7) % 14000000),
-        percent: 10 + (aid % 6),
+        fullname: `Mijoz ${i}-${j}`,
+        phone: `+99890${(1000000 + aid).toString().slice(-7)}`,
+        passport: `A${String(1000000 + aid).slice(-7)}`,
+        amount: amount,
+        payment_amount: Math.floor(amount * (1 + (10 + (aid % 10)) / 100)),
+        percent: 10 + (aid % 10),
         status,
         expired_month,
         merchant: f.merchant,
         fillial: { id: f.id, name: f.name },
         fillial_id: f.id,
-        user: null,
-        paid: status === "APPROVED" && (aid % 3 === 0),
-        products: [{ id: 900 + j, name: `Product ${j}`, price: 10000 + j * 5000, count: 1 }],
+        user: operator ? { id: operator.id, fullname: operator.fullname, phone: operator.phone } : { id: userId, fullname: `Operator ${userId}` },
+        paid: status === "APPROVED" && (aid % 5 === 0),
+        products: products,
         createdAt,
       });
     }
+  }
+  
+  // Add more recent applications for today and yesterday for better daily stats
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  
+  // Add 20-30 applications for today spread across hours
+  const todayAppsCount = 20 + Math.floor(Math.random() * 11);
+  for (let t = 0; t < todayAppsCount; t++) {
+    const aid = MOCK_APPLICATIONS.reduce((mx, a) => Math.max(mx, a.id), 0) + 1;
+    const fillialId = 1 + (t % TARGET_FILLIALS);
+    const fillial = MOCK_FILLIALS.find(f => f.id === fillialId);
+    const hourOffset = Math.floor(Math.random() * 16); // Between 0-16 hours ago (morning to now)
+    const createdAt = new Date(now - hourOffset * 3600000).toISOString();
+    
+    const status = t % 3 === 0 ? "PENDING" : t % 5 === 0 ? "REJECTED" : "APPROVED";
+    const amount = 1000000 + Math.floor(Math.random() * 15000000);
+    
+    const userId = 1 + (t % 100);
+    const operator = MOCK_USERS.find(u => u.id === userId);
+    
+    MOCK_APPLICATIONS.push({
+      id: aid,
+      fullname: `Bugungi mijoz ${t + 1}`,
+      phone: `+99890${(2000000 + aid).toString().slice(-7)}`,
+      passport: `A${String(2000000 + aid).slice(-7)}`,
+      amount: amount,
+      payment_amount: Math.floor(amount * 1.15),
+      percent: 12 + (t % 6),
+      status,
+      expired_month: [3, 6, 9, 12][t % 4],
+      merchant: fillial?.merchant,
+      fillial: { id: fillialId, name: fillial?.name || `Filial ${fillialId}` },
+      fillial_id: fillialId,
+      user: operator ? { id: operator.id, fullname: operator.fullname, phone: operator.phone } : { id: userId, fullname: `Operator ${userId}` },
+      paid: false,
+      products: [{ id: 5000 + t, name: `Mahsulot ${t}`, price: 100000 + t * 50000, count: 1 }],
+      createdAt,
+    });
+  }
+  
+  // Add 15-25 applications for yesterday
+  const yesterdayAppsCount = 15 + Math.floor(Math.random() * 11);
+  for (let y = 0; y < yesterdayAppsCount; y++) {
+    const aid = MOCK_APPLICATIONS.reduce((mx, a) => Math.max(mx, a.id), 0) + 1;
+    const fillialId = 1 + (y % TARGET_FILLIALS);
+    const fillial = MOCK_FILLIALS.find(f => f.id === fillialId);
+    const hourOffset = 24 + Math.floor(Math.random() * 24); // Between 24-48 hours ago
+    const createdAt = new Date(now - hourOffset * 3600000).toISOString();
+    
+    const status = y % 4 === 0 ? "PENDING" : y % 6 === 0 ? "REJECTED" : "APPROVED";
+    const amount = 800000 + Math.floor(Math.random() * 12000000);
+    
+    const userId = 1 + (y % 100);
+    const operator = MOCK_USERS.find(u => u.id === userId);
+    
+    MOCK_APPLICATIONS.push({
+      id: aid,
+      fullname: `Kechagi mijoz ${y + 1}`,
+      phone: `+99890${(3000000 + aid).toString().slice(-7)}`,
+      passport: `A${String(3000000 + aid).slice(-7)}`,
+      amount: amount,
+      payment_amount: Math.floor(amount * 1.12),
+      percent: 10 + (y % 8),
+      status,
+      expired_month: [3, 6, 9, 12][y % 4],
+      merchant: fillial?.merchant,
+      fillial: { id: fillialId, name: fillial?.name || `Filial ${fillialId}` },
+      fillial_id: fillialId,
+      user: operator ? { id: operator.id, fullname: operator.fullname, phone: operator.phone } : { id: userId, fullname: `Operator ${userId}` },
+      paid: status === "APPROVED" && (y % 3 === 0),
+      products: [{ id: 6000 + y, name: `Mahsulot ${y}`, price: 80000 + y * 40000, count: 1 + (y % 3) }],
+      createdAt,
+    });
   }
 })();
 
@@ -553,18 +690,88 @@ export async function getMerchant(id: number) {
   return delay(m);
 }
 
+// Auth functions for compatibility
+export async function login(phone: string, password: string) {
+  // Mock login - in development, always succeed
+  return delay({
+    access_token: "mock-token-12345",
+    user: { 
+      id: 1, 
+      phone, 
+      fullname: "Mock Admin User", 
+      role: "ADMIN",
+      image: null as string | null,
+      work_status: "WORKING",
+      merchant_id: null as number | null,
+      fillial_id: null as number | null,
+      createdAt: new Date().toISOString()
+    }
+  });
+}
+
+export async function logout() {
+  // Mock logout
+  return delay(undefined);
+}
+
+export function getCurrentUser() {
+  // Mock current user
+  return { 
+    id: 1, 
+    phone: "+998900000001", 
+    fullname: "Mock Admin User", 
+    role: "ADMIN",
+    image: null as string | null,
+    work_status: "WORKING",
+    merchant_id: null as number | null,
+    fillial_id: null as number | null,
+    createdAt: new Date().toISOString()
+  };
+}
+
+export function isAuthenticated() {
+  // In mock mode, always authenticated
+  return true;
+}
+
 const mock = {
+  // Auth
+  login,
+  logout,
+  getCurrentUser,
+  isAuthenticated,
+  // Users
   listUsers,
   getUser,
   createUser,
   updateUser,
+  deleteUser: async (id: number) => delay(undefined), // mock delete
+  // Fillials
   listFillials,
   getFillial,
   createFillial,
   updateFillial,
+  deleteFillial: async (id: number) => delay(undefined), // mock delete
+  // Applications
+  listApplications,
+  listZayavkalar: listApplications, // alias for compatibility
+  getZayavka: async (id: number) => {
+    const app = MOCK_APPLICATIONS.find(a => a.id === id);
+    if (!app) throw new Error("Not found");
+    return delay(app);
+  },
+  getApplication: async (id: number) => {
+    const app = MOCK_APPLICATIONS.find(a => a.id === id);
+    if (!app) throw new Error("Not found");
+    return delay(app);
+  },
+  createZayavka: async (payload: any) => delay({ id: Date.now(), ...payload }), // mock create
+  updateZayavka: async (id: number, payload: any) => delay({ id, ...payload }), // mock update
+  deleteZayavka: async (id: number) => delay(undefined), // mock delete
+  // Merchants
   listMerchants,
   getMerchant,
-  listApplications,
+  // Aggregations
   aggregateApplicationsByFillial,
   aggregateStatusDistribution,
   aggregateApplicationsOverTime,

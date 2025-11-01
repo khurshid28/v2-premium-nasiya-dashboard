@@ -1,6 +1,6 @@
 import React from "react";
 import Dropdown from "components/dropdown";
-import { FiAlignJustify } from "react-icons/fi";
+import { FiAlignJustify, FiUser } from "react-icons/fi";
 // Link removed — not needed for the simplified navbar
 import navbarimage from "assets/img/layout/Navbar.png";
 import { useNavigate } from "react-router-dom";
@@ -11,7 +11,6 @@ import { RiMoonFill, RiSunFill } from "react-icons/ri";
 import {
   IoMdInformationCircleOutline,
 } from "react-icons/io";
-import avatar from "assets/img/avatars/avatar4.png";
 
 const Navbar = (props: {
   onOpenSidenav: () => void;
@@ -119,22 +118,34 @@ const Navbar = (props: {
         {/* Profile & Dropdown */}
         <Dropdown
           button={
-            <img
-              className="h-10 w-10 rounded-full object-cover"
-              src={user?.image || avatar}
-              alt={user?.fullname || "User"}
-              title={`${user?.fullname ?? "User"}${user?.phone ? " • " + user.phone : ""}`}
-            />
+            user?.image ? (
+              <img
+                className="h-10 w-10 rounded-full object-cover"
+                src={user.image}
+                alt={user?.fullname || "User"}
+                title={`${user?.fullname ?? "User"}${user?.phone ? " • " + user.phone : ""}`}
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white">
+                <FiUser className="h-5 w-5" />
+              </div>
+            )
           }
           children={
             <div className="flex w-60 flex-col rounded-[20px] bg-white shadow-xl shadow-shadow-500 dark:!bg-navy-700 dark:text-white dark:shadow-none">
               {/* User info */}
               <div className="flex items-center gap-3 p-4">
-                <img
-                  className="h-10 w-10 rounded-full object-cover"
-                  src={user?.image || avatar}
-                  alt={user?.fullname || "User"}
-                />
+                {user?.image ? (
+                  <img
+                    className="h-10 w-10 rounded-full object-cover"
+                    src={user.image}
+                    alt={user?.fullname || "User"}
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white">
+                    <FiUser className="h-5 w-5" />
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-navy-700 dark:text-white">{user?.fullname || "Anonim"}</div>
                   {user?.phone ? (
