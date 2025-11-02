@@ -120,13 +120,13 @@ const Navbar = (props: {
           button={
             user?.image ? (
               <img
-                className="h-10 w-10 rounded-full object-cover"
+                className="h-10 w-10 rounded-full object-cover flex-shrink-0"
                 src={user.image}
                 alt={user?.fullname || "User"}
                 title={`${user?.fullname ?? "User"}${user?.phone ? " • " + user.phone : ""}`}
               />
             ) : (
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-white">
                 <FiUser className="h-5 w-5" />
               </div>
             )
@@ -137,12 +137,12 @@ const Navbar = (props: {
               <div className="flex items-center gap-3 p-4">
                 {user?.image ? (
                   <img
-                    className="h-10 w-10 rounded-full object-cover"
+                    className="h-10 w-10 rounded-full object-cover flex-shrink-0"
                     src={user.image}
                     alt={user?.fullname || "User"}
                   />
                 ) : (
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-500 text-white">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-brand-500 text-white">
                     <FiUser className="h-5 w-5" />
                   </div>
                 )}

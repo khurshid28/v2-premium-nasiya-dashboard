@@ -107,12 +107,14 @@ export default function ProfileEditModal({ isOpen, onClose }: Props) {
             />
           </div>
           {form.image && (
-            <div className="mt-2">
-              <img 
-                src={form.image} 
-                alt="Preview" 
-                className="h-20 w-20 rounded-full object-cover border-2 border-gray-300"
-              />
+            <div className="mt-2 flex items-center">
+              <div className="h-20 w-20 rounded-full overflow-hidden border-2 border-gray-300 flex-shrink-0">
+                <img 
+                  src={form.image} 
+                  alt="Preview" 
+                  className="h-full w-full object-cover"
+                />
+              </div>
             </div>
           )}
         </div>
