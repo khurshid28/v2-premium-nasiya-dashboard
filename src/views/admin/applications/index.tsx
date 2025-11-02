@@ -6,7 +6,7 @@ import DetailModal from "components/modal/DetailModalNew";
 import AvatarName from "components/AvatarName";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
-import { formatPhone, formatMoney, formatMoneyWithUZS, appStatusBadge, formatDateNoSeconds, formatDate24Hour, isApproved } from "lib/formatters";
+import { formatPhone, formatMoney, formatMoneyWithUZS, appStatusBadge, formatDateNoSeconds, formatDate24Hour, isApproved, isLimit, isConfirmed } from "lib/formatters";
 import { exportSingleTable } from "lib/exportExcel";
 import Toast from "components/toast/ToastNew";
 
@@ -431,7 +431,7 @@ const Applications = (): JSX.Element => {
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">ID</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3">Ariza beruvchi</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Telefon</th>
-              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden md:table-cell">Summa</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden md:table-cell">Tovar</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden lg:table-cell">To'lov/Limit</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden sm:table-cell">To'lov</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden xl:table-cell">Filial</th>
@@ -442,10 +442,12 @@ const Applications = (): JSX.Element => {
             </tr>
           </thead>
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
-            {pageData.map((a) => (
+            {pageData.map((a) => {
+              const shouldPulse = isLimit(a.status) || isConfirmed(a.status);
+              return (
               <tr
                 key={a.id}
-                className="border-t border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-700"
+                className={`border-t border-gray-200 dark:border-gray-600 cursor-pointer hover:bg-gray-50 dark:hover:bg-navy-700 ${shouldPulse ? 'animate-pulse bg-yellow-50 dark:bg-yellow-900/20 border-l-4 border-l-yellow-500 shadow-sm' : ''}`}
                 onClick={async () => {
                   try {
                     setDetailLoading(true);
@@ -585,7 +587,8 @@ const Applications = (): JSX.Element => {
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm hidden xl:table-cell">{formatDate24Hour(a.createdAt)}</td>
               </tr>
-            ))}
+              );
+            })}
             <DetailModal
               title={selected ? `Ariza #${selected.id}` : "Ariza tafsilotlari"}
               isOpen={open}

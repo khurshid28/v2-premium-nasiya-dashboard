@@ -141,23 +141,53 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
   // Create dynamic chart data with 3 statuses: Rejected, Approved, Pending
   const dynamicChartData = [rejectedPercent, approvedPercent, pendingPercent];
   
-  // Ensure we have valid data - if all are 0, show placeholder data
-  const hasValidData = dynamicChartData.some(val => val > 0);
+  // Check if we have valid data (at least one value > 0)
+  const hasValidData = statusDistribution.total > 0;
   const safeChartData = hasValidData ? dynamicChartData : [33, 33, 34];
   
   const dynamicChartOptions = {
     ...pieChartOptions,
-    labels: ["Rad qilingan", "Tugatilgan", "Kutilmoqda"],
-    colors: ["#EF4444", "#10B981", "#F59E0B"], // Red, Green, Yellow
+    labels: hasValidData ? ["Rad qilingan", "Tugatilgan", "Kutilmoqda"] : ["Ma'lumot yo'q", "Ma'lumot yo'q", "Ma'lumot yo'q"],
+    colors: hasValidData ? ["#EF4444", "#10B981", "#F59E0B"] : ["#E5E7EB", "#D1D5DB", "#9CA3AF"], // Red, Green, Yellow OR Gray shades
     fill: {
       ...pieChartOptions.fill,
-      colors: ["#EF4444", "#10B981", "#F59E0B"] // Match with colors array
+      colors: hasValidData ? ["#EF4444", "#10B981", "#F59E0B"] : ["#E5E7EB", "#D1D5DB", "#9CA3AF"] // Match with colors array
     },
     // Add safety options for chart rendering
     chart: {
       ...pieChartOptions.chart,
       animations: {
         enabled: false // Disable animations to prevent render issues
+      }
+    },
+    legend: {
+      show: false, // Hide ApexCharts legend, use custom legend below chart
+      position: 'bottom',
+      fontSize: '14px',
+      fontFamily: 'inherit',
+      labels: {
+        colors: '#6B7280',
+        useSeriesColors: false
+      }
+    },
+    dataLabels: {
+      enabled: false
+    },
+    tooltip: {
+      enabled: hasValidData,
+      y: {
+        formatter: function(value: number, { seriesIndex }: { seriesIndex: number }) {
+          // seriesIndex: 0 = Rad qilingan, 1 = Tugatilgan, 2 = Kutilmoqda
+          const counts = [statusDistribution.rejected, statusDistribution.approved, statusDistribution.pending];
+          return counts[seriesIndex] + ' ta ariza';
+        }
+      }
+    },
+    plotOptions: {
+      pie: {
+        dataLabels: {
+          offset: -10
+        }
       }
     }
   };
@@ -186,59 +216,63 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         </div>
       </div>
 
-      <div className="mb-auto flex h-full w-full items-center justify-center">
+      <div className="mb-auto flex h-full w-full flex-col items-center justify-center">
         {loading ? (
           <div className="flex items-center justify-center h-[220px]">
             <div className="text-gray-500 dark:text-gray-400">Yuklanmoqda...</div>
           </div>
-        ) : safeChartData && safeChartData.length > 0 ? (
-          <PieChart 
-            key={`pie-chart-${timePeriod}`}
-            chartOptions={dynamicChartOptions} 
-            chartData={safeChartData} 
-            series={safeChartData} 
-          />
-        ) : (
+        ) : !hasValidData ? (
           <div className="flex items-center justify-center h-[220px]">
-            <div className="text-gray-500 dark:text-gray-400">Ma'lumot topilmadi</div>
+            <div className="text-lg font-medium text-gray-500 dark:text-gray-400">Ma'lumot yo'q</div>
           </div>
+        ) : (
+          <>
+            <PieChart 
+              key={`pie-chart-${timePeriod}`}
+              chartOptions={dynamicChartOptions} 
+              chartData={safeChartData} 
+              series={safeChartData} 
+            />
+          </>
         )}
       </div>
-      <div className="flex flex-row !justify-between rounded-2xl px-2 py-3 shadow-2xl shadow-shadow-500 dark:!bg-navy-700 dark:shadow-none">
-        <div className="flex flex-col items-center justify-center">
+      {hasValidData && !loading && (
+        <div className="flex flex-row !justify-between rounded-2xl px-2 py-3 shadow-2xl shadow-shadow-500 dark:!bg-navy-700 dark:shadow-none">
+          <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-red-500" />
-            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Rad qilingan</p>
+              <div className="h-2 w-2 rounded-full bg-red-500" />
+              <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Rad qilingan</p>
+            </div>
+            <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
+              {rejectedPercent}%
+            </p>
           </div>
-          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
-            {rejectedPercent}%
-          </p>
-        </div>
 
-        <div className="h-11 w-px bg-gray-300 dark:bg-white/10" />
+          <div className="h-11 w-px bg-gray-300 dark:bg-white/10" />
 
-        <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-green-500" />
-            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Tugatilgan</p>
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Tugatilgan</p>
+            </div>
+            <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
+              {approvedPercent}%
+            </p>
           </div>
-          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
-            {approvedPercent}%
-          </p>
-        </div>
 
-        <div className="h-11 w-px bg-gray-300 dark:bg-white/10" />
+          <div className="h-11 w-px bg-gray-300 dark:bg-white/10" />
 
-        <div className="flex flex-col items-center justify-center">
+          <div className="flex flex-col items-center justify-center">
             <div className="flex items-center justify-center">
-            <div className="h-2 w-2 rounded-full bg-yellow-500" />
-            <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Kutilmoqda</p>
+              <div className="h-2 w-2 rounded-full bg-yellow-500" />
+              <p className="ml-1 text-xs font-normal text-gray-600 dark:text-gray-300">Kutilmoqda</p>
+            </div>
+            <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
+              {pendingPercent}%
+            </p>
           </div>
-          <p className="mt-px text-lg font-bold text-navy-700 dark:text-white">
-            {pendingPercent}%
-          </p>
         </div>
-      </div>
+      )}
     </Card>
   );
 };

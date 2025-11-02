@@ -6,11 +6,13 @@ import Profile from "views/admin/profile";
 import Fillials from "views/admin/fillials";
 import Users from "views/admin/users";
 import Applications from "views/admin/applications";
+import InfoPage from "views/admin/info";
+import ReportsPage from "views/admin/reports";
 // Auth import
 import SignIn from "views/auth/SignIn";
 
 // Icon Imports (Tabler icons)
-import { LayoutDashboard, Home, User, FileText, Login } from "tabler-icons-react";
+import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report } from "tabler-icons-react";
 
 const routes = [
   {
@@ -70,6 +72,20 @@ const routes = [
     path: "applications",
   icon: <FileText size={20} />,
     component: <Applications />,
+  },
+  {
+    name: "Ma'lumot",
+    layout: "/admin",
+    path: "info",
+    icon: <InfoCircle size={20} />,
+    component: <InfoPage />,
+  },
+  {
+    name: "Hisobotlar",
+    layout: "/admin",
+    path: "reports",
+    icon: <Report size={20} />,
+    component: <ReportsPage />,
   },
   {
     name: "Kirish",

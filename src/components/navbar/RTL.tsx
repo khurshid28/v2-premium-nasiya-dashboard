@@ -146,8 +146,8 @@ const Navbar = (props: {
                     <FiUser className="h-5 w-5" />
                   </div>
                 )}
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-navy-700 dark:text-white">{user?.fullname || "Anonim"}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-navy-700 dark:text-white break-words">{user?.fullname || "Anonim"}</div>
                   {user?.phone ? (
                     <div className="truncate text-xs text-gray-600 dark:text-gray-300">{user.phone}</div>
                   ) : null}
@@ -156,7 +156,14 @@ const Navbar = (props: {
               <div className="h-px w-full bg-gray-200 dark:bg-white/20" />
 
               {/* Actions */}
-              <div className="p-2">
+              <div className="p-2 space-y-1">
+                <button
+                  onClick={() => navigate("/admin/info")}
+                  className="w-full rounded-md px-3 py-2 text-start text-sm font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-white/10 flex items-center gap-2"
+                >
+                  <IoMdInformationCircleOutline className="h-4 w-4" />
+                  Ma'lumot
+                </button>
                 <button
                   onClick={handleLogout}
                   className="w-full rounded-md px-3 py-2 text-start text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-white/10"

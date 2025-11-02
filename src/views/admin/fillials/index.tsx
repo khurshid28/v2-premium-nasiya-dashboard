@@ -168,7 +168,7 @@ const Fillials = (): JSX.Element => {
   return (
     <div>
       <div className="mb-4">
-        <h2 className="text-xl sm:text-2xl font-semibold">Filiallar</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold text-navy-700 dark:text-white">Filiallar</h2>
       </div>
       
       {/* Mobile: Stack everything vertically */}
