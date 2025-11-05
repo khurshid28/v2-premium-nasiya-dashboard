@@ -309,7 +309,7 @@ const Applications = (): JSX.Element => {
               { value: "all", label: "Barcha merchantlar" },
               ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
                 value: String(m.id), 
-                label: m.fullname || `Merchant #${m.id}` 
+                label: m.name || `Merchant #${m.id}` 
               }))
             ]}
             className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"

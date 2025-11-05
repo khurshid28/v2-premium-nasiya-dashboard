@@ -273,7 +273,7 @@ const Dashboard = (): JSX.Element => {
                 { value: "all", label: "Barcha merchantlar" },
                 ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
                   value: String(m.id), 
-                  label: m.fullname || `Merchant #${m.id}` 
+                  label: m.name || `Merchant #${m.id}` 
                 }))
               ]}
               className="w-full sm:w-auto sm:min-w-[160px]"

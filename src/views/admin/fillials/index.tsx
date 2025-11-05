@@ -221,7 +221,7 @@ const Fillials = (): JSX.Element => {
               { value: "all", label: "Barcha merchantlar" },
               ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
                 value: String(m.id), 
-                label: m.fullname || `Merchant #${m.id}` 
+                label: m.name || `Merchant #${m.id}` 
               }))
             ]}
             className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
