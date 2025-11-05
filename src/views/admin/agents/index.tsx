@@ -135,25 +135,23 @@ const Agents = (): JSX.Element => {
       });
     }
 
-    // Group by fillial
+    // Initialize all fillials with 0 values
     const statsByFillial: any = {};
+    agent.fillials.forEach((fillial: any) => {
+      statsByFillial[fillial.id] = {
+        fillial: fillial,
+        totalCount: 0,
+        confirmedCount: 0,
+        confirmedAmount: 0
+      };
+    });
+
+    // Update stats for fillials with applications
     filteredApps.forEach((app: any) => {
       const fillialId = app.fillial_id;
-      if (!fillialId) return;
-
-      if (!statsByFillial[fillialId]) {
-        const fillialObj = agent.fillials?.find(f => f.id === fillialId);
-        statsByFillial[fillialId] = {
-          fillial: fillialObj,
-          totalCount: 0,
-          confirmedCount: 0,
-          totalAmount: 0,
-          confirmedAmount: 0
-        };
-      }
+      if (!fillialId || !statsByFillial[fillialId]) return;
 
       statsByFillial[fillialId].totalCount++;
-      statsByFillial[fillialId].totalAmount += app.amount || 0;
 
       const status = (app.status || "").toUpperCase();
       const isConfirmed = status === "CONFIRMED" || status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
@@ -480,7 +478,7 @@ const Agents = (): JSX.Element => {
                       <tr>
                         <th className="px-2 py-2 text-left">Filial</th>
                         <th className="px-2 py-2 text-right">Arizalar</th>
-                        <th className="px-2 py-2 text-right">Summa</th>
+                        <th className="px-2 py-2 text-right">Tasdiqlangan summa</th>
                       </tr>
                     </thead>
                     <tbody className="text-gray-700 dark:text-gray-300">
@@ -495,8 +493,7 @@ const Agents = (): JSX.Element => {
                             <div className="text-xs text-green-600 dark:text-green-400">✓ {stat.confirmedCount}</div>
                           </td>
                           <td className="px-2 py-2 text-right">
-                            <div className="text-xs">{formatMoney(stat.totalAmount)}</div>
-                            <div className="text-xs text-green-600 dark:text-green-400 font-semibold">
+                            <div className="font-semibold text-green-600 dark:text-green-400">
                               {formatMoney(stat.confirmedAmount)}
                             </div>
                           </td>
