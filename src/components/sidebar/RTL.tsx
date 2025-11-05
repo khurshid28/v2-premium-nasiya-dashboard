@@ -26,7 +26,7 @@ const Sidebar = (props: {
       <div className={`mx-[56px] mt-[50px] flex items-center`}>
         <div className="mt-1 h-2.5 flex items-center font-poppins text-[20px] font-bold uppercase text-navy-700 ms-1 dark:text-white">
           <img src="/pp.png" alt="logo" className="me-3 h-8 w-8 rounded-full object-cover" />
-          <span className="text-[18px]">PN Super</span>
+          <span className="text-[18px]">PN Dashboard</span>
         </div>
       </div>
       <div className="mt-[58px] mb-7 h-px bg-gray-300 dark:bg-white/30" />
