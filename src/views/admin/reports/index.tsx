@@ -193,6 +193,7 @@ const ReportsPage = () => {
           value={String(selectedMerchantId)}
           onChange={(value) => {
             setSelectedMerchantId(value === "all" ? "all" : Number(value));
+            setFillialFilter("all");
             setPage(1);
           }}
           options={[
@@ -212,7 +213,9 @@ const ReportsPage = () => {
           }}
           options={[
             { value: "all", label: "Barcha filiallar" },
-            ...fillials.map(f => ({ value: f.id.toString(), label: f.name }))
+            ...fillials
+              .filter(f => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+              .map(f => ({ value: f.id.toString(), label: f.name }))
           ]}
           className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
         />

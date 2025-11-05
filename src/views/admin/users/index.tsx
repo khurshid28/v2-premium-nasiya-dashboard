@@ -154,7 +154,10 @@ const Users = (): JSX.Element => {
           
           <CustomSelect
             value={String(selectedMerchantId)}
-            onChange={(value) => setSelectedMerchantId(value === "all" ? "all" : Number(value))}
+            onChange={(value) => {
+              setSelectedMerchantId(value === "all" ? "all" : Number(value));
+              setFillialFilter("all");
+            }}
             options={[
               { value: "all", label: "Barcha merchantlar" },
               ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
@@ -170,7 +173,9 @@ const Users = (): JSX.Element => {
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
             options={[
               { value: "all", label: "Barcha filiallar" },
-              ...(Array.isArray(fillials) ? fillials : []).map(f => ({ value: String(f.id), label: f.name }))
+              ...(Array.isArray(fillials) ? fillials : [])
+                .filter(f => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+                .map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="min-w-[120px] sm:min-w-[150px] flex-1 sm:flex-none"
           />

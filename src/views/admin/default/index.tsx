@@ -268,7 +268,10 @@ const Dashboard = (): JSX.Element => {
           <div className="flex flex-wrap items-center gap-2">
             <CustomSelect
               value={String(selectedMerchantId)}
-              onChange={(value) => { setSelectedMerchantId(value === "all" ? "all" : Number(value)); }}
+              onChange={(value) => { 
+                setSelectedMerchantId(value === "all" ? "all" : Number(value)); 
+                setSelectedFillialId("all"); 
+              }}
               options={[
                 { value: "all", label: "Barcha merchantlar" },
                 ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
@@ -292,10 +295,13 @@ const Dashboard = (): JSX.Element => {
               onChange={(value) => { setSelectedFillialId(value === "all" ? "all" : Number(value)); }}
               options={[
                 { value: "all", label: "Barcha filiallar" },
-                ...(Array.isArray(fillials) ? fillials : []).filter((f) => selectedRegion === "all" || f.region === selectedRegion).map((f) => ({ 
-                  value: String(f.id), 
-                  label: f.name 
-                }))
+                ...(Array.isArray(fillials) ? fillials : [])
+                  .filter((f) => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+                  .filter((f) => selectedRegion === "all" || f.region === selectedRegion)
+                  .map((f) => ({ 
+                    value: String(f.id), 
+                    label: f.name 
+                  }))
               ]}
               className="w-full sm:w-auto sm:min-w-[160px]"
             />
