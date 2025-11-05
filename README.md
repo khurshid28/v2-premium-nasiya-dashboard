@@ -1,4 +1,4 @@
-# 🏦 Premium Nasiya Admin Panel
+# 🏦 Premium Nasiya Super Panel
 
 <div align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="version" />
@@ -9,7 +9,7 @@
 </div>
 
 <p align="center">
-  <b>Zamonaviy nasiya xizmatlarini boshqarish uchun professional admin panel</b>
+  <b>Zamonaviy nasiya xizmatlarini boshqarish uchun professional super panel</b>
 </p>
 
 <p align="center">
@@ -24,7 +24,7 @@
 ## 📸 Screenshot
 
 <div align="center">
-  <img src="https://via.placeholder.com/1200x600/4F46E5/ffffff?text=Premium+Nasiya+Admin+Dashboard" alt="Dashboard Preview" />
+  <img src="https://via.placeholder.com/1200x600/4F46E5/ffffff?text=Premium+Nasiya+Super+Dashboard" alt="Dashboard Preview" />
 </div>
 
 ---

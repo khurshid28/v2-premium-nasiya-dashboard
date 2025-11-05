@@ -221,7 +221,7 @@ const Dashboard = (): JSX.Element => {
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-semibold dark:text-white">Admin</h2>
+            <h2 className="text-2xl font-semibold dark:text-white">Super</h2>
             <div className="text-sm text-gray-500 dark:text-gray-300">Asosiy ko'rsatkichlar va tizim holati</div>
           </div>
         </div>

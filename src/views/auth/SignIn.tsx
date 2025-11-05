@@ -49,9 +49,9 @@ export default function SignIn(): JSX.Element {
       // Real API call
       const response = await apiLogin(login.trim(), password.trim());
       
-      // Check if user has ADMIN role
-      if (response.user.role !== "ADMIN") {
-        setAuthError("Kirish rad etildi. Faqat administratorlar tizimga kirishlari mumkin.");
+      // Check if user has SUPER role
+      if (response.user.role !== "SUPER") {
+        setAuthError("Kirish rad etildi. Faqat super administratorlar tizimga kirishlari mumkin.");
         // Clear any stored data
         localStorage.removeItem("token");
         localStorage.removeItem("userData");
@@ -68,8 +68,8 @@ export default function SignIn(): JSX.Element {
         role: response.user.role,
       });
       
-      // Navigate to admin default
-      navigate("/admin/dashboard");
+      // Navigate to super default
+      navigate("/super/dashboard");
     } catch (err: any) {
       console.error("Login error:", err);
       

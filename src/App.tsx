@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
-import AdminLayout from "layouts/admin";
+import SuperLayout from "layouts/admin";
 import AuthLayout from "layouts/auth";
 import { UserProvider } from "contexts/UserContext";
 
@@ -13,11 +13,11 @@ const App = () => {
     <UserProvider>
       <Routes>
         <Route path="auth/*" element={<AuthLayout />} />
-        <Route path="admin/*" element={<AdminLayout />} />
+        <Route path="super/*" element={<SuperLayout />} />
         <Route path="/sign-in" element={<Navigate to="/auth/sign-in" replace />} />
         <Route
           path="/"
-          element={isAuth ? <Navigate to="/admin" replace /> : <Navigate to="/auth/sign-in" replace />}
+          element={isAuth ? <Navigate to="/super" replace /> : <Navigate to="/auth/sign-in" replace />}
         />
       </Routes>
       {/* <ToastContainer onClose={() => setToastOpen(false)} /> */}

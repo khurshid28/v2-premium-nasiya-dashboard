@@ -4,7 +4,7 @@ import Navbar from "components/navbar";
 import Sidebar from "components/sidebar";
 import routes from "routes";
 
-export default function Admin(props: { [x: string]: any }) {
+export default function Super(props: { [x: string]: any }) {
   const { ...rest } = props;
   const location = useLocation();
   const [open, setOpen] = React.useState(window.innerWidth >= 1200);
@@ -51,7 +51,7 @@ export default function Admin(props: { [x: string]: any }) {
   const getRoutes = (routes: RoutesType[] = []): any => {
     if (!routes || routes.length === 0) return null;
     return routes.map((prop, key) => {
-      if (prop.layout === "/admin") {
+      if (prop.layout === "/super") {
         return (
           <Route path={`/${prop.path}`} element={prop.component} key={key} />
         );
@@ -85,7 +85,7 @@ export default function Admin(props: { [x: string]: any }) {
 
                 <Route
                   path="/"
-                  element={<Navigate to="/admin/dashboard" replace />}
+                  element={<Navigate to="/super/dashboard" replace />}
                 />
               </Routes>
             </div>
