@@ -6,6 +6,7 @@ import { formatPhone, formatMoney } from "lib/formatters";
 import Pagination from "components/pagination";
 import Toast from "components/toast/ToastNew";
 import CustomSelect from "components/dropdown/CustomSelect";
+import DateRangePicker from "components/DateRangePicker";
 import type { Agent } from "types/api";
 
 const Agents = (): JSX.Element => {
@@ -24,6 +25,15 @@ const Agents = (): JSX.Element => {
   const [toastMessage, setToastMessage] = React.useState("");
   const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
   const [agentStats, setAgentStats] = React.useState({ count: 0, totalAmount: 0 });
+  const [fillialStats, setFillialStats] = React.useState<any[]>([]);
+  const [allApplications, setAllApplications] = React.useState<any[]>([]);
+  
+  // Modal filters
+  const [modalStartDate, setModalStartDate] = React.useState("");
+  const [modalEndDate, setModalEndDate] = React.useState("");
+  const [modalRegion, setModalRegion] = React.useState("all");
+  const [modalMerchant, setModalMerchant] = React.useState<number | "all">("all");
+  const [merchants, setMerchants] = React.useState<any[]>([]);
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
@@ -70,6 +80,109 @@ const Agents = (): JSX.Element => {
       clearTimeout(timeoutId);
     };
   }, []);
+
+  // Load merchants
+  React.useEffect(() => {
+    let mounted = true;
+    api.listMerchants({ page: 1, pageSize: 100 })
+      .then((res) => {
+        if (!mounted) return;
+        setMerchants(res?.items || []);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setMerchants([]);
+      });
+    return () => { mounted = false; };
+  }, []);
+
+  // Calculate fillial stats based on filters
+  const calculateFillialStats = React.useCallback((agent: Agent, apps: any[]) => {
+    if (!agent.fillials || agent.fillials.length === 0) {
+      setFillialStats([]);
+      setAgentStats({ count: 0, totalAmount: 0 });
+      return;
+    }
+
+    const agentFillialIds = agent.fillials.map(f => f.id);
+    let filteredApps = apps.filter((app: any) => agentFillialIds.includes(app.fillial_id));
+
+    // Apply date filter
+    if (modalStartDate || modalEndDate) {
+      const start = modalStartDate ? new Date(modalStartDate) : new Date(0);
+      const end = modalEndDate ? new Date(modalEndDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      filteredApps = filteredApps.filter((app: any) => {
+        if (!app.createdAt) return false;
+        const d = new Date(app.createdAt);
+        return d >= start && d <= end;
+      });
+    }
+
+    // Apply region filter
+    if (modalRegion !== "all") {
+      filteredApps = filteredApps.filter((app: any) => {
+        const fillial = agent.fillials?.find(f => f.id === app.fillial_id);
+        return fillial?.region === modalRegion;
+      });
+    }
+
+    // Apply merchant filter
+    if (modalMerchant !== "all") {
+      filteredApps = filteredApps.filter((app: any) => {
+        const fillial = agent.fillials?.find(f => f.id === app.fillial_id);
+        return fillial?.merchant_id === Number(modalMerchant);
+      });
+    }
+
+    // Group by fillial
+    const statsByFillial: any = {};
+    filteredApps.forEach((app: any) => {
+      const fillialId = app.fillial_id;
+      if (!fillialId) return;
+
+      if (!statsByFillial[fillialId]) {
+        const fillialObj = agent.fillials?.find(f => f.id === fillialId);
+        statsByFillial[fillialId] = {
+          fillial: fillialObj,
+          totalCount: 0,
+          confirmedCount: 0,
+          totalAmount: 0,
+          confirmedAmount: 0
+        };
+      }
+
+      statsByFillial[fillialId].totalCount++;
+      statsByFillial[fillialId].totalAmount += app.amount || 0;
+
+      const status = (app.status || "").toUpperCase();
+      const isConfirmed = status === "CONFIRMED" || status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
+      if (isConfirmed) {
+        statsByFillial[fillialId].confirmedCount++;
+        statsByFillial[fillialId].confirmedAmount += app.amount || 0;
+      }
+    });
+
+    // Convert to array and sort by total count (descending)
+    const statsArray = Object.values(statsByFillial).sort((a: any, b: any) => b.totalCount - a.totalCount);
+    setFillialStats(statsArray);
+
+    // Calculate total stats
+    const totalCount = filteredApps.length;
+    const totalAmount = filteredApps.reduce((sum: number, app: any) => {
+      const status = (app.status || "").toUpperCase();
+      const isConfirmed = status === "CONFIRMED" || status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
+      return sum + (isConfirmed ? (app.amount || 0) : 0);
+    }, 0);
+    setAgentStats({ count: totalCount, totalAmount });
+  }, [modalStartDate, modalEndDate, modalRegion, modalMerchant]);
+
+  // Recalculate when filters change
+  React.useEffect(() => {
+    if (selected && allApplications.length > 0) {
+      calculateFillialStats(selected, allApplications);
+    }
+  }, [modalStartDate, modalEndDate, modalRegion, modalMerchant, selected, allApplications, calculateFillialStats]);
 
   const filteredData = React.useMemo(() => {
     let filtered = data;
@@ -213,27 +326,22 @@ const Agents = (): JSX.Element => {
                 onClick={async () => {
                   try {
                     setDetailLoading(true);
+                    // Reset filters when opening modal
+                    setModalStartDate("");
+                    setModalEndDate("");
+                    setModalRegion("all");
+                    setModalMerchant("all");
+                    
                     const [fullAgent, applicationsRes] = await Promise.all([
                       api.getAgent(row.id),
                       api.listApplications({})
                     ]);
                     
                     setSelected(fullAgent);
+                    setAllApplications(applicationsRes?.items || []);
                     
-                    // Filter applications by agent's fillials
-                    const agentFillialIds = fullAgent.fillials?.map(f => f.id) || [];
-                    const agentApps = (applicationsRes?.items || []).filter((app: any) => 
-                      agentFillialIds.includes(app.fillial_id)
-                    );
-                    
-                    // Calculate stats
-                    const totalAmount = agentApps.reduce((sum: number, app: any) => {
-                      const status = (app.status || "").toUpperCase();
-                      const isCompleted = status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE" || status === "CONFIRMED";
-                      return sum + (isCompleted ? (app.amount || 0) : 0);
-                    }, 0);
-                    
-                    setAgentStats({ count: agentApps.length, totalAmount });
+                    // Calculate initial stats
+                    calculateFillialStats(fullAgent, applicationsRes?.items || []);
                     setOpen(true);
                   } catch (err) {
                     console.error("Error fetching agent details:", err);
@@ -241,6 +349,8 @@ const Agents = (): JSX.Element => {
                     setToastMessage("Agent tafsilotlarini yuklashda xatolik yuz berdi");
                     setToastOpen(true);
                     setSelected(row);
+                    setAllApplications([]);
+                    setFillialStats([]);
                     setAgentStats({ count: 0, totalAmount: 0 });
                     setOpen(true);
                   } finally {
@@ -321,39 +431,98 @@ const Agents = (): JSX.Element => {
               </div>
             </div>
 
-            {/* Filliallar ro'yxati */}
+            {/* Filterlar */}
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Filliallar</h4>
-              {selected.fillials && selected.fillials.length > 0 ? (
-                <div className="space-y-1">
-                  {selected.fillials.map((fillial: any) => (
-                    <div key={fillial.id} className="flex items-center gap-2 text-sm">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100 text-xs">
-                        {fillial.id}
-                      </span>
-                      <span className="text-gray-700 dark:text-gray-300">{fillial.name}</span>
-                      {fillial.region && (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">({fillial.region})</span>
-                      )}
-                    </div>
-                  ))}
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Filterlar</h4>
+              <div className="space-y-2">
+                <DateRangePicker 
+                  startDate={modalStartDate} 
+                  endDate={modalEndDate} 
+                  onStartChange={setModalStartDate} 
+                  onEndChange={setModalEndDate} 
+                />
+                <div className="flex flex-wrap gap-2">
+                  <CustomSelect
+                    value={String(modalMerchant)}
+                    onChange={(value) => setModalMerchant(value === "all" ? "all" : Number(value))}
+                    options={[
+                      { value: "all", label: "Barcha merchantlar" },
+                      ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                        value: String(m.id), 
+                        label: m.name || `Merchant #${m.id}` 
+                      }))
+                    ]}
+                    className="min-w-[150px] flex-1"
+                  />
+                  <CustomSelect
+                    value={modalRegion}
+                    onChange={setModalRegion}
+                    options={[
+                      { value: "all", label: "Barcha hududlar" },
+                      ...Array.from(new Set((selected.fillials || []).map(f => f.region).filter(Boolean))).map(r => ({ 
+                        value: r as string, 
+                        label: r as string 
+                      }))
+                    ]}
+                    className="min-w-[150px] flex-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Filliallar bo'yicha hisobot */}
+            <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Filliallar bo'yicha hisobot</h4>
+              {fillialStats.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 dark:bg-navy-700 text-xs text-gray-600 dark:text-gray-300">
+                      <tr>
+                        <th className="px-2 py-2 text-left">Filial</th>
+                        <th className="px-2 py-2 text-right">Arizalar</th>
+                        <th className="px-2 py-2 text-right">Summa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-gray-700 dark:text-gray-300">
+                      {fillialStats.map((stat: any, index: number) => (
+                        <tr key={stat.fillial?.id || index} className="border-t border-gray-200 dark:border-gray-600">
+                          <td className="px-2 py-2">
+                            <div className="font-medium">{stat.fillial?.name || "-"}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{stat.fillial?.region || ""}</div>
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <div className="font-semibold">{stat.totalCount}</div>
+                            <div className="text-xs text-green-600 dark:text-green-400">✓ {stat.confirmedCount}</div>
+                          </td>
+                          <td className="px-2 py-2 text-right">
+                            <div className="text-xs">{formatMoney(stat.totalAmount)}</div>
+                            <div className="text-xs text-green-600 dark:text-green-400 font-semibold">
+                              {formatMoney(stat.confirmedAmount)}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               ) : (
-                <div className="text-sm text-gray-500 dark:text-gray-400">Filliallar mavjud emas</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  Tanlangan filtrlar bo'yicha filliallar topilmadi
+                </div>
               )}
             </div>
 
-            {/* Arizalar statistikasi */}
+            {/* Umumiy statistika */}
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Arizalar statistikasi</h4>
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Umumiy statistika</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
                   <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">Jami arizalar</div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{agentStats.count}</div>
+                  <div className="text-xl font-bold text-blue-700 dark:text-blue-300">{agentStats.count}</div>
                 </div>
                 <div className="rounded-lg bg-green-50 dark:bg-green-900/20 p-3">
-                  <div className="text-xs text-green-600 dark:text-green-400 font-medium">Umumiy summa</div>
-                  <div className="text-lg sm:text-2xl font-bold text-green-700 dark:text-green-300">
+                  <div className="text-xs text-green-600 dark:text-green-400 font-medium">Tasdiqlangan summa</div>
+                  <div className="text-base font-bold text-green-700 dark:text-green-300">
                     {formatMoney(agentStats.totalAmount)}
                   </div>
                 </div>
