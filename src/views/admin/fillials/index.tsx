@@ -48,6 +48,7 @@ const Fillials = (): JSX.Element => {
   const [agents, setAgents] = React.useState<any[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
+  const [selectedFillialId, setSelectedFillialId] = React.useState<number | "all">("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
@@ -75,7 +76,12 @@ const Fillials = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, regionFilter, selectedMerchantId, selectedAgentId]);
+  }, [search, regionFilter, selectedMerchantId, selectedAgentId, selectedFillialId]);
+
+  // Reset fillial filter when merchant or agent changes
+  React.useEffect(() => {
+    setSelectedFillialId("all");
+  }, [selectedMerchantId, selectedAgentId]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -131,22 +137,36 @@ const Fillials = (): JSX.Element => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // Faqat component mount bo'lganda API chaqirish (client-side filtering)
 
-  // Client-side filtering va pagination
-  const filteredData = React.useMemo(() => {
-    let filtered = data;
+  // Fillials dropdown uchun - agent va merchant filterga qarab
+  const availableFillials = React.useMemo(() => {
+    let fillials = data;
     
     // Merchant filter
     if (selectedMerchantId !== "all") {
-      filtered = filtered.filter((item: any) => item.merchant_id === Number(selectedMerchantId));
+      fillials = fillials.filter((item: any) => item.merchant_id === Number(selectedMerchantId));
     }
     
-    // Agent filter
+    // Agent filter - agar agent tanlangan bo'lsa, faqat o'sha agentning filliallarini ko'rsat
     if (selectedAgentId !== "all") {
       const agent = agents.find(a => a.id === Number(selectedAgentId));
-      if (agent && agent.fillials) {
+      if (agent && agent.fillials && agent.fillials.length > 0) {
         const agentFillialIds = agent.fillials.map((f: any) => f.id);
-        filtered = filtered.filter((item: any) => agentFillialIds.includes(item.id));
+        fillials = fillials.filter((item: any) => agentFillialIds.includes(item.id));
+      } else {
+        fillials = [];
       }
+    }
+    
+    return fillials;
+  }, [data, selectedMerchantId, selectedAgentId, agents]);
+
+  // Client-side filtering va pagination
+  const filteredData = React.useMemo(() => {
+    let filtered = availableFillials;
+    
+    // Fillial filter - agar aniq fillial tanlangan bo'lsa
+    if (selectedFillialId !== "all") {
+      filtered = filtered.filter((item: any) => item.id === selectedFillialId);
     }
     
     // Search filter
@@ -165,7 +185,7 @@ const Fillials = (): JSX.Element => {
     }
     
     return filtered;
-  }, [data, search, regionFilter, selectedMerchantId, selectedAgentId, agents]);
+  }, [availableFillials, search, regionFilter, selectedFillialId]);
   
   // Pagination
   const startIndex = (page - 1) * pageSize;
@@ -266,6 +286,21 @@ const Fillials = (): JSX.Element => {
               }))
             ]}
             className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
+          />
+          
+          <CustomSelect
+            value={String(selectedFillialId)}
+            onChange={(value) => {
+              setSelectedFillialId(value === "all" ? "all" : Number(value));
+            }}
+            options={[
+              { value: "all", label: "Barcha filliallar" },
+              ...(Array.isArray(availableFillials) ? availableFillials : []).map((f) => ({ 
+                value: String(f.id), 
+                label: f.name || `Fillial #${f.id}` 
+              }))
+            ]}
+            className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
           />
           
           <CustomSelect
@@ -425,56 +460,109 @@ const Fillials = (): JSX.Element => {
           <span className="ml-3 text-gray-600 dark:text-gray-400">Ma'lumotlar yuklanmoqda...</span>
         </div>
       ) : selected ? (
-        <div className="space-y-2">
-                    <div className="flex items-start gap-4">
-                      {selected.image ? (
-                        <img src={selected.image} alt={selected.name} className="h-20 w-20 rounded object-cover" />
-                      ) : null}
-                      <div className="flex-1">
-                        <div><strong className="text-gray-900 dark:text-white">Hudud:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.region ?? "-"}</span></div>
-                        <div><strong className="text-gray-900 dark:text-white">Manzil:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.address ?? "-"}</span></div>
+        <div className="space-y-4">
+                    {/* Main Info Card */}
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-navy-800 dark:to-navy-900 rounded-xl p-4 border border-blue-100 dark:border-navy-700">
+                      <div className="flex items-start gap-4">
+                        {selected.image && (
+                          <img src={selected.image} alt={selected.name} className="h-20 w-20 rounded-lg object-cover border-2 border-white dark:border-navy-700 shadow-md" />
+                        )}
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">📍</span>
+                            <div>
+                              <p className="text-xs text-gray-600 dark:text-gray-400">Hudud</p>
+                              <p className="font-semibold text-gray-900 dark:text-white">{selected.region ?? "-"}</p>
+                            </div>
+                          </div>
+                          {selected.address && (
+                            <div className="flex items-start gap-2">
+                              <span className="text-xl">🏢</span>
+                              <div>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">Manzil</p>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">{selected.address}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                     
                     {/* Director info */}
-                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Direktor ma'lumotlari</h4>
-                      <div><strong className="text-gray-900 dark:text-white">Ism-familiya:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.director_name ?? "-"}</span></div>
-                      <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.director_phone)}</span></div>
+                    <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                      <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                        <span className="text-2xl">👤</span>
+                        Direktor ma'lumotlari
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ism-familiya</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{selected.director_name ?? "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Telefon</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{formatPhone(selected.director_phone)}</p>
+                        </div>
+                      </div>
                     </div>
                     
                     {/* Financial info */}
-                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Moliyaviy ma'lumotlar</h4>
-                      <div><strong className="text-gray-900 dark:text-white">Bank:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.bank_name ?? "-"}</span></div>
-                      <div><strong className="text-gray-900 dark:text-white">MFO:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.mfo ?? "-"}</span></div>
-                      <div><strong className="text-gray-900 dark:text-white">Hisob raqam:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.hisob_raqam ?? "-"}</span></div>
-                      <div><strong className="text-gray-900 dark:text-white">INN:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.inn ?? "-"}</span></div>
-                      <div><strong className="text-gray-900 dark:text-white">NDS:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.nds ?? "-"}</span></div>
+                    <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                      <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                        <span className="text-2xl">💰</span>
+                        Moliyaviy ma'lumotlar
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Bank</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{selected.bank_name ?? "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">MFO</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{selected.mfo ?? "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Hisob raqam</p>
+                          <p className="font-medium text-gray-900 dark:text-white text-sm">{selected.hisob_raqam ?? "-"}</p>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">INN</p>
+                          <p className="font-medium text-gray-900 dark:text-white">{selected.inn ?? "-"}</p>
+                        </div>
+                        {selected.nds && (
+                          <div className="bg-gray-50 dark:bg-navy-900 rounded-lg p-3">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">NDS</p>
+                            <p className="font-medium text-gray-900 dark:text-white">{selected.nds}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Expired months */}
                     {selected.expired_months && Array.isArray(selected.expired_months) && selected.expired_months.length > 0 && (
-                      <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Muddatli to'lov rejalari</h4>
+                      <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                        <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                          <span className="text-2xl">📅</span>
+                          Muddatli to'lov rejalari
+                        </h4>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           {selected.expired_months.map((item: any, index: number) => (
                             <div 
                               key={index} 
-                              className={`p-3 rounded-lg border ${
+                              className={`p-3 rounded-lg border-2 transition-all ${
                                 item.active 
-                                  ? 'border-green-200 bg-green-50 dark:border-green-700 dark:bg-green-900/20' 
+                                  ? 'border-green-400 bg-gradient-to-br from-green-50 to-green-100 dark:border-green-600 dark:from-green-900/30 dark:to-green-900/20 shadow-sm' 
                                   : 'border-gray-200 bg-gray-50 dark:border-gray-600 dark:bg-gray-700/20'
                               }`}
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-medium text-gray-900 dark:text-white">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-lg font-bold text-gray-900 dark:text-white">
                                   {item.month} oy
                                 </span>
-                                <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${
                                   item.active 
-                                    ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'
-                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                    ? 'bg-green-500 text-white dark:bg-green-600'
+                                    : 'bg-gray-300 text-gray-700 dark:bg-gray-600 dark:text-gray-300'
                                 }`}>
                                   {item.active ? 'Aktiv' : 'Nofaol'}
                                 </span>
@@ -490,10 +578,21 @@ const Fillials = (): JSX.Element => {
 
                     {/* Merchant info */}
                     {selected.merchant && (
-                      <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Merchant ma'lumotlari</h4>
-                        <div><strong className="text-gray-900 dark:text-white">Nomi:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.merchant.name}</span></div>
-                        <div><strong className="text-gray-900 dark:text-white">ID:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.merchant.id}</span></div>
+                      <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                        <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                          <span className="text-2xl">🏪</span>
+                          Merchant ma'lumotlari
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-navy-700 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400 font-medium">Nomi:</span>
+                            <span className="text-gray-900 dark:text-white font-semibold">{selected.merchant.name}</span>
+                          </div>
+                          <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-navy-700 rounded-lg">
+                            <span className="text-gray-600 dark:text-gray-400 font-medium">ID:</span>
+                            <span className="text-gray-900 dark:text-white font-semibold">{selected.merchant.id}</span>
+                          </div>
+                        </div>
                       </div>
                     )}
 
@@ -504,31 +603,58 @@ const Fillials = (): JSX.Element => {
                       );
                       
                       return agent ? (
-                        <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Agent ma'lumotlari</h4>
-                          <div><strong className="text-gray-900 dark:text-white">Ism-familiya:</strong> <span className="text-gray-700 dark:text-gray-300">{agent.fullname || "-"}</span></div>
-                          <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(agent.phone)}</span></div>
-                          <div><strong className="text-gray-900 dark:text-white">Holat:</strong> <span className="text-gray-700 dark:text-gray-300">{agent.work_status || "-"}</span></div>
+                        <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                          <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                            <span className="text-2xl">👨‍💼</span>
+                            Agent ma'lumotlari
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2">
+                            <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-navy-700 rounded-lg">
+                              <span className="text-gray-600 dark:text-gray-400 font-medium">Ism-familiya:</span>
+                              <span className="text-gray-900 dark:text-white font-semibold">{agent.fullname || "-"}</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-navy-700 rounded-lg">
+                              <span className="text-gray-600 dark:text-gray-400 font-medium">Telefon:</span>
+                              <span className="text-gray-900 dark:text-white font-semibold">{formatPhone(agent.phone)}</span>
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-gray-50 dark:bg-navy-700 rounded-lg">
+                              <span className="text-gray-600 dark:text-gray-400 font-medium">Holat:</span>
+                              <span className="text-gray-900 dark:text-white font-semibold">{agent.work_status || "-"}</span>
+                            </div>
+                          </div>
                         </div>
                       ) : null;
                     })()}
 
                     {/* Status and dates */}
-                    <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-                      <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Holat va sana</h4>
-                      <div><strong className="text-gray-900 dark:text-white">Ish holati:</strong> 
-                        {selected.work_status === "WORKING" ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-green-100 dark:bg-green-800 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-100">Ishlaydi</span>
-                        ) : selected.work_status === "BLOCKED" ? (
-                          <span className="ml-2 inline-flex items-center rounded-full bg-yellow-100 dark:bg-yellow-800 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-100">Bloklangan</span>
-                        ) : (
-                          <span className="ml-2 text-gray-700 dark:text-gray-300">{selected.work_status ?? "-"}</span>
-                        )}
-                      </div>
-                      <div><strong className="text-gray-900 dark:text-white">Yaratilgan:</strong> 
-                        <span className="text-gray-700 dark:text-gray-300 ml-2">
-                          {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('en-GB') : "-"}
-                        </span>
+                    <div className="bg-white dark:bg-navy-800 rounded-xl p-4 border border-gray-200 dark:border-navy-700 shadow-sm">
+                      <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-3 text-lg">
+                        <span className="text-2xl">📊</span>
+                        Holat va sana
+                      </h4>
+                      <div className="grid grid-cols-1 gap-3">
+                        <div className="flex items-center justify-between p-3 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-navy-700 dark:to-navy-600 rounded-lg">
+                          <span className="text-gray-600 dark:text-gray-400 font-medium">Ish holati:</span>
+                          <div>
+                            {selected.work_status === "WORKING" ? (
+                              <span className="inline-flex items-center rounded-full bg-gradient-to-r from-green-500 to-green-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm">
+                                ✓ Ishlaydi
+                              </span>
+                            ) : selected.work_status === "BLOCKED" ? (
+                              <span className="inline-flex items-center rounded-full bg-gradient-to-r from-yellow-500 to-yellow-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm">
+                                ⚠ Bloklangan
+                              </span>
+                            ) : (
+                              <span className="text-gray-700 dark:text-gray-300 font-semibold">{selected.work_status ?? "-"}</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-navy-700 dark:to-navy-600 rounded-lg">
+                          <span className="text-gray-600 dark:text-gray-400 font-medium">Yaratilgan:</span>
+                          <span className="text-gray-900 dark:text-white font-semibold">
+                            {selected.createdAt ? new Date(selected.createdAt).toLocaleDateString('en-GB') : "-"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="mt-4 flex gap-2">
