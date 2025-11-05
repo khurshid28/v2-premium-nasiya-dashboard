@@ -23,7 +23,6 @@ const Agents = (): JSX.Element => {
   const [toastOpen, setToastOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState("");
   const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
-  const [agentApplications, setAgentApplications] = React.useState<any[]>([]);
   const [agentStats, setAgentStats] = React.useState({ count: 0, totalAmount: 0 });
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -234,7 +233,6 @@ const Agents = (): JSX.Element => {
                       return sum + (isCompleted ? (app.amount || 0) : 0);
                     }, 0);
                     
-                    setAgentApplications(agentApps);
                     setAgentStats({ count: agentApps.length, totalAmount });
                     setOpen(true);
                   } catch (err) {
@@ -243,7 +241,6 @@ const Agents = (): JSX.Element => {
                     setToastMessage("Agent tafsilotlarini yuklashda xatolik yuz berdi");
                     setToastOpen(true);
                     setSelected(row);
-                    setAgentApplications([]);
                     setAgentStats({ count: 0, totalAmount: 0 });
                     setOpen(true);
                   } finally {
