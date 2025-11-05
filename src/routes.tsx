@@ -3,6 +3,9 @@ import React from "react";
 // Super Imports
 import MainDashboard from "views/admin/default";
 import Profile from "views/admin/profile";
+import Merchants from "views/admin/merchants";
+import Agents from "views/admin/agents";
+import Admins from "views/admin/admins";
 import Fillials from "views/admin/fillials";
 import Users from "views/admin/users";
 import Applications from "views/admin/applications";
@@ -12,7 +15,7 @@ import ReportsPage from "views/admin/reports";
 import SignIn from "views/auth/SignIn";
 
 // Icon Imports (Tabler icons)
-import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report } from "tabler-icons-react";
+import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck } from "tabler-icons-react";
 
 const routes = [
   {
@@ -52,6 +55,27 @@ const routes = [
   //   icon: <MdBarChart className="h-6 w-6" />,
   //   component: <SuperDashboard />,
   // },
+  {
+    name: "Merchantlar",
+    layout: "/super",
+    path: "merchants",
+    icon: <BuildingStore size={20} />,
+    component: <Merchants />,
+  },
+  {
+    name: "Agentlar",
+    layout: "/super",
+    path: "agents",
+    icon: <UsersIcon size={20} />,
+    component: <Agents />,
+  },
+  {
+    name: "Adminlar",
+    layout: "/super",
+    path: "admins",
+    icon: <UserCheck size={20} />,
+    component: <Admins />,
+  },
   {
     name: "Filiallar",
     layout: "/super",
