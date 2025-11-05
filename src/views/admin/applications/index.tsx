@@ -247,10 +247,15 @@ const Applications = (): JSX.Element => {
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   
+  // Reset fillial filter when merchant or agent changes
+  React.useEffect(() => {
+    setFillialFilter("all");
+  }, [selectedMerchantId, selectedAgentId]);
+
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate, selectedMerchantId]);
+  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate, selectedMerchantId, selectedAgentId]);
 
   // Slice data for current page
   const pageData = React.useMemo(() => {
@@ -361,7 +366,22 @@ const Applications = (): JSX.Element => {
             options={[
               { value: "all", label: "Barcha filiallar" },
               ...(Array.isArray(fillialsList) ? fillialsList : [])
-                .filter(f => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+                .filter(f => {
+                  // Merchant filter
+                  if (selectedMerchantId !== "all" && f.merchant_id !== Number(selectedMerchantId)) {
+                    return false;
+                  }
+                  // Agent filter
+                  if (selectedAgentId !== "all") {
+                    const agent = agents.find((ag: any) => ag.id === Number(selectedAgentId));
+                    if (agent && agent.fillials && agent.fillials.length > 0) {
+                      const agentFillialIds = agent.fillials.map((af: any) => af.id);
+                      return agentFillialIds.includes(f.id);
+                    }
+                    return false;
+                  }
+                  return true;
+                })
                 .map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="flex-1 min-w-[150px] sm:flex-initial sm:w-auto"

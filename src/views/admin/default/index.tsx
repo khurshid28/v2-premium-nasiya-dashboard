@@ -109,12 +109,18 @@ const Dashboard = (): JSX.Element => {
           filteredApps = filteredApps.filter((a: any) => merchantFillialIds.includes(a.fillial_id));
         }
 
-        // Filter by agent
+        // Filter by agent - bu fillials ro'yxatini ham filter qiladi
         if (selectedAgentId !== "all") {
           const agent = agents.find(a => a.id === Number(selectedAgentId));
-          if (agent && agent.fillials) {
+          if (agent && agent.fillials && agent.fillials.length > 0) {
             const agentFillialIds = agent.fillials.map((f: any) => f.id);
+            // Agent filterini merchantFilteredFillials ga ham qo'llash
+            merchantFilteredFillials = merchantFilteredFillials.filter(f => agentFillialIds.includes(f.id));
             filteredApps = filteredApps.filter((a: any) => agentFillialIds.includes(a.fillial_id));
+          } else {
+            // Agar agent topilmasa yoki filliallari bo'lmasa
+            merchantFilteredFillials = [];
+            filteredApps = [];
           }
         }
 
@@ -154,20 +160,11 @@ const Dashboard = (): JSX.Element => {
         }
 
         // Filter users by merchant, agent, and fillial
+        // merchantFilteredFillials allaqachon merchant va agent filter qilingan
         let filteredUsers = users?.items || [];
-        // First filter by merchant (through fillials)
-        if (selectedMerchantId !== "all") {
-          const merchantFillialIds = merchantFilteredFillials.map(f => f.id);
-          filteredUsers = filteredUsers.filter((u: any) => merchantFillialIds.includes(u.fillial_id));
-        }
-        // Filter by agent
-        if (selectedAgentId !== "all") {
-          const agent = agents.find(a => a.id === Number(selectedAgentId));
-          if (agent && agent.fillials) {
-            const agentFillialIds = agent.fillials.map((f: any) => f.id);
-            filteredUsers = filteredUsers.filter((u: any) => agentFillialIds.includes(u.fillial_id));
-          }
-        }
+        const validFillialIds = merchantFilteredFillials.map(f => f.id);
+        filteredUsers = filteredUsers.filter((u: any) => validFillialIds.includes(u.fillial_id));
+        
         if (selectedFillialId !== "all") {
           filteredUsers = filteredUsers.filter((u: any) => u.fillial_id === selectedFillialId);
         } else if (selectedRegion !== "all") {

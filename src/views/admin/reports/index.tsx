@@ -248,7 +248,22 @@ const ReportsPage = () => {
           options={[
             { value: "all", label: "Barcha filiallar" },
             ...fillials
-              .filter(f => selectedMerchantId === "all" || f.merchant_id === Number(selectedMerchantId))
+              .filter(f => {
+                // Merchant filter
+                if (selectedMerchantId !== "all" && f.merchant_id !== Number(selectedMerchantId)) {
+                  return false;
+                }
+                // Agent filter
+                if (selectedAgentId !== "all") {
+                  const agent = agents.find((a: any) => a.id === Number(selectedAgentId));
+                  if (agent && agent.fillials && agent.fillials.length > 0) {
+                    const agentFillialIds = agent.fillials.map((af: any) => af.id);
+                    return agentFillialIds.includes(f.id);
+                  }
+                  return false;
+                }
+                return true;
+              })
               .map(f => ({ value: f.id.toString(), label: f.name }))
           ]}
           className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
