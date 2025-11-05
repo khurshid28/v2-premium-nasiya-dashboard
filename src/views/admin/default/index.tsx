@@ -2,6 +2,7 @@ import React from "react";
 import api from "lib/api";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
+import Pagination from "components/pagination";
 // formatShortMoney removed (unused in this view)
 import TotalSpent from "./components/TotalSpent";
 import WeeklyRevenue from "./components/WeeklyRevenue";
@@ -34,7 +35,9 @@ const Dashboard = (): JSX.Element => {
   const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   const [selectedExpiredMonth, setSelectedExpiredMonth] = React.useState<number | "all">("all");
   // charts removed: barData, pieData, lineData
-  // pagination state for fillial cards removed
+  // pagination for fillial stats table
+  const [fillialStatsPage, setFillialStatsPage] = React.useState<number>(1);
+  const [fillialStatsPageSize] = React.useState<number>(10);
 
   React.useEffect(() => {
     let mounted = true;
@@ -330,6 +333,18 @@ const Dashboard = (): JSX.Element => {
     return Object.values(statsByFillial).sort((a: any, b: any) => b.totalCount - a.totalCount);
   }, [applications, fillials, startDate, endDate, selectedMerchantId, selectedRegion]);
 
+  // Pagination for fillial stats
+  const totalFillialStats = fillialStats.length;
+  const fillialStatsTotalPages = Math.max(1, Math.ceil(totalFillialStats / fillialStatsPageSize));
+  const fillialStatsStartIndex = (fillialStatsPage - 1) * fillialStatsPageSize;
+  const fillialStatsEndIndex = fillialStatsStartIndex + fillialStatsPageSize;
+  const paginatedFillialStats = fillialStats.slice(fillialStatsStartIndex, fillialStatsEndIndex);
+
+  // Reset pagination when filters change
+  React.useEffect(() => {
+    setFillialStatsPage(1);
+  }, [selectedMerchantId, selectedRegion, selectedAgentId, startDate, endDate, selectedFillialId, search]);
+
   return (
     <div>
       <div className="flex flex-col gap-3">
@@ -502,11 +517,16 @@ const Dashboard = (): JSX.Element => {
 
       {/* Filliallar bo'yicha hisobot */}
       <div className="mt-6">
-        <div className="mb-4">
-          <h3 className="text-xl font-semibold text-navy-700 dark:text-white">Filliallar bo'yicha hisobot</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Tanlangan filtrlar bo'yicha har bir filial statistikasi (ko'p arizali filiallar birinchi)
-          </p>
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-semibold text-navy-700 dark:text-white">Filliallar bo'yicha hisobot</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              Tanlangan filtrlar bo'yicha har bir filial statistikasi (ko'p arizali filiallar birinchi)
+            </p>
+          </div>
+          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Jami: <span className="text-lg font-bold text-brand-500 dark:text-brand-400">{totalFillialStats}</span> ta filial
+          </div>
         </div>
         
         <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
@@ -523,19 +543,19 @@ const Dashboard = (): JSX.Element => {
               </tr>
             </thead>
             <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
-              {fillialStats.length === 0 ? (
+              {paginatedFillialStats.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                     Tanlangan filtrlar bo'yicha filliallar topilmadi
                   </td>
                 </tr>
               ) : (
-                fillialStats.map((stat: any, index: number) => (
+                paginatedFillialStats.map((stat: any, index: number) => (
                   <tr
                     key={stat.fillial?.id || index}
                     className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-navy-700"
                   >
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{index + 1}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{fillialStatsStartIndex + index + 1}</td>
                     <td className="px-4 py-3 font-medium">{stat.fillial?.name || "-"}</td>
                     <td className="px-4 py-3">
                       <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100">
@@ -562,6 +582,17 @@ const Dashboard = (): JSX.Element => {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination for fillial stats */}
+        {totalFillialStats > fillialStatsPageSize && (
+          <div className="mt-4">
+            <Pagination
+              page={fillialStatsPage}
+              totalPages={fillialStatsTotalPages}
+              onPageChange={setFillialStatsPage}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
