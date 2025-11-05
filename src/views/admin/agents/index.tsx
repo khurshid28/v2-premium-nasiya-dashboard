@@ -34,6 +34,10 @@ const Agents = (): JSX.Element => {
   const [modalRegion, setModalRegion] = React.useState("all");
   const [modalMerchant, setModalMerchant] = React.useState<number | "all">("all");
   const [merchants, setMerchants] = React.useState<any[]>([]);
+  
+  // Modal pagination
+  const [fillialStatsPage, setFillialStatsPage] = React.useState<number>(1);
+  const [fillialStatsPageSize] = React.useState<number>(10);
 
   const abortControllerRef = React.useRef<AbortController | null>(null);
 
@@ -142,7 +146,8 @@ const Agents = (): JSX.Element => {
         fillial: fillial,
         totalCount: 0,
         confirmedCount: 0,
-        confirmedAmount: 0
+        confirmedAmount: 0,
+        paymentAmount: 0
       };
     });
 
@@ -155,9 +160,15 @@ const Agents = (): JSX.Element => {
 
       const status = (app.status || "").toUpperCase();
       const isConfirmed = status === "CONFIRMED" || status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
+      const isFinished = status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
+      
       if (isConfirmed) {
         statsByFillial[fillialId].confirmedCount++;
         statsByFillial[fillialId].confirmedAmount += app.amount || 0;
+      }
+      
+      if (isFinished) {
+        statsByFillial[fillialId].paymentAmount += app.payment_amount || 0;
       }
     });
 
@@ -181,6 +192,11 @@ const Agents = (): JSX.Element => {
       calculateFillialStats(selected, allApplications);
     }
   }, [modalStartDate, modalEndDate, modalRegion, modalMerchant, selected, allApplications, calculateFillialStats]);
+
+  // Reset pagination when filters change
+  React.useEffect(() => {
+    setFillialStatsPage(1);
+  }, [modalStartDate, modalEndDate, modalRegion, modalMerchant]);
 
   const filteredData = React.useMemo(() => {
     let filtered = data;
@@ -470,38 +486,59 @@ const Agents = (): JSX.Element => {
 
             {/* Filliallar bo'yicha hisobot */}
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
-              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Filliallar bo'yicha hisobot</h4>
-              {fillialStats.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-navy-700 text-xs text-gray-600 dark:text-gray-300">
-                      <tr>
-                        <th className="px-2 py-2 text-left">Filial</th>
-                        <th className="px-2 py-2 text-right">Arizalar</th>
-                        <th className="px-2 py-2 text-right">Tasdiqlangan summa</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-700 dark:text-gray-300">
-                      {fillialStats.map((stat: any, index: number) => (
-                        <tr key={stat.fillial?.id || index} className="border-t border-gray-200 dark:border-gray-600">
-                          <td className="px-2 py-2">
-                            <div className="font-medium">{stat.fillial?.name || "-"}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">{stat.fillial?.region || ""}</div>
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <div className="font-semibold">{stat.totalCount}</div>
-                            <div className="text-xs text-green-600 dark:text-green-400">✓ {stat.confirmedCount}</div>
-                          </td>
-                          <td className="px-2 py-2 text-right">
-                            <div className="font-semibold text-green-600 dark:text-green-400">
-                              {formatMoney(stat.confirmedAmount)}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-gray-900 dark:text-white">Filliallar bo'yicha hisobot</h4>
+                <div className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                  Jami: <span className="text-sm font-bold text-brand-500 dark:text-brand-400">{fillialStats.length}</span> ta filial
                 </div>
+              </div>
+              {fillialStats.length > 0 ? (
+                <>
+                  <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 dark:bg-navy-700 text-xs text-gray-600 dark:text-gray-300">
+                        <tr>
+                          <th className="px-2 py-2 text-left">Filial</th>
+                          <th className="px-2 py-2 text-right">Arizalar</th>
+                          <th className="px-2 py-2 text-right">Tasdiqlangan summa</th>
+                        </tr>
+                      </thead>
+                      <tbody className="text-gray-700 dark:text-gray-300">
+                        {(() => {
+                          const startIndex = (fillialStatsPage - 1) * fillialStatsPageSize;
+                          const endIndex = startIndex + fillialStatsPageSize;
+                          const paginatedStats = fillialStats.slice(startIndex, endIndex);
+                          return paginatedStats.map((stat: any, index: number) => (
+                            <tr key={stat.fillial?.id || index} className="border-t border-gray-200 dark:border-gray-600">
+                              <td className="px-2 py-2">
+                                <div className="font-medium">{stat.fillial?.name || "-"}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">{stat.fillial?.region || ""}</div>
+                              </td>
+                              <td className="px-2 py-2 text-right">
+                                <div className="font-semibold">{stat.totalCount}</div>
+                                <div className="text-xs text-green-600 dark:text-green-400">✓ {stat.confirmedCount}</div>
+                              </td>
+                              <td className="px-2 py-2 text-right">
+                                <div className="font-semibold text-green-600 dark:text-green-400">
+                                  {formatMoney(stat.confirmedAmount)}
+                                </div>
+                              </td>
+                            </tr>
+                          ));
+                        })()}
+                      </tbody>
+                    </table>
+                  </div>
+                  {fillialStats.length > fillialStatsPageSize && (
+                    <div className="mt-3">
+                      <Pagination
+                        page={fillialStatsPage}
+                        totalPages={Math.ceil(fillialStats.length / fillialStatsPageSize)}
+                        onPageChange={setFillialStatsPage}
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-sm text-gray-500 dark:text-gray-400">
                   Tanlangan filtrlar bo'yicha filliallar topilmadi
@@ -513,6 +550,10 @@ const Agents = (): JSX.Element => {
             <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
               <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Umumiy statistika</h4>
               <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg bg-purple-50 dark:bg-purple-900/20 p-3">
+                  <div className="text-xs text-purple-600 dark:text-purple-400 font-medium">Filliallar soni</div>
+                  <div className="text-xl font-bold text-purple-700 dark:text-purple-300">{selected.fillials?.length || 0}</div>
+                </div>
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 p-3">
                   <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">Jami arizalar</div>
                   <div className="text-xl font-bold text-blue-700 dark:text-blue-300">{agentStats.count}</div>
@@ -521,6 +562,15 @@ const Agents = (): JSX.Element => {
                   <div className="text-xs text-green-600 dark:text-green-400 font-medium">Tasdiqlangan summa</div>
                   <div className="text-base font-bold text-green-700 dark:text-green-300">
                     {formatMoney(agentStats.totalAmount)}
+                  </div>
+                </div>
+                <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 p-3">
+                  <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">Umumiy oborot</div>
+                  <div className="text-base font-bold text-orange-700 dark:text-orange-300">
+                    {(() => {
+                      const totalTurnover = fillialStats.reduce((sum: number, stat: any) => sum + (stat.paymentAmount || 0), 0);
+                      return formatMoney(totalTurnover);
+                    })()}
                   </div>
                 </div>
               </div>
