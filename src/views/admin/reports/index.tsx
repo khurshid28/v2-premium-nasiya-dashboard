@@ -26,7 +26,9 @@ const ReportsPage = () => {
   const [fillialFilter, setFillialFilter] = useState<string>("all");
   const [fillials, setFillials] = useState<any[]>([]);
   const [merchants, setMerchants] = useState<any[]>([]);
+  const [agents, setAgents] = useState<any[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = useState<number | "all">("all");
+  const [selectedAgentId, setSelectedAgentId] = useState<number | "all">("all");
 
   useEffect(() => {
     loadFillials();
@@ -34,16 +36,19 @@ const ReportsPage = () => {
 
   const loadFillials = async () => {
     try {
-      const [filialsRes, merchantsRes] = await Promise.all([
+      const [filialsRes, merchantsRes, agentsRes] = await Promise.all([
         api.listFillials({ page: 1, pageSize: 1000 }),
-        api.listMerchants({ page: 1, pageSize: 100 })
+        api.listMerchants({ page: 1, pageSize: 100 }),
+        api.listAgents({ page: 1, pageSize: 100 })
       ]);
       setFillials(filialsRes?.items || []);
       setMerchants(merchantsRes?.items || []);
+      setAgents(agentsRes?.items || []);
     } catch (error) {
       console.error("Error loading data:", error);
       setFillials([]);
       setMerchants([]);
+      setAgents([]);
     }
   };
 
@@ -64,6 +69,20 @@ const ReportsPage = () => {
           const appFillialId = app.fillial?.id || app.fillialId;
           const fillialObj = fillials.find(f => f.id === appFillialId);
           if (!fillialObj || fillialObj.merchant_id !== Number(selectedMerchantId)) {
+            return;
+          }
+        }
+
+        // Filter by agent if selected (through fillial)
+        if (selectedAgentId !== "all") {
+          const agent = agents.find((a: any) => a.id === Number(selectedAgentId));
+          if (agent && agent.fillials) {
+            const agentFillialIds = agent.fillials.map((f: any) => f.id);
+            const appFillialId = app.fillial?.id || app.fillialId;
+            if (!agentFillialIds.includes(appFillialId)) {
+              return;
+            }
+          } else {
             return;
           }
         }
@@ -128,7 +147,7 @@ const ReportsPage = () => {
   useEffect(() => {
     loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillialFilter, selectedMerchantId]);
+  }, [fillialFilter, selectedMerchantId, selectedAgentId]);
 
   // Get unique years for filter
   const availableYears = Array.from(new Set(reports.map(r => r.year))).sort((a, b) => b - a);
@@ -201,6 +220,21 @@ const ReportsPage = () => {
             ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
               value: String(m.id), 
               label: m.name || `Merchant #${m.id}` 
+            }))
+          ]}
+          className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
+        />
+        <CustomSelect
+          value={String(selectedAgentId)}
+          onChange={(value) => {
+            setSelectedAgentId(value === "all" ? "all" : Number(value));
+            setPage(1);
+          }}
+          options={[
+            { value: "all", label: "Barcha agentlar" },
+            ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+              value: String(a.id), 
+              label: a.fullname || `Agent #${a.id}` 
             }))
           ]}
           className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"

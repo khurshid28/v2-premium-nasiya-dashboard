@@ -17,6 +17,7 @@ import { isApproved, isPending } from "lib/formatters";
 const Dashboard = (): JSX.Element => {
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [agents, setAgents] = React.useState<any[]>([]);
   const [applications, setApplications] = React.useState<any>(null);
   const [usersCount, setUsersCount] = React.useState<number>(0);
   const [applicationsCount, setApplicationsCount] = React.useState<number>(0);
@@ -30,6 +31,7 @@ const Dashboard = (): JSX.Element => {
   const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   const [selectedFillialId, setSelectedFillialId] = React.useState<number | "all">("all");
   const [selectedRegion, setSelectedRegion] = React.useState<string>("all");
+  const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   const [selectedExpiredMonth, setSelectedExpiredMonth] = React.useState<number | "all">("all");
   // charts removed: barData, pieData, lineData
   // pagination state for fillial cards removed
@@ -40,18 +42,21 @@ const Dashboard = (): JSX.Element => {
     
     Promise.all([
       api.listFillials({ page: 1, pageSize: 100 }),
-      api.listMerchants({ page: 1, pageSize: 100 })
+      api.listMerchants({ page: 1, pageSize: 100 }),
+      api.listAgents({ page: 1, pageSize: 100 })
     ])
-      .then(([filialsRes, merchantsRes]) => { 
+      .then(([filialsRes, merchantsRes, agentsRes]) => { 
         if (!mounted) return; 
         setFillials(filialsRes?.items || []); 
         setMerchants(merchantsRes?.items || []); 
+        setAgents(agentsRes?.items || []); 
       })
       .catch((err) => {
         if (!mounted || err.name === 'AbortError') return;
         console.error("Failed to load data:", err);
         setFillials([]);
         setMerchants([]);
+        setAgents([]);
       });
     
     return () => { 
@@ -105,6 +110,15 @@ const Dashboard = (): JSX.Element => {
           filteredApps = filteredApps.filter((a: any) => merchantFillialIds.includes(a.fillial_id));
         }
 
+        // Filter by agent
+        if (selectedAgentId !== "all") {
+          const agent = agents.find(a => a.id === Number(selectedAgentId));
+          if (agent && agent.fillials) {
+            const agentFillialIds = agent.fillials.map((f: any) => f.id);
+            filteredApps = filteredApps.filter((a: any) => agentFillialIds.includes(a.fillial_id));
+          }
+        }
+
         // Filter by fillial
         if (selectedFillialId !== "all") {
           filteredApps = filteredApps.filter((a: any) => a.fillial_id === selectedFillialId);
@@ -140,12 +154,20 @@ const Dashboard = (): JSX.Element => {
           console.log(`DEBUG: No month filter applied, ${filteredApps.length} apps`);
         }
 
-        // Filter users by merchant and fillial
+        // Filter users by merchant, agent, and fillial
         let filteredUsers = users?.items || [];
         // First filter by merchant (through fillials)
         if (selectedMerchantId !== "all") {
           const merchantFillialIds = merchantFilteredFillials.map(f => f.id);
           filteredUsers = filteredUsers.filter((u: any) => merchantFillialIds.includes(u.fillial_id));
+        }
+        // Filter by agent
+        if (selectedAgentId !== "all") {
+          const agent = agents.find(a => a.id === Number(selectedAgentId));
+          if (agent && agent.fillials) {
+            const agentFillialIds = agent.fillials.map((f: any) => f.id);
+            filteredUsers = filteredUsers.filter((u: any) => agentFillialIds.includes(u.fillial_id));
+          }
         }
         if (selectedFillialId !== "all") {
           filteredUsers = filteredUsers.filter((u: any) => u.fillial_id === selectedFillialId);
@@ -214,7 +236,7 @@ const Dashboard = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth, selectedMerchantId]);
+  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth, selectedMerchantId, selectedAgentId, agents]);
 
   // metrics are provided by the reusable dashboard components in ./components
 
@@ -360,6 +382,18 @@ const Dashboard = (): JSX.Element => {
                 value: r, 
                 label: r === "all" ? "Barcha hududlar" : r 
               }))}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            />
+            <CustomSelect
+              value={String(selectedAgentId)}
+              onChange={(value) => { setSelectedAgentId(value === "all" ? "all" : Number(value)); }}
+              options={[
+                { value: "all", label: "Barcha agentlar" },
+                ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+                  value: String(a.id), 
+                  label: a.fullname || `Agent #${a.id}` 
+                }))
+              ]}
               className="w-full sm:w-auto sm:min-w-[160px]"
             />
             <CustomSelect

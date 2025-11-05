@@ -44,7 +44,9 @@ const Applications = (): JSX.Element => {
   const [applications, setApplications] = React.useState<Application[]>([]);
   const [fillialsList, setFillialsList] = React.useState<any[]>([]);
   const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [agents, setAgents] = React.useState<any[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
+  const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [paidFilter, setPaidFilter] = React.useState("all");
@@ -101,10 +103,11 @@ const Applications = (): JSX.Element => {
       if (!mounted || abortController.signal.aborted) return;
       
       try {
-        const [appsRes, fillialsRes, merchantsRes] = await Promise.all([
+        const [appsRes, fillialsRes, merchantsRes, agentsRes] = await Promise.all([
           api.listApplications({}),
           api.listFillials({}),
-          api.listMerchants({ page: 1, pageSize: 100 })
+          api.listMerchants({ page: 1, pageSize: 100 }),
+          api.listAgents({ page: 1, pageSize: 100 })
         ]);
         
         if (!mounted || abortController.signal.aborted) return;
@@ -113,6 +116,7 @@ const Applications = (): JSX.Element => {
         setApplications(apps);
         setFillialsList(fillialsRes?.items || []);
         setMerchants(merchantsRes?.items || []);
+        setAgents(agentsRes?.items || []);
       } catch (err: any) {
         if (!mounted || abortController.signal.aborted) return;
         if (err.name === 'AbortError') return;
@@ -201,11 +205,22 @@ const Applications = (): JSX.Element => {
       const matchesRegion = regionFilter === "all" || (!fillialRegion && regionFilter === "all") || fillialRegion === regionFilter;
       // merchant filter (through fillial)
       const matchesMerchant = selectedMerchantId === "all" || (fillialObj && fillialObj.merchant_id === Number(selectedMerchantId));
+      // agent filter (through fillials)
+      let matchesAgent = true;
+      if (selectedAgentId !== "all") {
+        const agent = agents.find((ag: any) => ag.id === Number(selectedAgentId));
+        if (agent && agent.fillials) {
+          const agentFillialIds = agent.fillials.map((f: any) => f.id);
+          matchesAgent = agentFillialIds.includes(a.fillial_id);
+        } else {
+          matchesAgent = false;
+        }
+      }
       const matchesExpiredMonth = expiredMonthFilter === "all" || (a.expired_month && Number(a.expired_month) === Number(expiredMonthFilter));
       const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
-  const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
+      const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
 
-      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesMerchant || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
+      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesMerchant || !matchesAgent || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
 
       if ((start || end) && a.createdAt) {
         const created = new Date(a.createdAt);
@@ -215,7 +230,7 @@ const Applications = (): JSX.Element => {
 
       return true;
     });
-  }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId]);
+  }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId, selectedAgentId, agents]);
 
   const stats = React.useMemo(() => {
     const items = filtered;
@@ -318,6 +333,29 @@ const Applications = (): JSX.Element => {
             className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
+            value={regionFilter}
+            onChange={setRegionFilter}
+            options={regions.map(r => ({ 
+              value: r, 
+              label: r === "all" ? "Barcha hududlar" : r 
+            }))}
+            className="flex-1 min-w-[140px] sm:flex-initial sm:w-auto"
+          />
+          <CustomSelect
+            value={String(selectedAgentId)}
+            onChange={(value) => {
+              setSelectedAgentId(value === "all" ? "all" : Number(value));
+            }}
+            options={[
+              { value: "all", label: "Barcha agentlar" },
+              ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+                value: String(a.id), 
+                label: a.fullname || `Agent #${a.id}` 
+              }))
+            ]}
+            className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"
+          />
+          <CustomSelect
             value={String(fillialFilter)}
             onChange={(value) => setFillialFilter(value === "all" ? "all" : Number(value))}
             options={[
@@ -327,15 +365,6 @@ const Applications = (): JSX.Element => {
                 .map(f => ({ value: String(f.id), label: f.name }))
             ]}
             className="flex-1 min-w-[150px] sm:flex-initial sm:w-auto"
-          />
-          <CustomSelect
-            value={regionFilter}
-            onChange={setRegionFilter}
-            options={regions.map(r => ({ 
-              value: r, 
-              label: r === "all" ? "Barcha hududlar" : r 
-            }))}
-            className="flex-1 min-w-[140px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(expiredMonthFilter)}

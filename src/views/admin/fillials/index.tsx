@@ -45,7 +45,9 @@ const Fillials = (): JSX.Element => {
   const [search, setSearch] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState("all");
   const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [agents, setAgents] = React.useState<any[]>([]);
   const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
+  const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
@@ -73,7 +75,7 @@ const Fillials = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, regionFilter, selectedMerchantId]);
+  }, [search, regionFilter, selectedMerchantId, selectedAgentId]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -97,14 +99,16 @@ const Fillials = (): JSX.Element => {
       const fetchData = async () => {
         try {
           // API dan barcha ma'lumotlarni olish (client-side filtering uchun)
-          const [filialsRes, merchantsRes] = await Promise.all([
+          const [filialsRes, merchantsRes, agentsRes] = await Promise.all([
             api.listFillials({}),
-            api.listMerchants({ page: 1, pageSize: 100 })
+            api.listMerchants({ page: 1, pageSize: 100 }),
+            api.listAgents({ page: 1, pageSize: 100 })
           ]);
           if (!mounted || abortController.signal.aborted) return;
           
           setData(filialsRes?.items || []);
           setMerchants(merchantsRes?.items || []);
+          setAgents(agentsRes?.items || []);
           setLoading(false);
         } catch (err: any) {
           if (!mounted || abortController.signal.aborted) return;
@@ -136,6 +140,15 @@ const Fillials = (): JSX.Element => {
       filtered = filtered.filter((item: any) => item.merchant_id === Number(selectedMerchantId));
     }
     
+    // Agent filter
+    if (selectedAgentId !== "all") {
+      const agent = agents.find(a => a.id === Number(selectedAgentId));
+      if (agent && agent.fillials) {
+        const agentFillialIds = agent.fillials.map((f: any) => f.id);
+        filtered = filtered.filter((item: any) => agentFillialIds.includes(item.id));
+      }
+    }
+    
     // Search filter
     if (search.trim()) {
       const searchLower = search.toLowerCase();
@@ -152,7 +165,7 @@ const Fillials = (): JSX.Element => {
     }
     
     return filtered;
-  }, [data, search, regionFilter, selectedMerchantId]);
+  }, [data, search, regionFilter, selectedMerchantId, selectedAgentId, agents]);
   
   // Pagination
   const startIndex = (page - 1) * pageSize;
@@ -238,6 +251,21 @@ const Fillials = (): JSX.Element => {
               ...regions.map(c => ({ value: c, label: c }))
             ]}
             className="min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none"
+          />
+          
+          <CustomSelect
+            value={String(selectedAgentId)}
+            onChange={(value) => {
+              setSelectedAgentId(value === "all" ? "all" : Number(value));
+            }}
+            options={[
+              { value: "all", label: "Barcha agentlar" },
+              ...(Array.isArray(agents) ? agents : []).map((a) => ({ 
+                value: String(a.id), 
+                label: a.fullname || `Agent #${a.id}` 
+              }))
+            ]}
+            className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
           />
           
           <CustomSelect
