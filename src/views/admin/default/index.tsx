@@ -16,6 +16,7 @@ import { isApproved, isPending } from "lib/formatters";
 
 const Dashboard = (): JSX.Element => {
   const [fillials, setFillials] = React.useState<any[]>([]);
+  const [merchants, setMerchants] = React.useState<any[]>([]);
   const [usersCount, setUsersCount] = React.useState<number>(0);
   const [applicationsCount, setApplicationsCount] = React.useState<number>(0);
   const [approvedAmount, setApprovedAmount] = React.useState<number>(0);
@@ -25,6 +26,7 @@ const Dashboard = (): JSX.Element => {
   const [search, setSearch] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
   const [endDate, setEndDate] = React.useState("");
+  const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   const [selectedFillialId, setSelectedFillialId] = React.useState<number | "all">("all");
   const [selectedRegion, setSelectedRegion] = React.useState<string>("all");
   const [selectedExpiredMonth, setSelectedExpiredMonth] = React.useState<number | "all">("all");
@@ -35,15 +37,20 @@ const Dashboard = (): JSX.Element => {
     let mounted = true;
     const controller = new AbortController();
     
-    api.listFillials({ page: 1, pageSize: 100 })
-      .then((res) => { 
+    Promise.all([
+      api.listFillials({ page: 1, pageSize: 100 }),
+      api.listMerchants({ page: 1, pageSize: 100 })
+    ])
+      .then(([filialsRes, merchantsRes]) => { 
         if (!mounted) return; 
-        setFillials(res?.items || []); 
+        setFillials(filialsRes?.items || []); 
+        setMerchants(merchantsRes?.items || []); 
       })
       .catch((err) => {
         if (!mounted || err.name === 'AbortError') return;
-        console.error("Failed to load fillials:", err);
+        console.error("Failed to load data:", err);
         setFillials([]);
+        setMerchants([]);
       });
     
     return () => { 
@@ -86,12 +93,20 @@ const Dashboard = (): JSX.Element => {
           });
         }
 
+        // Filter by merchant (affects fillials and apps)
+        let merchantFilteredFillials = fillialsList;
+        if (selectedMerchantId !== "all") {
+          merchantFilteredFillials = fillialsList.filter(f => f.merchant_id === Number(selectedMerchantId));
+          const merchantFillialIds = merchantFilteredFillials.map(f => f.id);
+          filteredApps = filteredApps.filter((a: any) => merchantFillialIds.includes(a.fillial_id));
+        }
+
         // Filter by fillial
         if (selectedFillialId !== "all") {
           filteredApps = filteredApps.filter((a: any) => a.fillial_id === selectedFillialId);
         } else if (selectedRegion !== "all") {
           // Filter by region if no specific fillial is selected
-          const regionFillials = fillialsList.filter(f => f.region === selectedRegion);
+          const regionFillials = merchantFilteredFillials.filter(f => f.region === selectedRegion);
           const regionFillialIds = regionFillials.map(f => f.id);
           filteredApps = filteredApps.filter((a: any) => regionFillialIds.includes(a.fillial_id));
         }
@@ -99,7 +114,7 @@ const Dashboard = (): JSX.Element => {
         // Filter by search (search in fillial names)
         if (search.trim()) {
           const searchLower = search.toLowerCase();
-          const matchingFillials = fillialsList.filter(f => 
+          const matchingFillials = merchantFilteredFillials.filter(f => 
             f.name?.toLowerCase().includes(searchLower) || 
             f.address?.toLowerCase().includes(searchLower)
           );
@@ -121,18 +136,23 @@ const Dashboard = (): JSX.Element => {
           console.log(`DEBUG: No month filter applied, ${filteredApps.length} apps`);
         }
 
-        // Filter users by fillial
+        // Filter users by merchant and fillial
         let filteredUsers = users?.items || [];
+        // First filter by merchant (through fillials)
+        if (selectedMerchantId !== "all") {
+          const merchantFillialIds = merchantFilteredFillials.map(f => f.id);
+          filteredUsers = filteredUsers.filter((u: any) => merchantFillialIds.includes(u.fillial_id));
+        }
         if (selectedFillialId !== "all") {
           filteredUsers = filteredUsers.filter((u: any) => u.fillial_id === selectedFillialId);
         } else if (selectedRegion !== "all") {
-          const regionFillials = fillialsList.filter(f => f.region === selectedRegion);
+          const regionFillials = merchantFilteredFillials.filter(f => f.region === selectedRegion);
           const regionFillialIds = regionFillials.map(f => f.id);
           filteredUsers = filteredUsers.filter((u: any) => regionFillialIds.includes(u.fillial_id));
         }
         if (search.trim()) {
           const searchLower = search.toLowerCase();
-          const matchingFillials = fillialsList.filter(f => 
+          const matchingFillials = merchantFilteredFillials.filter(f => 
             f.name?.toLowerCase().includes(searchLower) || 
             f.address?.toLowerCase().includes(searchLower)
           );
@@ -140,8 +160,8 @@ const Dashboard = (): JSX.Element => {
           filteredUsers = filteredUsers.filter((u: any) => matchingFillialIds.includes(u.fillial_id));
         }
 
-        // Filter fillials for count
-        let filteredFillials = fillialsList;
+        // Filter fillials for count (start with merchant-filtered fillials)
+        let filteredFillials = merchantFilteredFillials;
         if (selectedRegion !== "all") {
           filteredFillials = filteredFillials.filter(f => f.region === selectedRegion);
         }
@@ -190,7 +210,7 @@ const Dashboard = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth]);
+  }, [startDate, endDate, selectedFillialId, selectedRegion, search, fillials, selectedExpiredMonth, selectedMerchantId]);
 
   // metrics are provided by the reusable dashboard components in ./components
 
@@ -246,6 +266,18 @@ const Dashboard = (): JSX.Element => {
           
           {/* Row 3: All Filters and Refresh button */}
           <div className="flex flex-wrap items-center gap-2">
+            <CustomSelect
+              value={String(selectedMerchantId)}
+              onChange={(value) => { setSelectedMerchantId(value === "all" ? "all" : Number(value)); }}
+              options={[
+                { value: "all", label: "Barcha merchantlar" },
+                ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                  value: String(m.id), 
+                  label: m.fullname || `Merchant #${m.id}` 
+                }))
+              ]}
+              className="w-full sm:w-auto sm:min-w-[160px]"
+            />
             <CustomSelect
               value={selectedRegion}
               onChange={(value) => { setSelectedRegion(value); setSelectedFillialId("all"); }}

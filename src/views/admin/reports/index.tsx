@@ -25,6 +25,8 @@ const ReportsPage = () => {
   const [yearFilter, setYearFilter] = useState<string>("all");
   const [fillialFilter, setFillialFilter] = useState<string>("all");
   const [fillials, setFillials] = useState<any[]>([]);
+  const [merchants, setMerchants] = useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = useState<number | "all">("all");
 
   useEffect(() => {
     loadFillials();
@@ -32,10 +34,16 @@ const ReportsPage = () => {
 
   const loadFillials = async () => {
     try {
-      const response = await api.listFillials({ page: 1, pageSize: 1000 });
-      setFillials(response?.items || []);
+      const [filialsRes, merchantsRes] = await Promise.all([
+        api.listFillials({ page: 1, pageSize: 1000 }),
+        api.listMerchants({ page: 1, pageSize: 100 })
+      ]);
+      setFillials(filialsRes?.items || []);
+      setMerchants(merchantsRes?.items || []);
     } catch (error) {
-      console.error("Error loading fillials:", error);
+      console.error("Error loading data:", error);
+      setFillials([]);
+      setMerchants([]);
     }
   };
 
@@ -50,6 +58,15 @@ const ReportsPage = () => {
 
       applications.forEach((app: any) => {
         if (!app.createdAt) return;
+
+        // Filter by merchant if selected (through fillial)
+        if (selectedMerchantId !== "all") {
+          const appFillialId = app.fillial?.id || app.fillialId;
+          const fillialObj = fillials.find(f => f.id === appFillialId);
+          if (!fillialObj || fillialObj.merchant_id !== Number(selectedMerchantId)) {
+            return;
+          }
+        }
 
         // Filter by fillial if selected
         if (fillialFilter !== "all") {
@@ -111,7 +128,7 @@ const ReportsPage = () => {
   useEffect(() => {
     loadReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fillialFilter]);
+  }, [fillialFilter, selectedMerchantId]);
 
   // Get unique years for filter
   const availableYears = Array.from(new Set(reports.map(r => r.year))).sort((a, b) => b - a);
@@ -172,6 +189,21 @@ const ReportsPage = () => {
 
       {/* Filters and Action Buttons in one row */}
       <div className="flex flex-wrap gap-2 mb-6">
+        <CustomSelect
+          value={String(selectedMerchantId)}
+          onChange={(value) => {
+            setSelectedMerchantId(value === "all" ? "all" : Number(value));
+            setPage(1);
+          }}
+          options={[
+            { value: "all", label: "Barcha merchantlar" },
+            ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+              value: String(m.id), 
+              label: m.fullname || `Merchant #${m.id}` 
+            }))
+          ]}
+          className="min-w-[120px] sm:min-w-[180px] flex-1 sm:flex-none"
+        />
         <CustomSelect
           value={fillialFilter}
           onChange={(value) => {

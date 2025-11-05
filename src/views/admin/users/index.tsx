@@ -31,6 +31,8 @@ const Users = (): JSX.Element => {
   const [search, setSearch] = React.useState("");
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [fillialFilter, setFillialFilter] = React.useState<number | "all">("all");
+  const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
@@ -54,9 +56,10 @@ const Users = (): JSX.Element => {
         u.fullname?.toLowerCase().includes(s) || 
         u.phone?.toLowerCase().includes(s);
       const matchesFillial = fillialFilter === "all" || u.fillial?.id === fillialFilter;
-      return matchesSearch && matchesFillial;
+      const matchesMerchant = selectedMerchantId === "all" || u.merchant?.id === Number(selectedMerchantId);
+      return matchesSearch && matchesFillial && matchesMerchant;
     });
-  }, [users, search, fillialFilter]);
+  }, [users, search, fillialFilter, selectedMerchantId]);
 
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -64,7 +67,7 @@ const Users = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, fillialFilter]);
+  }, [search, fillialFilter, selectedMerchantId]);
 
   // Paginate filtered data
   const pageData = React.useMemo(() => {
@@ -102,9 +105,17 @@ const Users = (): JSX.Element => {
 
   React.useEffect(() => {
     let mounted = true;
-    api.listFillials({}).then((res) => {
+    Promise.all([
+      api.listFillials({}),
+      api.listMerchants({ page: 1, pageSize: 100 })
+    ]).then(([filialsRes, merchantsRes]) => {
       if (!mounted) return;
-      setFillials(res.items || []);
+      setFillials(filialsRes.items || []);
+      setMerchants(merchantsRes.items || []);
+    }).catch(() => {
+      if (!mounted) return;
+      setFillials([]);
+      setMerchants([]);
     });
     return () => { mounted = false; };
   }, []);
@@ -140,6 +151,19 @@ const Users = (): JSX.Element => {
             <span className="hidden sm:inline">Operator Qo'shish</span>
             <span className="sm:hidden">+ Operator</span>
           </button>
+          
+          <CustomSelect
+            value={String(selectedMerchantId)}
+            onChange={(value) => setSelectedMerchantId(value === "all" ? "all" : Number(value))}
+            options={[
+              { value: "all", label: "Barcha merchantlar" },
+              ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                value: String(m.id), 
+                label: m.fullname || `Merchant #${m.id}` 
+              }))
+            ]}
+            className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
+          />
           
           <CustomSelect
             value={String(fillialFilter)}

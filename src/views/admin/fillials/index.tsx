@@ -44,6 +44,8 @@ const Fillials = (): JSX.Element => {
   
   const [search, setSearch] = React.useState("");
   const [regionFilter, setRegionFilter] = React.useState("all");
+  const [merchants, setMerchants] = React.useState<any[]>([]);
+  const [selectedMerchantId, setSelectedMerchantId] = React.useState<number | "all">("all");
   
   // Client-side pagination
   const [page, setPage] = React.useState<number>(1);
@@ -71,7 +73,7 @@ const Fillials = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, regionFilter]);
+  }, [search, regionFilter, selectedMerchantId]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -95,16 +97,21 @@ const Fillials = (): JSX.Element => {
       const fetchData = async () => {
         try {
           // API dan barcha ma'lumotlarni olish (client-side filtering uchun)
-          const res = await api.listFillials({});
+          const [filialsRes, merchantsRes] = await Promise.all([
+            api.listFillials({}),
+            api.listMerchants({ page: 1, pageSize: 100 })
+          ]);
           if (!mounted || abortController.signal.aborted) return;
           
-          setData(res?.items || []);
+          setData(filialsRes?.items || []);
+          setMerchants(merchantsRes?.items || []);
           setLoading(false);
         } catch (err: any) {
           if (!mounted || abortController.signal.aborted) return;
           
           // Error handling - clear data on error
           setData([]);
+          setMerchants([]);
           setLoading(false);
         }
       };
@@ -124,6 +131,11 @@ const Fillials = (): JSX.Element => {
   const filteredData = React.useMemo(() => {
     let filtered = data;
     
+    // Merchant filter
+    if (selectedMerchantId !== "all") {
+      filtered = filtered.filter((item: any) => item.merchant_id === Number(selectedMerchantId));
+    }
+    
     // Search filter
     if (search.trim()) {
       const searchLower = search.toLowerCase();
@@ -140,7 +152,7 @@ const Fillials = (): JSX.Element => {
     }
     
     return filtered;
-  }, [data, search, regionFilter]);
+  }, [data, search, regionFilter, selectedMerchantId]);
   
   // Pagination
   const startIndex = (page - 1) * pageSize;
@@ -199,6 +211,21 @@ const Fillials = (): JSX.Element => {
             <span className="hidden sm:inline">Filial qo'shish</span>
             <span className="sm:hidden">+ Filial</span>
           </button>
+          
+          <CustomSelect
+            value={String(selectedMerchantId)}
+            onChange={(value) => {
+              setSelectedMerchantId(value === "all" ? "all" : Number(value));
+            }}
+            options={[
+              { value: "all", label: "Barcha merchantlar" },
+              ...(Array.isArray(merchants) ? merchants : []).map((m) => ({ 
+                value: String(m.id), 
+                label: m.fullname || `Merchant #${m.id}` 
+              }))
+            ]}
+            className="min-w-[120px] sm:min-w-[160px] flex-1 sm:flex-none"
+          />
           
           <CustomSelect
             value={regionFilter}
