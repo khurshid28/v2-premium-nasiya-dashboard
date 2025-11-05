@@ -497,6 +497,22 @@ const Fillials = (): JSX.Element => {
                       </div>
                     )}
 
+                    {/* Agent info */}
+                    {(() => {
+                      const agent = agents.find((a: any) => 
+                        a.fillials && a.fillials.some((f: any) => f.id === selected.id)
+                      );
+                      
+                      return agent ? (
+                        <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                          <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Agent ma'lumotlari</h4>
+                          <div><strong className="text-gray-900 dark:text-white">Ism-familiya:</strong> <span className="text-gray-700 dark:text-gray-300">{agent.fullname || "-"}</span></div>
+                          <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(agent.phone)}</span></div>
+                          <div><strong className="text-gray-900 dark:text-white">Holat:</strong> <span className="text-gray-700 dark:text-gray-300">{agent.work_status || "-"}</span></div>
+                        </div>
+                      ) : null;
+                    })()}
+
                     {/* Status and dates */}
                     <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
                       <h4 className="font-semibold text-gray-900 dark:text-white mb-2">Holat va sana</h4>

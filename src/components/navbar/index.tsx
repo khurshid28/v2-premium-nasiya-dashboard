@@ -30,7 +30,7 @@ const Navbar = (props: {
 
   // Global search state
   type SearchItem = {
-    type: "operator" | "application" | "fillial";
+    type: "operator" | "application" | "fillial" | "merchant" | "agent" | "admin";
     id: number;
     title: string;
     subtitle?: string;
@@ -86,10 +86,13 @@ const Navbar = (props: {
     const t = setTimeout(async () => {
       try {
         // Global search - barcha ma'lumotlarni olib, client-side da search qilish
-        const [usersRes, appsRes, filsRes] = await Promise.all([
+        const [usersRes, appsRes, filsRes, merchantsRes, agentsRes, adminsRes] = await Promise.all([
           api.listUsers({}),
           api.listApplications({}),
           api.listFillials({}),
+          api.listMerchants({}),
+          api.listAgents({}),
+          api.listAdmins({})
         ]);
         const searchLower = query.toLowerCase();
         const list: SearchItem[] = [];
@@ -173,6 +176,69 @@ const Navbar = (props: {
               raw: f,
             })
           );
+        
+        // Merchants search - name, ID
+        merchantsRes.items
+          .filter((m: any) => {
+            const searchFields = [
+              m.name?.toLowerCase() || '',
+              m.id?.toString() || ''
+            ];
+            return searchFields.some(field => field.includes(searchLower));
+          })
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((m: any) =>
+            list.push({
+              type: "merchant",
+              id: m.id,
+              title: m.name ?? "",
+              subtitle: m.work_status ? `Holat: ${m.work_status}` : undefined,
+              raw: m,
+            })
+          );
+        
+        // Agents search - fullname, phone
+        agentsRes.items
+          .filter((a: any) => {
+            const searchFields = [
+              a.fullname?.toLowerCase() || '',
+              a.phone?.toLowerCase() || '',
+              a.id?.toString() || ''
+            ];
+            return searchFields.some(field => field.includes(searchLower));
+          })
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((a: any) =>
+            list.push({
+              type: "agent",
+              id: a.id,
+              title: a.fullname ?? "",
+              subtitle: a.phone ?? "",
+              raw: a,
+            })
+          );
+        
+        // Admins search - fullname, phone
+        adminsRes.items
+          .filter((a: any) => {
+            const searchFields = [
+              a.fullname?.toLowerCase() || '',
+              a.phone?.toLowerCase() || '',
+              a.id?.toString() || ''
+            ];
+            return searchFields.some(field => field.includes(searchLower));
+          })
+          .slice(0, 5) // Faqat 5 ta natija
+          .forEach((a: any) =>
+            list.push({
+              type: "admin",
+              id: a.id,
+              title: a.fullname ?? "",
+              subtitle: a.phone ?? "",
+              raw: a,
+            })
+          );
+        
         setResults(list);
       } catch (e) {
         setResults([]);
@@ -236,11 +302,17 @@ const Navbar = (props: {
                 
                 // Navigate to appropriate page
                 if (selectedResult.type === "operator") {
-                  navigate("/admin/users");
+                  navigate("/super/users");
                 } else if (selectedResult.type === "application") {
-                  navigate("/admin/applications");
+                  navigate("/super/applications");
                 } else if (selectedResult.type === "fillial") {
-                  navigate("/admin/fillials");
+                  navigate("/super/fillials");
+                } else if (selectedResult.type === "merchant") {
+                  navigate("/super/merchants");
+                } else if (selectedResult.type === "agent") {
+                  navigate("/super/agents");
+                } else if (selectedResult.type === "admin") {
+                  navigate("/super/admins");
                 }
                 // Then show modal
                 setTimeout(() => setSelected(selectedResult), 100);
@@ -278,11 +350,17 @@ const Navbar = (props: {
                         setSelectedIndex(-1);
                         // Navigate to appropriate page
                         if (r.type === "operator") {
-                          navigate("/admin/users");
+                          navigate("/super/users");
                         } else if (r.type === "application") {
-                          navigate("/admin/applications");
+                          navigate("/super/applications");
                         } else if (r.type === "fillial") {
-                          navigate("/admin/fillials");
+                          navigate("/super/fillials");
+                        } else if (r.type === "merchant") {
+                          navigate("/super/merchants");
+                        } else if (r.type === "agent") {
+                          navigate("/super/agents");
+                        } else if (r.type === "admin") {
+                          navigate("/super/admins");
                         }
                         // Then show modal
                         setTimeout(() => setSelected(r), 100);
@@ -305,7 +383,7 @@ const Navbar = (props: {
                           )}
                           {/* Ko'shimcha ma'lumotlar */}
                           <div className="flex flex-wrap gap-2 mt-2">
-                            {r.type === "operator" && r.raw?.phone && (
+                            {(r.type === "operator" || r.type === "agent" || r.type === "admin") && r.raw?.phone && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
                                 📞 {r.raw.phone}
                               </span>
@@ -320,6 +398,11 @@ const Navbar = (props: {
                                 📍 {r.raw.region}
                               </span>
                             )}
+                            {r.type === "merchant" && r.raw?.work_status && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                                {r.raw.work_status}
+                              </span>
+                            )}
                             {r.raw?.id && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                                 ID: {r.raw.id}
@@ -328,7 +411,12 @@ const Navbar = (props: {
                           </div>
                         </div>
                         <span className="flex-shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                          {r.type === "operator" ? "Operator" : r.type === "application" ? "Ariza" : "Filial"}
+                          {r.type === "operator" ? "Operator" : 
+                           r.type === "application" ? "Ariza" : 
+                           r.type === "fillial" ? "Filial" :
+                           r.type === "merchant" ? "Merchant" :
+                           r.type === "agent" ? "Agent" :
+                           r.type === "admin" ? "Admin" : r.type}
                         </span>
                       </div>
                     </li>
@@ -458,7 +546,14 @@ const Navbar = (props: {
         <DetailModal
           isOpen={!!selected}
           onClose={() => setSelected(null)}
-          title={selected ? (selected.type === "operator" ? "Operator ma'lumoti" : selected.type === "application" ? "Ariza ma'lumoti" : "Filial ma'lumoti") : undefined}
+          title={selected ? (
+            selected.type === "operator" ? "Operator ma'lumoti" : 
+            selected.type === "application" ? "Ariza ma'lumoti" : 
+            selected.type === "fillial" ? "Filial ma'lumoti" :
+            selected.type === "merchant" ? "Merchant ma'lumoti" :
+            selected.type === "agent" ? "Agent ma'lumoti" :
+            selected.type === "admin" ? "Admin ma'lumoti" : "Ma'lumot"
+          ) : undefined}
         >
           {selected && selected.type === "operator" && (
             <div className="space-y-3">
@@ -690,6 +785,102 @@ const Navbar = (props: {
                       <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.mfo}</p>
                     </div>
                   )}
+                </div>
+              )}
+              {selected.raw.createdAt && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Yaratilgan sana</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{new Date(selected.raw.createdAt).toLocaleString('uz-UZ')}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {selected && selected.type === "merchant" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Nomi</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.name}</p>
+                </div>
+                {selected.raw.work_status && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ish holati</p>
+                    <span className={`inline-block px-2 py-1 text-xs rounded-full ${selected.raw.work_status === 'WORKING' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                      {selected.raw.work_status === 'WORKING' ? 'Faol' : 'Bloklangan'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {selected.raw.createdAt && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Yaratilgan sana</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{new Date(selected.raw.createdAt).toLocaleString('uz-UZ')}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {selected && selected.type === "agent" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">F.I.Sh</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.fullname}</p>
+                </div>
+                {selected.raw.phone && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Telefon</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.phone}</p>
+                  </div>
+                )}
+              </div>
+              {selected.raw.work_status && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ish holati</p>
+                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${selected.raw.work_status === 'WORKING' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    {selected.raw.work_status === 'WORKING' ? 'Faol' : 'Bloklangan'}
+                  </span>
+                </div>
+              )}
+              {selected.raw.fillials && selected.raw.fillials.length > 0 && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Filiallar ({selected.raw.fillials.length} ta)</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selected.raw.fillials.map((f: any) => (
+                      <span key={f.id} className="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                        {f.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selected.raw.createdAt && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Yaratilgan sana</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{new Date(selected.raw.createdAt).toLocaleString('uz-UZ')}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {selected && selected.type === "admin" && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">F.I.Sh</p>
+                  <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.fullname}</p>
+                </div>
+                {selected.raw.phone && (
+                  <div>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Telefon</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selected.raw.phone}</p>
+                  </div>
+                )}
+              </div>
+              {selected.raw.work_status && (
+                <div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Ish holati</p>
+                  <span className={`inline-block px-2 py-1 text-xs rounded-full ${selected.raw.work_status === 'WORKING' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                    {selected.raw.work_status === 'WORKING' ? 'Faol' : 'Bloklangan'}
+                  </span>
                 </div>
               )}
               {selected.raw.createdAt && (
