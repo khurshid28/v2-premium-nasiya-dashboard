@@ -2,7 +2,6 @@ import React from "react";
 import api from "lib/api";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
-import Pagination from "components/pagination";
 // formatShortMoney removed (unused in this view)
 import TotalSpent from "./components/TotalSpent";
 import WeeklyRevenue from "./components/WeeklyRevenue";
@@ -35,9 +34,6 @@ const Dashboard = (): JSX.Element => {
   const [selectedAgentId, setSelectedAgentId] = React.useState<number | "all">("all");
   const [selectedExpiredMonth, setSelectedExpiredMonth] = React.useState<number | "all">("all");
   // charts removed: barData, pieData, lineData
-  // pagination for fillial stats table
-  const [fillialStatsPage, setFillialStatsPage] = React.useState<number>(1);
-  const [fillialStatsPageSize] = React.useState<number>(10);
 
   React.useEffect(() => {
     let mounted = true;
@@ -265,86 +261,6 @@ const Dashboard = (): JSX.Element => {
     return ["all", 3, 6, 9, 12];
   }, []);
 
-  // Filliallar bo'yicha statistika
-  const fillialStats = React.useMemo(() => {
-    const apps = applications?.items || [];
-    const fillialsList = fillials || [];
-    
-    // Filter applications by current filters (merchant, region, date, etc)
-    let filteredApps = apps;
-    
-    // Apply date filter
-    if (startDate || endDate) {
-      const _start = startDate ? new Date(startDate) : new Date(0);
-      const _end = endDate ? new Date(endDate) : new Date();
-      _end.setHours(23, 59, 59, 999);
-      filteredApps = filteredApps.filter((a: any) => {
-        if (!a.createdAt) return false;
-        const d = new Date(a.createdAt);
-        return d >= _start && d <= _end;
-      });
-    }
-    
-    // Apply merchant filter
-    let merchantFilteredFillials = fillialsList;
-    if (selectedMerchantId !== "all") {
-      merchantFilteredFillials = fillialsList.filter(f => f.merchant_id === Number(selectedMerchantId));
-      const merchantFillialIds = merchantFilteredFillials.map(f => f.id);
-      filteredApps = filteredApps.filter((a: any) => merchantFillialIds.includes(a.fillial_id));
-    }
-    
-    // Apply region filter
-    if (selectedRegion !== "all") {
-      const regionFillials = merchantFilteredFillials.filter(f => f.region === selectedRegion);
-      const regionFillialIds = regionFillials.map(f => f.id);
-      filteredApps = filteredApps.filter((a: any) => regionFillialIds.includes(a.fillial_id));
-    }
-    
-    // Group by fillial
-    const statsByFillial: any = {};
-    
-    filteredApps.forEach((app: any) => {
-      const fillialId = app.fillial_id;
-      if (!fillialId) return;
-      
-      if (!statsByFillial[fillialId]) {
-        const fillialObj = fillialsList.find(f => f.id === fillialId);
-        statsByFillial[fillialId] = {
-          fillial: fillialObj,
-          totalCount: 0,
-          confirmedCount: 0,
-          totalAmount: 0,
-          confirmedAmount: 0
-        };
-      }
-      
-      statsByFillial[fillialId].totalCount++;
-      statsByFillial[fillialId].totalAmount += app.amount || 0;
-      
-      const status = (app.status || "").toUpperCase();
-      const isConfirmed = status === "CONFIRMED" || status === "FINISHED" || status === "COMPLETED" || status === "ACTIVE";
-      if (isConfirmed) {
-        statsByFillial[fillialId].confirmedCount++;
-        statsByFillial[fillialId].confirmedAmount += app.amount || 0;
-      }
-    });
-    
-    // Convert to array and sort by total count (descending)
-    return Object.values(statsByFillial).sort((a: any, b: any) => b.totalCount - a.totalCount);
-  }, [applications, fillials, startDate, endDate, selectedMerchantId, selectedRegion]);
-
-  // Pagination for fillial stats
-  const totalFillialStats = fillialStats.length;
-  const fillialStatsTotalPages = Math.max(1, Math.ceil(totalFillialStats / fillialStatsPageSize));
-  const fillialStatsStartIndex = (fillialStatsPage - 1) * fillialStatsPageSize;
-  const fillialStatsEndIndex = fillialStatsStartIndex + fillialStatsPageSize;
-  const paginatedFillialStats = fillialStats.slice(fillialStatsStartIndex, fillialStatsEndIndex);
-
-  // Reset pagination when filters change
-  React.useEffect(() => {
-    setFillialStatsPage(1);
-  }, [selectedMerchantId, selectedRegion, selectedAgentId, startDate, endDate, selectedFillialId, search]);
-
   return (
     <div>
       <div className="flex flex-col gap-3">
@@ -514,86 +430,8 @@ const Dashboard = (): JSX.Element => {
       {/* small stat cards removed (duplicate / copyable cards) */}
 
       {/* Charts and task row removed per request (Applications by Fillial, Status distribution, Applications over time, Tasks) */}
-
-      {/* Filliallar bo'yicha hisobot */}
-      <div className="mt-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-xl font-semibold text-navy-700 dark:text-white">Filliallar bo'yicha hisobot</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Tanlangan filtrlar bo'yicha har bir filial statistikasi (ko'p arizali filiallar birinchi)
-            </p>
-          </div>
-          <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Jami: <span className="text-lg font-bold text-brand-500 dark:text-brand-400">{totalFillialStats}</span> ta filial
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600">
-          <table className="w-full table-auto min-w-[700px]">
-            <thead className="bg-gray-50 dark:bg-navy-800 text-left text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-              <tr>
-                <th className="px-4 py-3">#</th>
-                <th className="px-4 py-3">Filial nomi</th>
-                <th className="px-4 py-3">Hudud</th>
-                <th className="px-4 py-3 text-right">Jami arizalar</th>
-                <th className="px-4 py-3 text-right">Tasdiqlangan</th>
-                <th className="px-4 py-3 text-right">Jami summa</th>
-                <th className="px-4 py-3 text-right">Tasdiqlangan summa</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
-              {paginatedFillialStats.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                    Tanlangan filtrlar bo'yicha filliallar topilmadi
-                  </td>
-                </tr>
-              ) : (
-                paginatedFillialStats.map((stat: any, index: number) => (
-                  <tr
-                    key={stat.fillial?.id || index}
-                    className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-navy-700"
-                  >
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{fillialStatsStartIndex + index + 1}</td>
-                    <td className="px-4 py-3 font-medium">{stat.fillial?.name || "-"}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-100">
-                        {stat.fillial?.region || "-"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold">{stat.totalCount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="text-green-600 dark:text-green-400 font-medium">
-                        {stat.confirmedCount.toLocaleString()}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs sm:text-sm">
-                      {stat.totalAmount.toLocaleString()} so'm
-                    </td>
-                    <td className="px-4 py-3 text-right text-xs sm:text-sm">
-                      <span className="text-green-600 dark:text-green-400 font-semibold">
-                        {stat.confirmedAmount.toLocaleString()} so'm
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination for fillial stats */}
-        {totalFillialStats > fillialStatsPageSize && (
-          <div className="mt-4">
-            <Pagination
-              page={fillialStatsPage}
-              totalPages={fillialStatsTotalPages}
-              onPageChange={setFillialStatsPage}
-            />
-          </div>
-        )}
-      </div>
+      
+      {/* Filliallar bo'yicha hisobot removed per user request */}
     </div>
   );
 };
