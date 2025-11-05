@@ -1,4 +1,4 @@
-import type { Paginated, User, Fillial, Zayavka } from "types/api";
+import type { Paginated, User, Fillial, Zayavka, Merchant, Agent, Admin } from "types/api";
 
 const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3333/api";
 
@@ -378,6 +378,202 @@ export async function deleteZayavka(id: number): Promise<void> {
   return handleResponse<void>(res);
 }
 
+// Merchants
+export async function listMerchants(opts?: { page?: number; pageSize?: number; search?: string; type?: string }): Promise<Paginated<Merchant>> {
+  const params: any = {};
+  if (opts?.page !== undefined) params.page = opts.page;
+  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+  if (opts?.search) params.search = opts.search;
+  if (opts?.type) params.type = opts.type;
+  const url = `${API_BASE}/merchant/all${qs(params)}`;
+  
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
+  });
+  
+  const result = await handleResponse<any>(res);
+  
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  return result;
+}
+
+export async function getMerchant(id: number): Promise<Merchant> {
+  const res = await fetchWithRetry(`${API_BASE}/merchant/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  return handleResponse<Merchant>(res);
+}
+
+export async function createMerchant(payload: Partial<Merchant>): Promise<Merchant> {
+  const res = await fetchWithRetry(`${API_BASE}/merchant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Merchant>(res);
+}
+
+export async function updateMerchant(id: number, payload: Partial<Merchant>): Promise<Merchant> {
+  const res = await fetchWithRetry(`${API_BASE}/merchant/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Merchant>(res);
+}
+
+export async function deleteMerchant(id: number): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/merchant/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+// Agents
+export async function listAgents(opts?: { page?: number; pageSize?: number; search?: string }): Promise<Paginated<Agent>> {
+  const params: any = {};
+  if (opts?.page !== undefined) params.page = opts.page;
+  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+  if (opts?.search) params.search = opts.search;
+  const url = `${API_BASE}/agent/all${qs(params)}`;
+  
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
+  });
+  
+  const result = await handleResponse<any>(res);
+  
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  return result;
+}
+
+export async function getAgent(id: number): Promise<Agent> {
+  const res = await fetchWithRetry(`${API_BASE}/agent/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  return handleResponse<Agent>(res);
+}
+
+export async function createAgent(payload: Partial<Agent>): Promise<Agent> {
+  const res = await fetchWithRetry(`${API_BASE}/agent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Agent>(res);
+}
+
+export async function updateAgent(id: number, payload: Partial<Agent>): Promise<Agent> {
+  const res = await fetchWithRetry(`${API_BASE}/agent/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Agent>(res);
+}
+
+export async function deleteAgent(id: number): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/agent/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+// Admins
+export async function listAdmins(opts?: { page?: number; pageSize?: number; search?: string; merchantId?: number | "all" }): Promise<Paginated<Admin>> {
+  const params: any = {};
+  if (opts?.page !== undefined) params.page = opts.page;
+  if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
+  if (opts?.search) params.search = opts.search;
+  if (opts?.merchantId && opts.merchantId !== "all") {
+    params.merchantId = opts.merchantId;
+  }
+  const url = `${API_BASE}/admin/all${qs(params)}`;
+  
+  const headers: Record<string, string> = {};
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  
+  const res = await fetchWithRetry(url, { 
+    method: 'GET',
+    headers
+  });
+  
+  const result = await handleResponse<any>(res);
+  
+  if (Array.isArray(result)) {
+    return {
+      items: result,
+      total: result.length,
+      page: opts?.page || 1,
+      pageSize: opts?.pageSize || 5
+    };
+  }
+  
+  return result;
+}
+
+export async function getAdmin(id: number): Promise<Admin> {
+  const res = await fetchWithRetry(`${API_BASE}/admin/${id}`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  return handleResponse<Admin>(res);
+}
+
+export async function createAdmin(payload: Partial<Admin>): Promise<Admin> {
+  const res = await fetchWithRetry(`${API_BASE}/admin`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Admin>(res);
+}
+
+export async function updateAdmin(id: number, payload: Partial<Admin>): Promise<Admin> {
+  const res = await fetchWithRetry(`${API_BASE}/admin/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Admin>(res);
+}
+
+export async function deleteAdmin(id: number): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/admin/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
 // NOTE:
 // - The endpoints above assume these paths: /user/all, /fillial/all, /app/all.
 //   If your NestJS controllers use different paths, adjust API_BASE or endpoint paths accordingly.
@@ -410,6 +606,24 @@ const api = {
   createZayavka,
   updateZayavka,
   deleteZayavka,
+  // Merchants
+  listMerchants,
+  getMerchant,
+  createMerchant,
+  updateMerchant,
+  deleteMerchant,
+  // Agents
+  listAgents,
+  getAgent,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  // Admins
+  listAdmins,
+  getAdmin,
+  createAdmin,
+  updateAdmin,
+  deleteAdmin,
 };
 
 export default api;
