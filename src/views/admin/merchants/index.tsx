@@ -12,7 +12,6 @@ const Merchants = (): JSX.Element => {
   const [loading, setLoading] = React.useState(true);
   
   const [search, setSearch] = React.useState("");
-  const [typeFilter, setTypeFilter] = React.useState("all");
   
   const [page, setPage] = React.useState<number>(1);
   const [pageSize, setPageSize] = React.useState<number>(5);
@@ -28,7 +27,7 @@ const Merchants = (): JSX.Element => {
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, typeFilter]);
+  }, [search]);
 
   React.useEffect(() => {
     let mounted = true;
@@ -80,12 +79,8 @@ const Merchants = (): JSX.Element => {
       );
     }
     
-    if (typeFilter !== "all") {
-      filtered = filtered.filter(item => item.type === typeFilter);
-    }
-    
     return filtered;
-  }, [data, search, typeFilter]);
+  }, [data, search]);
   
   const startIndex = (page - 1) * pageSize;
   const endIndex = startIndex + pageSize;
@@ -132,17 +127,6 @@ const Merchants = (): JSX.Element => {
           </button>
           
           <CustomSelect
-            value={typeFilter}
-            onChange={(value) => setTypeFilter(value)}
-            options={[
-              { value: "all", label: "Barcha turlar" },
-              { value: "MERCHANT", label: "MERCHANT" },
-              { value: "AGENT", label: "AGENT" }
-            ]}
-            className="min-w-[120px] sm:min-w-[140px] flex-1 sm:flex-none"
-          />
-          
-          <CustomSelect
             value={String(pageSize)}
             onChange={(value) => {
               setPageSize(Number(value));
@@ -162,7 +146,6 @@ const Merchants = (): JSX.Element => {
               const rows = filteredData.map((m: any) => ({
                 ID: m.id,
                 Nomi: m.name,
-                Turi: m.type ?? "",
                 Holat: m.work_status ?? "",
                 Yaratildi: m.createdAt ?? "",
               }));
@@ -198,7 +181,6 @@ const Merchants = (): JSX.Element => {
             <tr>
               <th className="px-3 sm:px-6 py-3 sm:py-4">ID</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4">Nomi</th>
-              <th className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">Turi</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4">Holat</th>
               <th className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">Yaratildi</th>
             </tr>
@@ -206,7 +188,7 @@ const Merchants = (): JSX.Element => {
           <tbody className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-navy-800">
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center">
+                <td colSpan={4} className="px-4 py-8 text-center">
                   <div className="flex items-center justify-center space-x-2">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
                     <span>Ma'lumotlar yuklanmoqda...</span>
@@ -215,8 +197,8 @@ const Merchants = (): JSX.Element => {
               </tr>
             ) : !pageData || pageData.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  {search || typeFilter !== "all" ? "Qidiruv bo'yicha merchantlar topilmadi" : "Merchantlar mavjud emas"}
+                <td colSpan={4} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  {search ? "Qidiruv bo'yicha merchantlar topilmadi" : "Merchantlar mavjud emas"}
                 </td>
               </tr>
             ) : pageData.map((row) => (
@@ -243,7 +225,6 @@ const Merchants = (): JSX.Element => {
               >
                 <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm">{row.id}</td>
                 <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-medium">{row.name}</td>
-                <td className="px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm hidden sm:table-cell">{row.type ?? "-"}</td>
                 <td className="px-3 sm:px-4 py-2">
                   {row.work_status === "WORKING" ? (
                     <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-800 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-100">Ishlaydi</span>
