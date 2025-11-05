@@ -82,8 +82,8 @@
 
 1. **Repository ni klonlash**
 ```bash
-git clone https://github.com/khurshid28/premium-nasiya-admin.git
-cd premium-nasiya-admin
+git clone https://github.com/khurshid28/premium-nasiya-dashboard.git
+cd premium-nasiya-dashboard
 ```
 
 2. **Paketlarni o'rnatish**
@@ -262,7 +262,7 @@ MIT License - [LICENSE.md](LICENSE.md)
 
 **Khurshid**
 - GitHub: [@khurshid28](https://github.com/khurshid28)
-- Repository: [premium-nasiya-admin](https://github.com/khurshid28/premium-nasiya-admin)
+- Repository: [premium-nasiya-dashboard](https://github.com/khurshid28/premium-nasiya-dashboard)
 
 ---
 
