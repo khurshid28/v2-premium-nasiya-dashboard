@@ -1,4 +1,4 @@
-# 🏦 Premium Nasiya Super Panel
+# 🏦 Premium Nasiya Dashboard
 
 <div align="center">
   <img src="https://img.shields.io/badge/version-1.0.0-blue.svg" alt="version" />
@@ -9,7 +9,7 @@
 </div>
 
 <p align="center">
-  <b>Zamonaviy nasiya xizmatlarini boshqarish uchun professional super panel</b>
+  <b>Zamonaviy nasiya xizmatlarini boshqarish uchun professional dashboard</b>
 </p>
 
 <p align="center">
