@@ -31,7 +31,7 @@ type Application = {
   updatedAt?: string | null;
   merchant?: { id: number; name: string } | null;
   fillial?: { id: number; name: string } | null;
-  user?: { id: number; fullname: string } | null;
+  user?: { id: number; fullname: string; phone?: string | null; image?: string | null } | null;
   myid_id?: number | null;
   paid?: boolean | null;
   fcmToken?: string | null;
@@ -75,6 +75,60 @@ const Applications = (): JSX.Element => {
   const SLIDER_MIN = 0;
   const SLIDER_MAX = 50000000; // 50 million UZS
   const SLIDER_STEP = 10000;
+
+  // Function to generate copy text
+  const generateCopyText = (app: Application): string => {
+    let text = `👤 Ariza beruvchi:\n${app.fullname}\n${app.passport || ''}\n\n`;
+    text += `📱 Telefon: ${formatPhone(app.phone)}\n`;
+    text += `🛒 Tovarlar summasi: ${formatMoney(app.amount)}\n`;
+    text += `💰 To'lov summasi: ${formatMoney(app.payment_amount || app.amount)}\n`;
+    text += `💳 To'lov: ${app.paid ? "✅ To'landi" : "❌ To'lanmadi"}\n`;
+    text += `🏢 Filial: ${app.fillial?.name ?? "-"}\n`;
+    
+    if ((app as any).request?.orderid) {
+      text += `📦 Order ID: #${(app as any).request.orderid}\n`;
+    }
+    
+    const loanId = (app as any).request?.loanid;
+    if (loanId) {
+      text += `💳 KREDIT ID: #${loanId}\n`;
+    }
+    
+    if ((app as any).request?.scoring_start && (app as any).request?.scoring_end) {
+      const start = new Date((app as any).request.scoring_start);
+      const end = new Date((app as any).request.scoring_end);
+      const diffMs = end.getTime() - start.getTime();
+      const diffSeconds = Math.floor(diffMs / 1000);
+      const minutes = Math.floor(diffSeconds / 60);
+      const seconds = diffSeconds % 60;
+      text += `⏱️ Tekshiruv vaqti: ${minutes} m ${seconds} s\n`;
+    }
+    
+    if (app.user) {
+      text += `\n👨‍💼 Operator ma'lumotlari:\n`;
+      text += `   • F.I.O: ${app.user.fullname}\n`;
+      if (app.user.phone) text += `   • Telefon: ${formatPhone(app.user.phone)}\n`;
+      text += `   • ID: #${app.user.id}\n`;
+    }
+    
+    text += `\n`;
+    if (app.phone2) text += `📞 Qo'shimcha telefon: ${formatPhone(app.phone2)}\n`;
+    if (app.limit) text += `💵 Limit: ${formatMoney(app.limit)}\n`;
+    if (app.expired_month) text += `📅 Muddat (oy): ${app.expired_month}\n`;
+    if (app.percent) text += `📊 Foiz: ${app.percent}%\n`;
+    if (app.createdAt) text += `🗓 Yaratilgan sana: ${formatDateNoSeconds(app.createdAt)}\n`;
+    if (app.canceled_reason) text += `❌ Bekor qilish sababi: ${app.canceled_reason}\n`;
+    text += `📈 Holat: ${appStatusBadge(app.status).label}\n`;
+    
+    if (app.products && app.products.length > 0) {
+      text += `\n🛍️ Mahsulotlar:\n`;
+      app.products.forEach((p, idx) => {
+        text += `   ${idx + 1}. ${p.name} - ${formatMoney(p.price)} - ${p.count ?? 1} ta\n`;
+      });
+    }
+    
+    return text;
+  };
 
   const statuses = React.useMemo(() => {
     return [
@@ -529,6 +583,7 @@ const Applications = (): JSX.Element => {
                     setSelected(fullApplication);
                     setOpen(true);
                   } catch (err) {
+                    console.error('Error fetching application:', err);
                     // Show error message to user
                     setToastMessage("Ariza tafsilotlarini yuklashda xatolik yuz berdi");
                     setToastType('error');
@@ -548,6 +603,7 @@ const Applications = (): JSX.Element => {
                     name={a.fullname}
                     subtitle={a.passport ?? undefined}
                     size="sm"
+                    showShortName={true}
                   />
                 </td>
                 <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap">{formatPhone(a.phone)}</td>
@@ -585,7 +641,16 @@ const Applications = (): JSX.Element => {
                       <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>;
                   })()}
                 </td>
-                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">{a.fillial?.name ?? "-"}</td>
+                <td className="px-2 sm:px-4 py-2 text-center text-xs sm:text-sm whitespace-nowrap hidden xl:table-cell">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="font-medium">{a.fillial?.name ?? "-"}</span>
+                    {a.user?.fullname && (
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                        {a.user.fullname}
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-2 sm:px-4 py-2 text-center">
                   {isApproved(a.status) ? (
                     <button
@@ -662,7 +727,19 @@ const Applications = (): JSX.Element => {
               </tr>
               );
             })}
-            <DetailModal
+            {pageData.length === 0 && (
+              <tr>
+                <td colSpan={11} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                  Hech qanday natija topilmadi
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Detail Modal */}
+      <DetailModal
               title={selected ? `Ariza #${selected.id}` : "Ariza tafsilotlari"}
               isOpen={open}
               onClose={() => {
@@ -677,6 +754,32 @@ const Applications = (): JSX.Element => {
                 </div>
               ) : selected ? (
                 <div className="space-y-3">
+                  {/* Copy button */}
+                  <div className="flex justify-end -mt-2 mb-2">
+                    <button
+                      onClick={() => {
+                        const copyText = generateCopyText(selected);
+                        navigator.clipboard.writeText(copyText).then(() => {
+                          setToastMessage("Ma'lumotlar nusxalandi!");
+                          setToastType('success');
+                          setToastOpen(true);
+                        }).catch(() => {
+                          setToastMessage("Nusxalashda xatolik yuz berdi");
+                          setToastType('error');
+                          setToastOpen(true);
+                        });
+                      }}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-700 text-white transition-all duration-200 text-sm font-medium shadow-md hover:shadow-lg"
+                      title="Ma'lumotlarni nusxalash"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-4 w-4" strokeWidth="2.5">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      Nusxalash
+                    </button>
+                  </div>
+                  
                   <div>
                     <strong className="text-gray-900 dark:text-white block mb-2">Ariza beruvchi:</strong>
                     <AvatarName
@@ -691,6 +794,85 @@ const Applications = (): JSX.Element => {
                   <div><strong className="text-gray-900 dark:text-white">To'lov summasi:</strong> <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(selected.payment_amount || selected.amount)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov:</strong> {selected.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</div>
                   <div><strong className="text-gray-900 dark:text-white">Filial:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fillial?.name ?? "-"}</span></div>
+                  
+                  {/* Order ID */}
+                  {(selected as any).request?.orderid && (
+                    <div className="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-blue-600" strokeWidth="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="16" y1="13" x2="8" y2="13" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="16" y1="17" x2="8" y2="17" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="10 9 9 9 8 9" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <strong className="text-gray-900 dark:text-white">Order ID:</strong> 
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">#{(selected as any).request.orderid}</span>
+                    </div>
+                  )}
+                  
+                  {/* Kredit ID */}
+                  {(selected as any).request?.loanid && (
+                    <div className="flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-blue-600" strokeWidth="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <line x1="1" y1="10" x2="23" y2="10" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <strong className="text-gray-900 dark:text-white">KREDIT ID:</strong> 
+                      <span className="text-blue-600 dark:text-blue-400 font-semibold">#{(selected as any).request.loanid}</span>
+                    </div>
+                  )}
+                  
+                  {/* Tekshiruv vaqti */}
+                  {(selected as any).request?.scoring_start && (selected as any).request?.scoring_end && (
+                    <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="h-5 w-5 text-amber-600 dark:text-amber-400" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round"/>
+                        <polyline points="12 6 12 12 16 14" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <strong className="text-gray-900 dark:text-white">Tekshiruv vaqti:</strong> 
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">
+                        {(() => {
+                          const start = new Date((selected as any).request.scoring_start);
+                          const end = new Date((selected as any).request.scoring_end);
+                          const diffMs = end.getTime() - start.getTime();
+                          const diffSeconds = Math.floor(diffMs / 1000);
+                          const minutes = Math.floor(diffSeconds / 60);
+                          const seconds = diffSeconds % 60;
+                          return `${minutes} m ${seconds} s`;
+                        })()}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Operator ma'lumotlari */}
+                  <div className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
+                    <strong className="text-gray-900 dark:text-white block mb-2">Operator ma'lumotlari:</strong>
+                    {selected.user ? (
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600 dark:text-gray-400">F.I.O:</span>
+                          <span className="font-medium text-blue-700 dark:text-blue-300">{selected.user.fullname}</span>
+                        </div>
+                        {selected.user.phone && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-600 dark:text-gray-400">Telefon:</span>
+                            <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.user.phone)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-600 dark:text-gray-400">ID:</span>
+                          <span className="text-gray-700 dark:text-gray-300">#{selected.user.id}</span>
+                        </div>
+                      </div>
+                    ) : (selected as any).user_id ? (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        Operator ID: <span className="font-medium text-blue-700 dark:text-blue-300">#{(selected as any).user_id}</span>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-gray-600 dark:text-gray-400">Ma'lumot topilmadi</div>
+                    )}
+                  </div>
+                  
                   {selected.phone2 && (
                     <div><strong className="text-gray-900 dark:text-white">Qo'shimcha telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.phone2)}</span></div>
                   )}
@@ -708,22 +890,6 @@ const Applications = (): JSX.Element => {
                   )}
                   {selected.canceled_reason && (
                     <div><strong className="text-red-600 dark:text-red-400">Bekor qilish sababi:</strong> <span className="text-red-600 dark:text-red-400">{selected.canceled_reason}</span></div>
-                  )}
-                  {selected.user && (
-                    <>
-                      <div>
-                        <strong className="text-gray-900 dark:text-white block mb-2">Operator:</strong>
-                        <AvatarName
-                          image={(selected.user as any).image ?? null}
-                          name={selected.user.fullname}
-                          subtitle={`ID: ${selected.user.id}`}
-                          size="sm"
-                        />
-                      </div>
-                      {(selected.user as any).phone && (
-                        <div><strong className="text-gray-900 dark:text-white">Operator telefoni:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone((selected.user as any).phone)}</span></div>
-                      )}
-                    </>
                   )}
                   <div><strong className="text-gray-900 dark:text-white">Holat:</strong> {(() => { const b = appStatusBadge(selected.status); return <span className={b.className}>{b.label}</span>; })()}</div>
                   <div>
@@ -759,17 +925,7 @@ const Applications = (): JSX.Element => {
                   Ma'lumot topilmadi
                 </div>
               )}
-            </DetailModal>
-            {pageData.length === 0 && (
-              <tr>
-                <td colSpan={11} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
-                  Hech qanday natija topilmadi
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      </DetailModal>
 
       <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{`${total} dan ${pageData.length} ta ko'rsatilmoqda`}</div>

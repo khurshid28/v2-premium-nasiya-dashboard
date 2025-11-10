@@ -317,6 +317,10 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
   if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
   if (opts?.search) params.search = opts.search;
   if (opts?.status) params.status = opts.status;
+  
+  // Add include parameter to fetch related data
+  params.include = 'fillial,user,products,merchant';
+  
   const url = `${API_BASE}/app/all${qs(params)}`;
   
   // Minimal headers to avoid CORS issues
@@ -348,7 +352,7 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {
-  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant,request`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Zayavka>(res);
 }
 

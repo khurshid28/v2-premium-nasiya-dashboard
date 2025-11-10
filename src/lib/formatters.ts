@@ -50,6 +50,42 @@ export function formatShortMoney(value?: number | string | null) {
   return `${n}`;
 }
 
+/**
+ * Format fullname for table display (short version)
+ * Examples:
+ * - "JAXONGIR ISLOMJONOV ILYOSJON O'G'LI" -> "JAXONGIR I.I"
+ * - "ABRORJON TUYCHIYEV" -> "ABRORJON T"
+ * - "SaidOlim" -> "SaidOlim"
+ */
+export function formatShortName(fullname?: string | null): string {
+  if (!fullname) return "-";
+  const parts = fullname.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  
+  const firstName = parts[0];
+  const otherParts = parts.slice(1, 3); // Take only first 2 parts after first name
+  
+  if (otherParts.length === 1) {
+    return `${firstName} ${otherParts[0].charAt(0).toUpperCase()}`;
+  } else {
+    const initials = otherParts.map(part => part.charAt(0).toUpperCase()).join(".");
+    return `${firstName} ${initials}`;
+  }
+}
+
+/**
+ * Get initials for avatar from fullname
+ * Examples:
+ * - "JAXONGIR ISLOMJONOV" -> "JI"
+ * - "ABRORJON" -> "A"
+ */
+export function getInitials(fullname?: string | null): string {
+  if (!fullname) return "?";
+  const parts = fullname.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return parts.slice(0, 2).map(part => part.charAt(0).toUpperCase()).join("");
+}
+
 export function statusBadge(status?: string | null) {
   const s = status ?? "";
   if (s === "WORKING") return { label: "ISHLAYDI", className: "inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300" };
