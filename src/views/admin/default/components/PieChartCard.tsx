@@ -3,7 +3,9 @@ import PieChart from "components/charts/PieChart";
 import { pieChartOptions } from "variables/charts";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { isApproved, isConfirmed, isRejected, isPending } from "lib/formatters";
 
 interface PieChartCardProps {
@@ -25,6 +27,9 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+  
   const [timePeriod, setTimePeriod] = React.useState("daily");
   const [statusDistribution, setStatusDistribution] = React.useState({
     approved: 0,
@@ -47,7 +52,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
-          applications = applications.filter(app => {
+          applications = applications.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= start && appDate <= end;
@@ -55,11 +60,11 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         }
 
         if (fillialId !== "all") {
-          applications = applications.filter(app => app.fillial_id === fillialId);
+          applications = applications.filter((app: any) => app.fillial_id === fillialId);
         } else if (region !== "all") {
           const regionFillials = fillialsList.filter(f => f.region === region);
           const regionFillialIds = regionFillials.map(f => f.id);
-          applications = applications.filter(app => regionFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => regionFillialIds.includes(app.fillial_id));
         }
 
         if (search.trim()) {
@@ -69,17 +74,17 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
             f.address?.toLowerCase().includes(searchLower)
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
-          applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => matchingFillialIds.includes(app.fillial_id));
         }
 
         // Filter by expired month
         if (expiredMonth !== "all") {
-          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+          applications = applications.filter((app: any) => app.expired_month && app.expired_month === String(expiredMonth));
         }
         
         // Filter by time period
         const now = new Date();
-        const filtered = applications.filter(app => {
+        const filtered = applications.filter((app: any) => {
           if (!app.createdAt) return true;
           const createdDate = new Date(app.createdAt);
           
@@ -104,9 +109,9 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
         });
         
         const counts = {
-          approved: filtered.filter(app => isApproved(app.status) || isConfirmed(app.status)).length,
-          pending: filtered.filter(app => isPending(app.status)).length,
-          rejected: filtered.filter(app => isRejected(app.status)).length,
+          approved: filtered.filter((app: any) => isApproved(app.status) || isConfirmed(app.status)).length,
+          pending: filtered.filter((app: any) => isPending(app.status)).length,
+          rejected: filtered.filter((app: any) => isRejected(app.status)).length,
           total: filtered.length
         };
         
@@ -126,7 +131,7 @@ const PieChartCard: React.FC<PieChartCardProps> = ({
     };
 
     loadStatusData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
 
   const approvedPercent = statusDistribution.total > 0 
     ? Math.round((statusDistribution.approved / statusDistribution.total) * 100) 

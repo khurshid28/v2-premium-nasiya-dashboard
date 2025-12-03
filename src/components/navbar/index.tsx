@@ -1,7 +1,7 @@
 import React from "react";
 import Dropdown from "components/dropdown";
 import { FiAlignJustify, FiUser } from "react-icons/fi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "contexts/UserContext";
 
 import { FiSearch } from "react-icons/fi";
@@ -10,6 +10,7 @@ import {
   IoMdInformationCircleOutline,
 } from "react-icons/io";
 import api from "lib/api";
+import demoApi from "lib/demoApi";
 import DetailModal from "components/modal/DetailModalNew";
 import { appStatusBadge } from "lib/formatters";
 
@@ -20,7 +21,13 @@ const Navbar = (props: {
 }) => {
   const { onOpenSidenav, brandText } = props;
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useUser();
+  
+  // Determine which API to use based on route
+  const currentApi = React.useMemo(() => {
+    return location.pathname.startsWith('/demo') ? demoApi : api;
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -87,12 +94,12 @@ const Navbar = (props: {
       try {
         // Global search - barcha ma'lumotlarni olib, client-side da search qilish
         const [usersRes, appsRes, filsRes, merchantsRes, agentsRes, adminsRes] = await Promise.all([
-          api.listUsers({}),
-          api.listApplications({}),
-          api.listFillials({}),
-          api.listMerchants({}),
-          api.listAgents({}),
-          api.listAdmins({})
+          currentApi.listUsers({}),
+          currentApi.listApplications({}),
+          currentApi.listFillials({}),
+          currentApi.listMerchants({}),
+          currentApi.listAgents({}),
+          currentApi.listAdmins({})
         ]);
         const searchLower = query.toLowerCase();
         const list: SearchItem[] = [];
@@ -300,19 +307,22 @@ const Navbar = (props: {
                 setQuery("");
                 setSelectedIndex(-1);
                 
-                // Navigate to appropriate page
+                // Navigate to appropriate page - check if in demo mode
+                const isDemoMode = location.pathname.startsWith('/demo');
+                const baseRoute = isDemoMode ? '/demo' : '/super';
+                
                 if (selectedResult.type === "operator") {
-                  navigate("/super/users");
+                  navigate(`${baseRoute}/users`);
                 } else if (selectedResult.type === "application") {
-                  navigate("/super/applications");
+                  navigate(`${baseRoute}/applications`);
                 } else if (selectedResult.type === "fillial") {
-                  navigate("/super/fillials");
+                  navigate(`${baseRoute}/fillials`);
                 } else if (selectedResult.type === "merchant") {
-                  navigate("/super/merchants");
+                  navigate(`${baseRoute}/merchants`);
                 } else if (selectedResult.type === "agent") {
-                  navigate("/super/agents");
+                  navigate(`${baseRoute}/agents`);
                 } else if (selectedResult.type === "admin") {
-                  navigate("/super/admins");
+                  navigate(`${baseRoute}/admins`);
                 }
                 // Then show modal
                 setTimeout(() => setSelected(selectedResult), 100);
@@ -348,19 +358,22 @@ const Navbar = (props: {
                         setShowResults(false);
                         setQuery("");
                         setSelectedIndex(-1);
-                        // Navigate to appropriate page
+                        // Navigate to appropriate page - check if in demo mode
+                        const isDemoMode = location.pathname.startsWith('/demo');
+                        const baseRoute = isDemoMode ? '/demo' : '/super';
+                        
                         if (r.type === "operator") {
-                          navigate("/super/users");
+                          navigate(`${baseRoute}/users`);
                         } else if (r.type === "application") {
-                          navigate("/super/applications");
+                          navigate(`${baseRoute}/applications`);
                         } else if (r.type === "fillial") {
-                          navigate("/super/fillials");
+                          navigate(`${baseRoute}/fillials`);
                         } else if (r.type === "merchant") {
-                          navigate("/super/merchants");
+                          navigate(`${baseRoute}/merchants`);
                         } else if (r.type === "agent") {
-                          navigate("/super/agents");
+                          navigate(`${baseRoute}/agents`);
                         } else if (r.type === "admin") {
-                          navigate("/super/admins");
+                          navigate(`${baseRoute}/admins`);
                         }
                         // Then show modal
                         setTimeout(() => setSelected(r), 100);

@@ -1,6 +1,10 @@
 import React from "react";
 import DetailModal from "components/modal/DetailModalNew";
-import api from "lib/api";
+import EditModal from "components/modal/EditModal";
+import PasswordModal from "components/PasswordModal";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { exportSingleTable } from "lib/exportExcel";
 import { formatPhone } from "lib/formatters";
 import Pagination from "components/pagination";
@@ -9,6 +13,9 @@ import CustomSelect from "components/dropdown/CustomSelect";
 import type { Admin } from "types/api";
 
 const Admins = (): JSX.Element => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+
   const [data, setData] = React.useState<Admin[]>([]);
   const [loading, setLoading] = React.useState(true);
   
@@ -21,6 +28,9 @@ const Admins = (): JSX.Element => {
   const [selected, setSelected] = React.useState<Admin | null>(null);
   const [open, setOpen] = React.useState(false);
   const [detailLoading, setDetailLoading] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
+  const [editInitial, setEditInitial] = React.useState<any>(null);
+  const [passwordOpen, setPasswordOpen] = React.useState(false);
   const [toastOpen, setToastOpen] = React.useState(false);
   const [toastMessage, setToastMessage] = React.useState("");
   const [toastType, setToastType] = React.useState<'success' | 'error' | 'info' | 'warning'>('info');
@@ -136,9 +146,14 @@ const Admins = (): JSX.Element => {
         
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { 
-            setToastType("error");
-            setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-            setToastOpen(true);
+            if (location.pathname.startsWith('/demo')) {
+              setEditInitial(null);
+              setEditOpen(true);
+            } else {
+              setToastType("info");
+              setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+              setToastOpen(true);
+            }
           }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
             <span className="hidden sm:inline">Admin qo'shish</span>
             <span className="sm:hidden">+ Admin</span>
@@ -355,10 +370,26 @@ const Admins = (): JSX.Element => {
                 Barcha ma'lumotlarni ko'chirish
               </button>
               <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { 
-                setToastType("error");
-                setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                setToastOpen(true);
+                if (location.pathname.startsWith('/demo')) {
+                  setEditInitial(selected);
+                  setEditOpen(true);
+                  setOpen(false);
+                } else {
+                  setToastType("info");
+                  setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                  setToastOpen(true);
+                }
               }}>Tahrirlash</button>
+              <button className="rounded bg-orange-600 hover:bg-orange-700 px-3 py-1 text-white" onClick={() => { 
+                if (location.pathname.startsWith('/demo')) {
+                  setPasswordOpen(true);
+                  setOpen(false);
+                } else {
+                  setToastType("info");
+                  setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                  setToastOpen(true);
+                }
+              }}>Parolni o'zgartirish</button>
             </div>
           </div>
         ) : (
@@ -367,6 +398,53 @@ const Admins = (): JSX.Element => {
           </div>
         )}
       </DetailModal>
+
+      <PasswordModal
+        isOpen={passwordOpen}
+        onClose={() => { setPasswordOpen(false); setSelected(null); }}
+        onSave={async (payload) => {
+          if (location.pathname.startsWith('/demo')) {
+            setPasswordOpen(false);
+            setSelected(null);
+            setToastType('success');
+            setToastMessage('Parol o\'zgartirildi (Demo)');
+            setToastOpen(true);
+            return;
+          }
+          if (selected && selected.id) {
+            await api.updateAdminPassword(selected.id, { password: payload });
+          }
+          setPasswordOpen(false);
+          setSelected(null);
+        }}
+      />
+
+      <EditModal
+        isOpen={editOpen}
+        onClose={() => { setEditOpen(false); setEditInitial(null); }}
+        initial={editInitial}
+        type="admin"
+        api={api}
+        onSave={async (payload) => {
+          if (location.pathname.startsWith('/demo')) {
+            setEditOpen(false);
+            setEditInitial(null);
+            setToastType('success');
+            setToastMessage(editInitial ? 'Admin tahrirlandi (Demo)' : 'Admin qo\'shildi (Demo)');
+            setToastOpen(true);
+            return;
+          }
+          if (editInitial && editInitial.id) {
+            await api.updateAdmin(editInitial.id, payload);
+          } else {
+            await api.createAdmin(payload);
+          }
+          const res = await api.listAdmins({});
+          setData(res?.items || []);
+          setEditOpen(false);
+          setEditInitial(null);
+        }}
+      />
 
       <Toast message={toastMessage} isOpen={toastOpen} onClose={() => setToastOpen(false)} type={toastType} />
     </div>

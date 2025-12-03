@@ -9,7 +9,9 @@ import {
 } from "variables/charts";
 import LineChart from "components/charts/LineChart";
 import CustomSelect from "components/dropdown/CustomSelect";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { isApproved } from "lib/formatters";
 
 interface TotalSpentProps {
@@ -31,6 +33,9 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+  
   const [totalData, setTotalData] = React.useState({
     count: 0,
     totalAmount: 0,
@@ -58,7 +63,7 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
-          applications = applications.filter(app => {
+          applications = applications.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= start && appDate <= end;
@@ -66,11 +71,11 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
         }
 
         if (fillialId !== "all") {
-          applications = applications.filter(app => app.fillial_id === fillialId);
+          applications = applications.filter((app: any) => app.fillial_id === fillialId);
         } else if (region !== "all") {
           const regionFillials = fillialsList.filter(f => f.region === region);
           const regionFillialIds = regionFillials.map(f => f.id);
-          applications = applications.filter(app => regionFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => regionFillialIds.includes(app.fillial_id));
         }
 
         if (search.trim()) {
@@ -80,17 +85,17 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
             f.address?.toLowerCase().includes(searchLower)
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
-          applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => matchingFillialIds.includes(app.fillial_id));
         }
 
         // Filter by expired month
         if (expiredMonth !== "all") {
-          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+          applications = applications.filter((app: any) => app.expired_month && app.expired_month === String(expiredMonth));
         }
         
         // Calculate total count and amount for current period
         const count = applications.length;
-        const totalAmount = applications.reduce((sum, app) => sum + (app.amount || 0), 0);
+        const totalAmount = applications.reduce((sum: any, app: any) => sum + (app.amount || 0), 0);
         
         // Generate data based on selected time period
         const now = new Date();
@@ -112,14 +117,14 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
           const monthDate = new Date();
           monthDate.setMonth(now.getMonth() - i);
           
-          const monthApps = applications.filter(app => {
+          const monthApps = applications.filter((app: any) => {
             if (!app.createdAt || !isApproved(app.status)) return false;
             const appDate = new Date(app.createdAt);
             return appDate.getMonth() === monthDate.getMonth() && 
                    appDate.getFullYear() === monthDate.getFullYear();
           });
           
-          const monthTotal = monthApps.reduce((sum, app) => sum + (app.amount || 0), 0);
+          const monthTotal = monthApps.reduce((sum: any, app: any) => sum + (app.amount || 0), 0);
           currentPeriodTotal += monthTotal;
           monthlyData.push(monthTotal / 1000); // Convert to thousands
           
@@ -137,7 +142,7 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
-          allApps = allApps.filter(app => {
+          allApps = allApps.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= start && appDate <= end;
@@ -145,11 +150,11 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
         }
 
         if (fillialId !== "all") {
-          allApps = allApps.filter(app => app.fillial_id === fillialId);
+          allApps = allApps.filter((app: any) => app.fillial_id === fillialId);
         } else if (region !== "all") {
           const regionFillials = fillialsList.filter(f => f.region === region);
           const regionFillialIds = regionFillials.map(f => f.id);
-          allApps = allApps.filter(app => regionFillialIds.includes(app.fillial_id));
+          allApps = allApps.filter((app: any) => regionFillialIds.includes(app.fillial_id));
         }
 
         if (search.trim()) {
@@ -159,21 +164,21 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
             f.address?.toLowerCase().includes(searchLower)
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
-          allApps = allApps.filter(app => matchingFillialIds.includes(app.fillial_id));
+          allApps = allApps.filter((app: any) => matchingFillialIds.includes(app.fillial_id));
         }
         
         for (let i = monthsCount * 2 - 1; i >= monthsCount; i--) {
           const monthDate = new Date();
           monthDate.setMonth(now.getMonth() - i);
           
-          const monthApps = allApps.filter(app => {
+          const monthApps = allApps.filter((app: any) => {
             if (!app.createdAt || !isApproved(app.status)) return false;
             const appDate = new Date(app.createdAt);
             return appDate.getMonth() === monthDate.getMonth() && 
                    appDate.getFullYear() === monthDate.getFullYear();
           });
           
-          const monthTotal = monthApps.reduce((sum, app) => sum + (app.amount || 0), 0);
+          const monthTotal = monthApps.reduce((sum: any, app: any) => sum + (app.amount || 0), 0);
           previousPeriodTotal += monthTotal;
         }
         
@@ -221,7 +226,7 @@ const TotalSpent: React.FC<TotalSpentProps> = ({
     };
 
     loadTotalData();
-  }, [timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, timePeriod, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
   return (
     <Card extra="!p-[20px] text-center">
       <div className="flex justify-between">

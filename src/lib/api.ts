@@ -447,6 +447,15 @@ export async function deleteMerchant(id: number): Promise<void> {
   return handleResponse<void>(res);
 }
 
+export async function updateMerchantPassword(id: number, payload: { password: string }): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/merchant/${id}/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<void>(res);
+}
+
 // Agents
 export async function listAgents(opts?: { page?: number; pageSize?: number; search?: string }): Promise<Paginated<Agent>> {
   const params: any = {};
@@ -507,6 +516,15 @@ export async function deleteAgent(id: number): Promise<void> {
   const res = await fetchWithRetry(`${API_BASE}/agent/${id}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+export async function updateAgentPassword(id: number, payload: { password: string }): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/agent/${id}/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
   });
   return handleResponse<void>(res);
 }
@@ -578,6 +596,15 @@ export async function deleteAdmin(id: number): Promise<void> {
   return handleResponse<void>(res);
 }
 
+export async function updateAdminPassword(id: number, payload: { password: string }): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/admin/${id}/password`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<void>(res);
+}
+
 // NOTE:
 // - The endpoints above assume these paths: /user/all, /fillial/all, /app/all.
 //   If your NestJS controllers use different paths, adjust API_BASE or endpoint paths accordingly.
@@ -616,18 +643,21 @@ const api = {
   createMerchant,
   updateMerchant,
   deleteMerchant,
+  updateMerchantPassword,
   // Agents
   listAgents,
   getAgent,
   createAgent,
   updateAgent,
   deleteAgent,
+  updateAgentPassword,
   // Admins
   listAdmins,
   getAdmin,
   createAdmin,
   updateAdmin,
   deleteAdmin,
+  updateAdminPassword,
 };
 
 export default api;

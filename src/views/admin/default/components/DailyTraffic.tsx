@@ -3,7 +3,9 @@ import BarChart from "components/charts/BarChart";
 import { barChartOptionsDailyTraffic } from "variables/charts";
 import { MdArrowDropUp } from "react-icons/md";
 import Card from "components/card";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { isApproved } from "lib/formatters";
 
 interface DailyTrafficProps {
@@ -25,6 +27,9 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+  
   const [chartData, setChartData] = React.useState<any[]>([]);
   const [dailyAmount, setDailyAmount] = React.useState(0);
   const [growthPercent, setGrowthPercent] = React.useState(0);
@@ -43,7 +48,7 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
-          applications = applications.filter(app => {
+          applications = applications.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= start && appDate <= end;
@@ -141,7 +146,7 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
     };
 
     loadDailyData();
-  }, [startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
   return (
     <Card extra="pb-7 p-[20px]">
       <div className="flex flex-row justify-between">

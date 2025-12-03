@@ -1,6 +1,8 @@
 import React from "react";
 import { Range } from "react-range";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import Pagination from "components/pagination";
 import DetailModal from "components/modal/DetailModalNew";
 import AvatarName from "components/AvatarName";
@@ -41,6 +43,9 @@ type Application = {
 
 
 const Applications = (): JSX.Element => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+
   const [applications, setApplications] = React.useState<Application[]>([]);
   const [fillialsList, setFillialsList] = React.useState<any[]>([]);
   const [merchants, setMerchants] = React.useState<any[]>([]);
@@ -78,6 +83,7 @@ const Applications = (): JSX.Element => {
 
   // Function to generate copy text
   const generateCopyText = (app: Application): string => {
+
     let text = `👤 Ariza beruvchi:\n${app.fullname}\n${app.passport || ''}\n\n`;
     text += `📱 Telefon: ${formatPhone(app.phone)}\n`;
     text += `🛒 Tovarlar summasi: ${formatMoney(app.amount)}\n`;
@@ -186,7 +192,7 @@ const Applications = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [api]);
 
   const filtered = React.useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -659,26 +665,40 @@ const Applications = (): JSX.Element => {
                         const downloadKey = `graph_${a.id}`;
                         setDownloadLoading(prev => ({ ...prev, [downloadKey]: true }));
                         try {
-                          const response = await fetch(`https://api.premiumnasiya.uz/api/v1/app/graph/${a.id}`, {
-                            method: 'GET',
-                            headers: {
-                              'Authorization': `Bearer ${localStorage.getItem('token')}`
+                          // In demo mode, use the static PDF from public folder
+                          const isDemo = location.pathname.startsWith('/demo');
+                          
+                          if (isDemo) {
+                            // Demo mode: download static graph.pdf
+                            const link = document.createElement("a");
+                            link.href = `${process.env.PUBLIC_URL}/graph.pdf`;
+                            link.download = `application_${a.id}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                          } else {
+                            // Production mode: fetch from API
+                            const response = await fetch(`https://api.premiumnasiya.uz/api/v1/app/graph/${a.id}`, {
+                              method: 'GET',
+                              headers: {
+                                'Authorization': `Bearer ${localStorage.getItem('token')}`
+                              }
+                            });
+                            
+                            if (!response.ok) {
+                              throw new Error('Document yuklab olishda xatolik');
                             }
-                          });
-                          
-                          if (!response.ok) {
-                            throw new Error('Document yuklab olishda xatolik');
+                            
+                            const blob = await response.blob();
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement("a");
+                            link.href = url;
+                            link.download = `application_${a.id}.pdf`;
+                            document.body.appendChild(link);
+                            link.click();
+                            link.remove();
+                            URL.revokeObjectURL(url);
                           }
-                          
-                          const blob = await response.blob();
-                          const url = URL.createObjectURL(blob);
-                          const link = document.createElement("a");
-                          link.href = url;
-                          link.download = `application_${a.id}.pdf`;
-                          document.body.appendChild(link);
-                          link.click();
-                          link.remove();
-                          URL.revokeObjectURL(url);
                         } catch (err) {
                           setToastMessage("Grafikni yuklab olishda xatolik yuz berdi");
                           setToastType('error');
@@ -919,6 +939,35 @@ const Applications = (): JSX.Element => {
                       <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Mahsulot yo'q</span>
                     )}
                   </div>
+                  
+                  {/* To'lov jadvali (Payments) */}
+                  {(selected as any).payments && Array.isArray((selected as any).payments) && (selected as any).payments.length > 0 && (
+                    <div>
+                      <strong className="text-gray-900 dark:text-white">To'lov jadvali:</strong>
+                      <div className="mt-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-navy-800 overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 dark:bg-navy-700">
+                            <tr className="text-left text-xs text-gray-600 dark:text-gray-300">
+                              <th className="px-3 py-2">Sana</th>
+                              <th className="px-3 py-2">Asosiy summa</th>
+                              <th className="px-3 py-2">Jami to'lov</th>
+                              <th className="px-3 py-2">Qoldiq qarz</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-gray-700 dark:text-gray-300">
+                            {(selected as any).payments.map((payment: any, idx: number) => (
+                              <tr key={idx} className="border-t border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-navy-700">
+                                <td className="px-3 py-2">{payment.date || '-'}</td>
+                                <td className="px-3 py-2 font-medium text-blue-600 dark:text-blue-400">{formatMoney(payment.prAmount || 0)}</td>
+                                <td className="px-3 py-2 font-semibold text-green-600 dark:text-green-400">{formatMoney(payment.totalAmount || 0)}</td>
+                                <td className="px-3 py-2 text-orange-600 dark:text-orange-400">{formatMoney(payment.remainingMainDebt || 0)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-500 dark:text-gray-400">

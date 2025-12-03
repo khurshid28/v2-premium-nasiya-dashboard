@@ -1,6 +1,5 @@
 import React from "react";
 import DetailModal from "./DetailModalNew";
-import api from "lib/api";
 import PhoneInput from "components/PhoneInput";
 import CustomSelect from "components/dropdown/CustomSelect";
 import CustomFileInput from "components/input/CustomFileInput";
@@ -10,7 +9,8 @@ type Props = {
   onClose: () => void;
   onSave: (payload: any) => Promise<void> | void;
   initial?: any;
-  type: "user" | "fillial";
+  type: "user" | "fillial" | "merchant" | "agent" | "admin";
+  api: any; // API instance (demoApi or apiReal)
 };
 
 const REGIONS = [
@@ -30,9 +30,11 @@ const REGIONS = [
   "TOSHKENT_SHAHAR",
 ];
 
-export default function EditModal({ isOpen, onClose, onSave, initial, type }: Props) {
+export default function EditModal({ isOpen, onClose, onSave, initial, type, api }: Props) {
   const [form, setForm] = React.useState<any>(initial ?? {});
   const [fillials, setFillials] = React.useState<any[]>([]);
+  const [admins, setAdmins] = React.useState<any[]>([]);
+  const [selectedFillials, setSelectedFillials] = React.useState<number[]>([]);
   // focus flags removed — we keep input simple with separate prefix
 
   React.useEffect(() => {
@@ -46,18 +48,38 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
     if (init.phone) formatted.phone = getTail9(init.phone);
     if (init.director_phone) formatted.director_phone = getTail9(init.director_phone);
     setForm(formatted);
-  }, [initial]);
+    
+    // For agents, initialize selected fillials
+    if (type === "agent" && init.fillials && Array.isArray(init.fillials)) {
+      setSelectedFillials(init.fillials.map((f: any) => f.id));
+    } else {
+      setSelectedFillials([]);
+    }
+  }, [initial, type]);
 
   React.useEffect(() => {
     let mounted = true;
-    api.listFillials({ page: 1, pageSize: 200 }).then((r) => {
+    api.listFillials({ page: 1, pageSize: 200 }).then((r: any) => {
       if (!mounted) return;
       setFillials(r.items);
     });
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [api]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    if (type === "merchant") {
+      api.listAdmins({ page: 1, pageSize: 200 }).then((r: any) => {
+        if (!mounted) return;
+        setAdmins(r.items || []);
+      });
+    }
+    return () => {
+      mounted = false;
+    };
+  }, [api, type]);
 
   const update = (key: string, value: any) => setForm((s: any) => ({ ...s, [key]: value }));
 
@@ -83,6 +105,12 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
       const d = String(payload.director_phone).replace(/\D/g, "").slice(-9);
       payload.director_phone = d ? `+998${d}` : "";
     }
+    
+    // For agents, add selected fillials
+    if (type === "agent") {
+      payload.fillial_ids = selectedFillials;
+    }
+    
     await onSave(payload);
     onClose();
   };
@@ -90,7 +118,146 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type }: Pr
   return (
     <DetailModal title={initial ? `Edit ${type}` : `Add ${type}`} isOpen={isOpen} onClose={onClose}>
       <div className="space-y-4">
-        {type === "user" ? (
+        {type === "merchant" ? (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <input value={form.name ?? ""} onChange={(e) => update("name", e.target.value)} className="mt-1 block w-full rounded-md border px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <div className="mt-1">
+                <PhoneInput value={form.phone ?? ""} onChange={(v) => update("phone", v)} placeholder="901234567" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Address</label>
+              <input value={form.address ?? ""} onChange={(e) => update("address", e.target.value)} className="mt-1 block w-full rounded-md border px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Admin *</label>
+              <CustomSelect
+                value={form.admin_id ?? ""}
+                onChange={(value) => {
+                  const v = value === "" ? null : Number(value);
+                  update("admin_id", v);
+                }}
+                options={[
+                  { value: "", label: "-- Admin tanlang --" },
+                  ...(Array.isArray(admins) ? admins : []).map((a) => ({ value: a.id.toString(), label: a.fullname || a.phone }))
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Image (file)</label>
+              <div className="mt-1">
+                <CustomFileInput
+                  onChange={onFile}
+                  accept="image/*"
+                  value={form.image}
+                  placeholder="Choose image file"
+                />
+              </div>
+            </div>
+          </>
+        ) : type === "agent" ? (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Full name</label>
+              <input value={form.fullname ?? ""} onChange={(e) => update("fullname", e.target.value)} className="mt-1 block w-full rounded-md border px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <div className="mt-1">
+                <PhoneInput value={form.phone ?? ""} onChange={(v) => update("phone", v)} placeholder="901234567" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Fillials *</label>
+              <div className="border rounded-md p-2 max-h-48 overflow-y-auto">
+                {(Array.isArray(fillials) ? fillials : []).map((f) => (
+                  <label key={f.id} className="flex items-center space-x-2 py-1 hover:bg-gray-50 px-2 rounded cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedFillials.includes(f.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedFillials([...selectedFillials, f.id]);
+                        } else {
+                          setSelectedFillials(selectedFillials.filter(id => id !== f.id));
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{f.name}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Tanlangan: {selectedFillials.length}</p>
+            </div>
+            {initial ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Work status</label>
+                <CustomSelect
+                  value={form.work_status ?? "WORKING"}
+                  onChange={(value) => update("work_status", value)}
+                  options={[
+                    { value: "WORKING", label: "WORKING" },
+                    { value: "BLOCKED", label: "BLOCKED" }
+                  ]}
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Image (file)</label>
+              <div className="mt-1">
+                <CustomFileInput
+                  onChange={onFile}
+                  accept="image/*"
+                  value={form.image}
+                  placeholder="Choose image file"
+                />
+              </div>
+            </div>
+          </>
+        ) : type === "admin" ? (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Full name</label>
+              <input value={form.fullname ?? ""} onChange={(e) => update("fullname", e.target.value)} className="mt-1 block w-full rounded-md border px-3 py-2" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Phone</label>
+              <div className="mt-1">
+                <PhoneInput value={form.phone ?? ""} onChange={(v) => update("phone", v)} placeholder="901234567" />
+              </div>
+            </div>
+            {initial ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Work status</label>
+                <CustomSelect
+                  value={form.work_status ?? "WORKING"}
+                  onChange={(value) => update("work_status", value)}
+                  options={[
+                    { value: "WORKING", label: "WORKING" },
+                    { value: "BLOCKED", label: "BLOCKED" }
+                  ]}
+                />
+              </div>
+            ) : null}
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Image (file)</label>
+              <div className="mt-1">
+                <CustomFileInput
+                  onChange={onFile}
+                  accept="image/*"
+                  value={form.image}
+                  placeholder="Choose image file"
+                />
+              </div>
+            </div>
+          </>
+        ) : type === "user" ? (
           <>
             <div>
               <label className="block text-sm font-medium text-gray-700">Full name</label>

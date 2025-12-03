@@ -1,7 +1,9 @@
 import React from "react";
 import DetailModal from "components/modal/DetailModalNew";
 import EditModal from "components/modal/EditModal";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { exportSingleTable } from "lib/exportExcel";
 import { formatPhone } from "lib/formatters";
 import Pagination from "components/pagination";
@@ -39,6 +41,23 @@ type Fillial = {
 
 
 const Fillials = (): JSX.Element => {
+  const location = useLocation();
+  
+  console.log('=== Fillials Component Render ===');
+  console.log('location.pathname:', location.pathname);
+  console.log('location:', location);
+  
+  const api = React.useMemo(() => {
+    const isDemo = location.pathname.startsWith('/demo');
+    console.log('Fillials useMemo - pathname:', location.pathname, 'isDemo:', isDemo);
+    console.log('Fillials useMemo - demoApi:', demoApi);
+    console.log('Fillials useMemo - apiReal:', apiReal);
+    console.log('Fillials useMemo - returning:', isDemo ? 'demoApi' : 'apiReal');
+    const selectedApi = isDemo ? demoApi : apiReal;
+    console.log('Fillials useMemo - selectedApi.listFillials:', selectedApi.listFillials);
+    return selectedApi;
+  }, [location.pathname]);
+
   const [data, setData] = React.useState<Fillial[]>([]);
   const [loading, setLoading] = React.useState(true);
   
@@ -134,8 +153,7 @@ const Fillials = (): JSX.Element => {
       abortController.abort();
       clearTimeout(timeoutId);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // Faqat component mount bo'lganda API chaqirish (client-side filtering)
+  }, [api]); // Re-run when api changes (demo vs real API)
 
   // Fillials dropdown uchun - agent va merchant filterga qarab
   const availableFillials = React.useMemo(() => {
@@ -237,9 +255,14 @@ const Fillials = (): JSX.Element => {
         {/* Buttons and filters row */}
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { 
-            setToastType("error");
-            setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-            setToastOpen(true);
+            if (location.pathname.startsWith('/demo')) {
+              setEditInitial(null);
+              setEditOpen(true);
+            } else {
+              setToastType("error");
+              setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+              setToastOpen(true);
+            }
           }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
             <span className="hidden sm:inline">Filial qo'shish</span>
             <span className="sm:hidden">+ Filial</span>
@@ -676,9 +699,15 @@ const Fillials = (): JSX.Element => {
                         Barcha ma'lumotlarni ko'chirish
                       </button>
                       <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { 
-                        setToastType("error");
-                        setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                        setToastOpen(true);
+                        if (location.pathname.startsWith('/demo')) {
+                          setEditInitial(selected);
+                          setEditOpen(true);
+                          setOpen(false);
+                        } else {
+                          setToastType("error");
+                          setToastMessage("Vaqtincha bu funksiya ishlamayapti");
+                          setToastOpen(true);
+                        }
                       }}>Tahrirlash</button>
                     </div>
                   </div>
@@ -693,7 +722,16 @@ const Fillials = (): JSX.Element => {
               onClose={() => { setEditOpen(false); setEditInitial(null); }}
               initial={editInitial}
               type="fillial"
+              api={api}
               onSave={async (payload) => {
+                if (location.pathname.startsWith('/demo')) {
+                  setEditOpen(false);
+                  setEditInitial(null);
+                  setToastType('success');
+                  setToastMessage(editInitial ? 'Filial tahrirlandi (Demo)' : 'Filial qo\'shildi (Demo)');
+                  setToastOpen(true);
+                  return;
+                }
                 if (editInitial && editInitial.id) {
                   await api.updateFillial(editInitial.id, payload);
                 } else {

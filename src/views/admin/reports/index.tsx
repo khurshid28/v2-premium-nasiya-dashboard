@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Card from "components/card";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { formatMoney } from "lib/formatters";
 import { MdCalendarMonth, MdAttachMoney, MdCheckCircle, MdShoppingCart } from "react-icons/md";
 import Pagination from "components/pagination";
@@ -18,6 +20,9 @@ interface MonthlyReport {
 }
 
 const ReportsPage = () => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+
   const [reports, setReports] = useState<MonthlyReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -117,7 +122,8 @@ const ReportsPage = () => {
 
         if (isCompleted) {
           monthlyData[monthKey].completedApplications += 1;
-          monthlyData[monthKey].totalProfit += app.payment_amount || app.amount || 0;
+          const paymentAmount = parseFloat(app.payment_amount) || parseFloat(app.amount) || 0;
+          monthlyData[monthKey].totalProfit += paymentAmount;
           
           // Count products and their total amount
           if (app.products && Array.isArray(app.products)) {

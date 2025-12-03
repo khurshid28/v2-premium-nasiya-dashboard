@@ -4,7 +4,9 @@ import BarChart from "components/charts/BarChart";
 import {
   barChartOptionsWeeklyRevenue,
 } from "variables/charts";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import { MdBarChart } from "react-icons/md";
 import { isApproved, isRejected, isLimit } from "lib/formatters";
 
@@ -43,6 +45,9 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
   fillials = [],
   expiredMonth = "all"
 }) => {
+  const location = useLocation();
+  const api = location.pathname.startsWith('/demo') ? demoApi : apiReal;
+  
   const [chartData, setChartData] = React.useState([{
     name: "Tugatilgan",
     data: [0, 0, 0, 0, 0, 0, 0],
@@ -72,7 +77,7 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
-          applications = applications.filter(app => {
+          applications = applications.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= start && appDate <= end;
@@ -80,11 +85,11 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
         }
 
         if (fillialId !== "all") {
-          applications = applications.filter(app => app.fillial_id === fillialId);
+          applications = applications.filter((app: any) => app.fillial_id === fillialId);
         } else if (region !== "all") {
           const regionFillials = fillialsList.filter(f => f.region === region);
           const regionFillialIds = regionFillials.map(f => f.id);
-          applications = applications.filter(app => regionFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => regionFillialIds.includes(app.fillial_id));
         }
 
         if (search.trim()) {
@@ -94,12 +99,12 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
             f.address?.toLowerCase().includes(searchLower)
           );
           const matchingFillialIds = matchingFillials.map(f => f.id);
-          applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+          applications = applications.filter((app: any) => matchingFillialIds.includes(app.fillial_id));
         }
 
         // Filter by expired month
         if (expiredMonth !== "all") {
-          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+          applications = applications.filter((app: any) => app.expired_month && app.expired_month === String(expiredMonth));
         }
         
         // Group by last 7 days (6 days ago to today)
@@ -111,7 +116,7 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
           date.setHours(0, 0, 0, 0); // Start of day
           const nextDay = new Date(date.getTime() + 24 * 60 * 60 * 1000 - 1); // End of day
           
-          const dayApps = applications.filter(app => {
+          const dayApps = applications.filter((app: any) => {
             if (!app.createdAt) return false;
             const appDate = new Date(app.createdAt);
             return appDate >= date && appDate <= nextDay;
@@ -122,9 +127,9 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
           const dayLabel = dayNames[date.getDay()];
           
           return {
-            approved: dayApps.filter(app => isApproved(app.status) || app.status === "CONFIRMED").length,
-            pending: dayApps.filter(app => !isApproved(app.status) && app.status !== "CONFIRMED" && !isRejected(app.status) && !isLimit(app.status)).length,
-            rejected: dayApps.filter(app => isRejected(app.status) || isLimit(app.status) || isCanceledByScoring(app.status) || isCanceledByDaily(app.status) || isCanceledByClient(app.status)).length,
+            approved: dayApps.filter((app: any) => isApproved(app.status) || app.status === "CONFIRMED").length,
+            pending: dayApps.filter((app: any) => !isApproved(app.status) && app.status !== "CONFIRMED" && !isRejected(app.status) && !isLimit(app.status)).length,
+            rejected: dayApps.filter((app: any) => isRejected(app.status) || isLimit(app.status) || isCanceledByScoring(app.status) || isCanceledByDaily(app.status) || isCanceledByClient(app.status)).length,
             date: dayLabel
           };
         });
@@ -175,7 +180,7 @@ const WeeklyRevenue: React.FC<WeeklyRevenueProps> = ({
     };
 
     loadWeeklyData();
-  }, [startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
+  }, [api, startDate, endDate, fillialId, region, search, fillials, expiredMonth]);
 
   return (
     <Card extra="flex flex-col bg-white w-full rounded-3xl py-6 px-2 text-center">
