@@ -1,5 +1,7 @@
 import React from "react";
-import api from "lib/api";
+import { useLocation } from "react-router-dom";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import DateRangePicker from "components/DateRangePicker";
 import CustomSelect from "components/dropdown/CustomSelect";
 // formatShortMoney removed (unused in this view)
@@ -15,6 +17,12 @@ import { IoMdHome } from "react-icons/io";
 import { isApproved, isPending } from "lib/formatters";
 
 const Dashboard = (): JSX.Element => {
+  const location = useLocation();
+  const api = React.useMemo(() => {
+    const isDemoMode = location.pathname.startsWith('/demo');
+    return isDemoMode ? demoApi : apiReal;
+  }, [location.pathname]);
+
   const [fillials, setFillials] = React.useState<any[]>([]);
   const [merchants, setMerchants] = React.useState<any[]>([]);
   const [agents, setAgents] = React.useState<any[]>([]);
