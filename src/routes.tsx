@@ -14,8 +14,17 @@ import ReportsPage from "views/admin/reports";
 // Auth import
 import SignIn from "views/auth/SignIn";
 
+// Demo imports
+import Permissions from "views/demo/permissions";
+import Debts from "views/demo/debts";
+import Customers from "views/demo/customers";
+import ScoringHistory from "views/demo/scoringHistory";
+import ScoringModels from "views/demo/scoringModels";
+import Payments from "views/demo/payments";
+import Products from "views/demo/products";
+
 // Icon Imports (Tabler icons)
-import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck } from "tabler-icons-react";
+import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck, ShieldLock, Receipt, Settings, CreditCard, Clock, Package } from "tabler-icons-react";
 
 const routes = [
   {
@@ -145,6 +154,55 @@ const routes = [
     path: "applications",
   icon: <FileText size={20} />,
     component: <Applications />,
+  },
+  {
+    name: "Ruxsat va Blocklar",
+    layout: "/demo",
+    path: "permissions",
+    icon: <ShieldLock size={20} />,
+    component: <Permissions />,
+  },
+  {
+    name: "Qarzdorlik",
+    layout: "/demo",
+    path: "debts",
+    icon: <Receipt size={20} />,
+    component: <Debts />,
+  },
+  {
+    name: "Mijozlar",
+    layout: "/demo",
+    path: "customers",
+    icon: <UsersIcon size={20} />,
+    component: <Customers />,
+  },
+  {
+    name: "Skoring tarixi",
+    layout: "/demo",
+    path: "scoring-history",
+    icon: <Clock size={20} />,
+    component: <ScoringHistory />,
+  },
+  {
+    name: "Skoring modellari",
+    layout: "/demo",
+    path: "scoring-models",
+    icon: <Settings size={20} />,
+    component: <ScoringModels />,
+  },
+  {
+    name: "To'lovlar",
+    layout: "/demo",
+    path: "payments",
+    icon: <CreditCard size={20} />,
+    component: <Payments />,
+  },
+  {
+    name: "Mahsulotlar",
+    layout: "/demo",
+    path: "products",
+    icon: <Package size={20} />,
+    component: <Products />,
   },
   {
     name: "Ma'lumot",
