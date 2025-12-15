@@ -379,7 +379,7 @@ const ApplicationDetail = (): JSX.Element => {
                 console.log('PaymentHistory length:', application.paymentHistory?.length);
                 console.log('PaymentHistory data:', application.paymentHistory);
                 return null;
-              })()}
+              })() as React.ReactNode}
               {application.paymentHistory && application.paymentHistory.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
