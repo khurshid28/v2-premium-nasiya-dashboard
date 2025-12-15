@@ -1,6 +1,8 @@
 import React from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Range } from "react-range";
-import api from "lib/api";
+import apiReal from "lib/api";
+import demoApi from "lib/demoApi";
 import Pagination from "components/pagination";
 import DetailModal from "components/modal/DetailModalNew";
 import AvatarName from "components/AvatarName";
@@ -41,6 +43,13 @@ type Application = {
 
 
 const Applications = (): JSX.Element => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const api = React.useMemo(() => {
+    const isDemoMode = location.pathname.startsWith('/demo');
+    return isDemoMode ? demoApi : apiReal;
+  }, [location.pathname]);
+
   const [applications, setApplications] = React.useState<Application[]>([]);
   const [fillialsList, setFillialsList] = React.useState<any[]>([]);
   const [merchants, setMerchants] = React.useState<any[]>([]);
@@ -746,6 +755,12 @@ const Applications = (): JSX.Element => {
                 setOpen(false);
                 setSelected(null);
               }}
+              onViewFull={selected ? () => {
+                const isDemoMode = location.pathname.startsWith('/demo');
+                const basePath = isDemoMode ? '/demo' : '/super';
+                navigate(`${basePath}/applications/${selected.id}`);
+                setOpen(false);
+              } : undefined}
             >
               {detailLoading ? (
                 <div className="flex items-center justify-center py-8">

@@ -1,8 +1,7 @@
 import { useState, useMemo } from "react";
-import { User, FileText, BuildingStore, Search, Home, LayoutDashboard } from "tabler-icons-react";
+import { User, FileText, BuildingStore, Search, Home } from "tabler-icons-react";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
-import DebtsDashboard from "./components/DebtsDashboard";
 
 // Types
 type CustomerDebt = {
@@ -403,10 +402,10 @@ const formatDate = (date: string) => {
 };
 
 // Tab type definition
-type TabType = "dashboard" | "customers" | "applications" | "merchants" | "fillials";
+type TabType = "customers" | "applications" | "merchants" | "fillials";
 
 export default function Debts() {
-  const [activeTab, setActiveTab] = useState<TabType>("dashboard");
+  const [activeTab, setActiveTab] = useState<TabType>("customers");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -427,8 +426,6 @@ export default function Debts() {
   // Get current data based on active tab
   const getCurrentData = (): (CustomerDebt | ApplicationDebt | MerchantDebt | FillialDebt)[] => {
     switch (activeTab) {
-      case "dashboard":
-        return [];
       case "customers":
         return MOCK_CUSTOMERS;
       case "applications":
@@ -579,17 +576,6 @@ export default function Debts() {
         {/* Tabs */}
         <div className="mb-5 flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700">
           <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-all ${
-              activeTab === "dashboard"
-                ? "border-brand-500 text-brand-500"
-                : "border-transparent text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-            }`}
-          >
-            <LayoutDashboard size={18} />
-            Dashboard
-          </button>
-          <button
             onClick={() => setActiveTab("customers")}
             className={`flex items-center gap-2 border-b-2 px-4 py-2 text-sm font-medium transition-all ${
               activeTab === "customers"
@@ -668,12 +654,8 @@ export default function Debts() {
         </div>
 
         {/* Content based on active tab */}
-        {activeTab === "dashboard" ? (
-          <DebtsDashboard />
-        ) : (
-          <>
-            {/* Table */}
-            <div className="overflow-x-auto">
+        {/* Table */}
+        <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
@@ -982,8 +964,6 @@ export default function Debts() {
               </div>
             </div>
           </div>
-        )}
-          </>
         )}
       </Card>
 

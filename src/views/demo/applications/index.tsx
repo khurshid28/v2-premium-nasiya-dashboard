@@ -1,2 +1,2 @@
-// This file is not needed - demo routes use the same components as regular routes
-export {};
+// Re-export admin applications component with demo mode support
+export { default } from "views/admin/applications";

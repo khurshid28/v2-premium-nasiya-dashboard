@@ -5,9 +5,10 @@ export type DetailModalProps = {
   isOpen: boolean;
   onClose: () => void;
   children?: React.ReactNode;
+  onViewFull?: () => void;
 };
 
-const DetailModal = ({ title, isOpen, onClose, children }: DetailModalProps): JSX.Element | null => {
+const DetailModal = ({ title, isOpen, onClose, children, onViewFull }: DetailModalProps): JSX.Element | null => {
   if (!isOpen) return null;
 
   return (
@@ -25,10 +26,18 @@ const DetailModal = ({ title, isOpen, onClose, children }: DetailModalProps): JS
           </button>
         </div>
         <div className="p-6 text-sm text-gray-800 dark:text-gray-300 overflow-y-auto flex-1">{children}</div>
-        <div className="p-4 border-t border-gray-200 dark:border-gray-600 flex justify-end gap-2 flex-shrink-0">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-600 flex justify-between gap-2 flex-shrink-0">
+          {onViewFull && (
+            <button
+              onClick={onViewFull}
+              className="rounded bg-brand-500 dark:bg-brand-400 px-4 py-2 text-sm font-medium hover:bg-brand-600 dark:hover:bg-brand-500 text-white"
+            >
+              To'liq ko'rish
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="rounded bg-gray-100 dark:bg-gray-700 px-3 py-1 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-300"
+            className="rounded bg-gray-100 dark:bg-gray-700 px-3 py-2 text-sm hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-900 dark:text-gray-300"
           >
             Yopish
           </button>

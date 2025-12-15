@@ -22,6 +22,8 @@ import ScoringHistory from "views/demo/scoringHistory";
 import ScoringModels from "views/demo/scoringModels";
 import Payments from "views/demo/payments";
 import Products from "views/demo/products";
+import DemoApplications from "views/demo/applications";
+import ApplicationDetail from "views/demo/applications/detail";
 
 // Icon Imports (Tabler icons)
 import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck, ShieldLock, Receipt, Settings, CreditCard, Clock, Package } from "tabler-icons-react";
@@ -149,11 +151,27 @@ const routes = [
     component: <Applications />,
   },
   {
+    name: "Ariza batafsil",
+    layout: "/super",
+    path: "applications/:id",
+    icon: <FileText size={20} />,
+    component: <ApplicationDetail />,
+    hidden: true,
+  },
+  {
     name: "Arizalar",
     layout: "/demo",
     path: "applications",
   icon: <FileText size={20} />,
-    component: <Applications />,
+    component: <DemoApplications />,
+  },
+  {
+    name: "Ariza batafsil",
+    layout: "/demo",
+    path: "applications/:id",
+    icon: <FileText size={20} />,
+    component: <ApplicationDetail />,
+    hidden: true,
   },
   {
     name: "Ruxsat va Blocklar",

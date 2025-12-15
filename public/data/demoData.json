@@ -1548,25 +1548,29 @@
           "date": "2025-12-05",
           "prAmount": 667624,
           "totalAmount": 667624,
-          "remainingMainDebt": 7343865
+          "remainingMainDebt": 7343865,
+          "paid": true
         },
         {
           "date": "2026-01-05",
           "prAmount": 667624,
           "totalAmount": 667624,
-          "remainingMainDebt": 6676241
+          "remainingMainDebt": 6676241,
+          "paid": true
         },
         {
           "date": "2026-02-05",
           "prAmount": 667624,
           "totalAmount": 667624,
-          "remainingMainDebt": 6008617
+          "remainingMainDebt": 6008617,
+          "paid": true
         },
         {
           "date": "2026-03-05",
           "prAmount": 667624,
           "totalAmount": 667624,
-          "remainingMainDebt": 5340993
+          "remainingMainDebt": 5340993,
+          "paid": true
         },
         {
           "date": "2026-04-05",
@@ -1615,6 +1619,37 @@
           "prAmount": 667625,
           "totalAmount": 667625,
           "remainingMainDebt": 0
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY1_1",
+          "date": "2025-11-17T09:55:42.751Z",
+          "amount": 2608302,
+          "provider": "AUTO",
+          "transactionId": "TXNX2ZMZVLFL",
+          "status": "completed"
+        },
+        {
+          "id": "PAY1_2",
+          "date": "2025-11-24T09:55:42.752Z",
+          "amount": 2635142,
+          "provider": "PAYME",
+          "status": "pending"
+        },
+        {
+          "id": "PAY1_3",
+          "date": "2025-12-01T09:55:42.752Z",
+          "amount": 2686213,
+          "provider": "AUTO",
+          "status": "pending"
+        },
+        {
+          "id": "PAY1_4",
+          "date": "2025-12-08T09:55:42.752Z",
+          "amount": 2604267,
+          "provider": "PAYME",
+          "status": "pending"
         }
       ]
     },
@@ -2109,6 +2144,24 @@
           "price": 5180198,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY4_1",
+          "date": "2025-12-01T09:55:42.752Z",
+          "amount": 6950955,
+          "provider": "MIB",
+          "transactionId": "TXNK1ZK7QDAW",
+          "status": "completed"
+        },
+        {
+          "id": "PAY4_2",
+          "date": "2025-12-08T09:55:42.752Z",
+          "amount": 7008084,
+          "provider": "PAYME",
+          "transactionId": "TXNYPTLEBDR0",
+          "status": "completed"
+        }
       ]
     },
     {
@@ -2534,25 +2587,29 @@
           "date": "2025-12-05",
           "prAmount": 173342,
           "totalAmount": 173342,
-          "remainingMainDebt": 1906758
+          "remainingMainDebt": 1906758,
+          "paid": true
         },
         {
           "date": "2026-01-05",
           "prAmount": 173342,
           "totalAmount": 173342,
-          "remainingMainDebt": 1733416
+          "remainingMainDebt": 1733416,
+          "paid": true
         },
         {
           "date": "2026-02-05",
           "prAmount": 173342,
           "totalAmount": 173342,
-          "remainingMainDebt": 1560074
+          "remainingMainDebt": 1560074,
+          "paid": true
         },
         {
           "date": "2026-03-05",
           "prAmount": 173342,
           "totalAmount": 173342,
-          "remainingMainDebt": 1386732
+          "remainingMainDebt": 1386732,
+          "paid": true
         },
         {
           "date": "2026-04-05",
@@ -2601,6 +2658,37 @@
           "prAmount": 173338,
           "totalAmount": 173338,
           "remainingMainDebt": 0
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY7_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 612622,
+          "provider": "PLUM",
+          "transactionId": "TXN49AZNBEOV",
+          "status": "completed"
+        },
+        {
+          "id": "PAY7_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 631280,
+          "provider": "MIB",
+          "status": "failed"
+        },
+        {
+          "id": "PAY7_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 596441,
+          "provider": "PLUM",
+          "status": "failed"
+        },
+        {
+          "id": "PAY7_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 593374,
+          "provider": "PLUM",
+          "status": "pending"
         }
       ]
     },
@@ -3027,25 +3115,29 @@
           "date": "2025-12-05",
           "prAmount": 90122,
           "totalAmount": 90122,
-          "remainingMainDebt": 991341
+          "remainingMainDebt": 991341,
+          "paid": true
         },
         {
           "date": "2026-01-05",
           "prAmount": 90122,
           "totalAmount": 90122,
-          "remainingMainDebt": 901219
+          "remainingMainDebt": 901219,
+          "paid": true
         },
         {
           "date": "2026-02-05",
           "prAmount": 90122,
           "totalAmount": 90122,
-          "remainingMainDebt": 811097
+          "remainingMainDebt": 811097,
+          "paid": true
         },
         {
           "date": "2026-03-05",
           "prAmount": 90122,
           "totalAmount": 90122,
-          "remainingMainDebt": 720975
+          "remainingMainDebt": 720975,
+          "paid": true
         },
         {
           "date": "2026-04-05",
@@ -3094,6 +3186,38 @@
           "prAmount": 90121,
           "totalAmount": 90121,
           "remainingMainDebt": 0
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY10_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 301574,
+          "provider": "MIB",
+          "transactionId": "TXNAJS3O2KN7",
+          "status": "completed"
+        },
+        {
+          "id": "PAY10_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 354593,
+          "provider": "AUTO",
+          "status": "pending"
+        },
+        {
+          "id": "PAY10_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 290923,
+          "provider": "MIB",
+          "transactionId": "TXNIZQTSDABH",
+          "status": "completed"
+        },
+        {
+          "id": "PAY10_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 380806,
+          "provider": "PAYME",
+          "status": "failed"
         }
       ]
     },
@@ -3439,6 +3563,38 @@
           "name": "Konditsioner",
           "price": 1523089,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY13_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 666970,
+          "provider": "AUTO",
+          "transactionId": "TXNW5JG0M79E",
+          "status": "completed"
+        },
+        {
+          "id": "PAY13_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 648078,
+          "provider": "PAYME",
+          "transactionId": "TXNKAS4KEGQY",
+          "status": "completed"
+        },
+        {
+          "id": "PAY13_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 657807,
+          "provider": "PLUM",
+          "status": "pending"
+        },
+        {
+          "id": "PAY13_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 633341,
+          "provider": "AUTO",
+          "status": "failed"
         }
       ]
     },
@@ -3933,6 +4089,23 @@
           "price": 3729154,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY16_1",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 664723,
+          "provider": "PLUM",
+          "transactionId": "TXNCNQWGC84Y",
+          "status": "completed"
+        },
+        {
+          "id": "PAY16_2",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 641570,
+          "provider": "PLUM",
+          "status": "pending"
+        }
       ]
     },
     {
@@ -4351,6 +4524,38 @@
           "name": "Televizor",
           "price": 3054038,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY19_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 1229261,
+          "provider": "PLUM",
+          "transactionId": "TXNXJDEQF76R",
+          "status": "completed"
+        },
+        {
+          "id": "PAY19_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 1181536,
+          "provider": "PAYME",
+          "status": "failed"
+        },
+        {
+          "id": "PAY19_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 1218275,
+          "provider": "AUTO",
+          "transactionId": "TXNZUS8NG9GK",
+          "status": "completed"
+        },
+        {
+          "id": "PAY19_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 1180526,
+          "provider": "MIB",
+          "status": "pending"
         }
       ]
     },
@@ -4771,6 +4976,38 @@
           "price": 971361,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY22_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 2722300,
+          "provider": "AUTO",
+          "transactionId": "TXNRO7X5QDQM",
+          "status": "completed"
+        },
+        {
+          "id": "PAY22_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 2732350,
+          "provider": "PLUM",
+          "status": "failed"
+        },
+        {
+          "id": "PAY22_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 2748939,
+          "provider": "MIB",
+          "transactionId": "TXNMCHXNDNLX",
+          "status": "completed"
+        },
+        {
+          "id": "PAY22_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 2702822,
+          "provider": "PAYME",
+          "status": "pending"
+        }
       ]
     },
     {
@@ -5122,13 +5359,15 @@
           "date": "2025-12-05",
           "prAmount": 761115,
           "totalAmount": 761115,
-          "remainingMainDebt": 8372269
+          "remainingMainDebt": 8372269,
+          "paid": true
         },
         {
           "date": "2026-01-05",
           "prAmount": 761115,
           "totalAmount": 761115,
-          "remainingMainDebt": 7611154
+          "remainingMainDebt": 7611154,
+          "paid": true
         },
         {
           "date": "2026-02-05",
@@ -5189,6 +5428,24 @@
           "prAmount": 761119,
           "totalAmount": 761119,
           "remainingMainDebt": 0
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY25_1",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 6270894,
+          "provider": "PLUM",
+          "transactionId": "TXNTLA7UTCA7",
+          "status": "completed"
+        },
+        {
+          "id": "PAY25_2",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 6312938,
+          "provider": "MIB",
+          "transactionId": "TXNQCEL4PBGI",
+          "status": "completed"
         }
       ]
     },
@@ -5534,6 +5791,31 @@
           "name": "Konditsioner",
           "price": 3715187,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY28_1",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 459954,
+          "provider": "MIB",
+          "transactionId": "TXN1489Q0YZM",
+          "status": "completed"
+        },
+        {
+          "id": "PAY28_2",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 485885,
+          "provider": "PAYME",
+          "transactionId": "TXNSQRMTC4OQ",
+          "status": "completed"
+        },
+        {
+          "id": "PAY28_3",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 434985,
+          "provider": "PLUM",
+          "status": "pending"
         }
       ]
     },
@@ -5954,6 +6236,38 @@
           "price": 4718266,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY31_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 3167440,
+          "provider": "MIB",
+          "transactionId": "TXN68R5SZNCW",
+          "status": "completed"
+        },
+        {
+          "id": "PAY31_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 3108779,
+          "provider": "AUTO",
+          "status": "failed"
+        },
+        {
+          "id": "PAY31_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 3170551,
+          "provider": "AUTO",
+          "transactionId": "TXNBSEIQHA76",
+          "status": "completed"
+        },
+        {
+          "id": "PAY31_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 3183048,
+          "provider": "MIB",
+          "status": "failed"
+        }
       ]
     },
     {
@@ -6298,6 +6612,23 @@
           "name": "Televizor",
           "price": 4079506,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY34_1",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 5540989,
+          "provider": "AUTO",
+          "transactionId": "TXNK3ZWSJWML",
+          "status": "completed"
+        },
+        {
+          "id": "PAY34_2",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 5536402,
+          "provider": "AUTO",
+          "status": "pending"
         }
       ]
     },
@@ -6718,6 +7049,30 @@
           "price": 978045,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY37_1",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 2983400,
+          "provider": "AUTO",
+          "transactionId": "TXNAJU0NTUHA",
+          "status": "completed"
+        },
+        {
+          "id": "PAY37_2",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 2988417,
+          "provider": "PLUM",
+          "status": "failed"
+        },
+        {
+          "id": "PAY37_3",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 2928595,
+          "provider": "AUTO",
+          "status": "failed"
+        }
       ]
     },
     {
@@ -7069,25 +7424,29 @@
           "date": "2025-12-05",
           "prAmount": 540274,
           "totalAmount": 540274,
-          "remainingMainDebt": 5943019
+          "remainingMainDebt": 5943019,
+          "paid": true
         },
         {
           "date": "2026-01-05",
           "prAmount": 540274,
           "totalAmount": 540274,
-          "remainingMainDebt": 5402745
+          "remainingMainDebt": 5402745,
+          "paid": true
         },
         {
           "date": "2026-02-05",
           "prAmount": 540274,
           "totalAmount": 540274,
-          "remainingMainDebt": 4862471
+          "remainingMainDebt": 4862471,
+          "paid": true
         },
         {
           "date": "2026-03-05",
           "prAmount": 540274,
           "totalAmount": 540274,
-          "remainingMainDebt": 4322197
+          "remainingMainDebt": 4322197,
+          "paid": true
         },
         {
           "date": "2026-04-05",
@@ -7136,6 +7495,39 @@
           "prAmount": 540279,
           "totalAmount": 540279,
           "remainingMainDebt": 0
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY40_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 1873979,
+          "provider": "PLUM",
+          "transactionId": "TXNORDZF7VUG",
+          "status": "completed"
+        },
+        {
+          "id": "PAY40_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 1847194,
+          "provider": "PLUM",
+          "transactionId": "TXNOWT79XQTB",
+          "status": "completed"
+        },
+        {
+          "id": "PAY40_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 1872613,
+          "provider": "PAYME",
+          "status": "pending"
+        },
+        {
+          "id": "PAY40_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 1817543,
+          "provider": "PAYME",
+          "transactionId": "TXNC53AE3568",
+          "status": "completed"
         }
       ]
     },
@@ -7481,6 +7873,30 @@
           "name": "Konditsioner",
           "price": 4661827,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY43_1",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 923705,
+          "provider": "MIB",
+          "transactionId": "TXNNIYPD4DK4",
+          "status": "completed"
+        },
+        {
+          "id": "PAY43_2",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 866343,
+          "provider": "PAYME",
+          "status": "failed"
+        },
+        {
+          "id": "PAY43_3",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 935387,
+          "provider": "PAYME",
+          "status": "failed"
         }
       ]
     },
@@ -7901,6 +8317,38 @@
           "price": 3150858,
           "count": 1
         }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY46_1",
+          "date": "2025-11-17T09:55:42.753Z",
+          "amount": 3238364,
+          "provider": "MIB",
+          "transactionId": "TXNXWBKIUXNF",
+          "status": "completed"
+        },
+        {
+          "id": "PAY46_2",
+          "date": "2025-11-24T09:55:42.753Z",
+          "amount": 3203157,
+          "provider": "PAYME",
+          "status": "failed"
+        },
+        {
+          "id": "PAY46_3",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 3230811,
+          "provider": "AUTO",
+          "status": "failed"
+        },
+        {
+          "id": "PAY46_4",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 3237021,
+          "provider": "AUTO",
+          "transactionId": "TXN0VQUPXZJT",
+          "status": "completed"
+        }
       ]
     },
     {
@@ -8245,6 +8693,24 @@
           "name": "Televizor",
           "price": 755409,
           "count": 1
+        }
+      ],
+      "paymentHistory": [
+        {
+          "id": "PAY49_1",
+          "date": "2025-12-01T09:55:42.753Z",
+          "amount": 6172283,
+          "provider": "MIB",
+          "transactionId": "TXNBNRGA57RX",
+          "status": "completed"
+        },
+        {
+          "id": "PAY49_2",
+          "date": "2025-12-08T09:55:42.753Z",
+          "amount": 6210874,
+          "provider": "PAYME",
+          "transactionId": "TXNW352IMI5X",
+          "status": "completed"
         }
       ]
     },
