@@ -371,6 +371,15 @@ const ApplicationDetail = (): JSX.Element => {
 
           {activeTab === 'history' && (
             <div>
+              {(() => {
+                console.log('=== SO\'NDIRISH TAB ===');
+                console.log('Application ID:', application.id);
+                console.log('Application data:', application);
+                console.log('Has paymentHistory?', !!application.paymentHistory);
+                console.log('PaymentHistory length:', application.paymentHistory?.length);
+                console.log('PaymentHistory data:', application.paymentHistory);
+                return null;
+              })()}
               {application.paymentHistory && application.paymentHistory.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
