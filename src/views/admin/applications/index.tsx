@@ -36,6 +36,7 @@ type Application = {
   user?: { id: number; fullname: string; phone?: string | null; image?: string | null } | null;
   myid_id?: number | null;
   paid?: boolean | null;
+  payment_method?: string | null;
   fcmToken?: string | null;
   products?: { id: number; name: string; price: number; count?: number | null }[];
 };
@@ -59,6 +60,7 @@ const Applications = (): JSX.Element => {
   const [search, setSearch] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [paidFilter, setPaidFilter] = React.useState("all");
+  const [paymentMethodFilter, setPaymentMethodFilter] = React.useState("all");
   const [fillialFilter, setFillialFilter] = React.useState<number | "all">("all");
   const [regionFilter, setRegionFilter] = React.useState<string>("all");
   const [expiredMonthFilter, setExpiredMonthFilter] = React.useState<number | "all">("all");
@@ -87,11 +89,18 @@ const Applications = (): JSX.Element => {
 
   // Function to generate copy text
   const generateCopyText = (app: Application): string => {
-    let text = `👤 Ariza beruvchi:\n${app.fullname}\n${app.passport || ''}\n\n`;
-    text += `📱 Telefon: ${formatPhone(app.phone)}\n`;
+    let text = `👤 Ariza beruvchi:\n${app.fullname}\n${app.passport || ''}\n📱 ${formatPhone(app.phone)}\n\n`;
     text += `🛒 Tovarlar summasi: ${formatMoney(app.amount)}\n`;
     text += `💰 To'lov summasi: ${formatMoney(app.payment_amount || app.amount)}\n`;
     text += `💳 To'lov: ${app.paid ? "✅ To'landi" : "❌ To'lanmadi"}\n`;
+    
+    // Add payment method if paid
+    const st = (app.status ?? "").toUpperCase();
+    const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+    if (isFinished && app.paid && app.payment_method) {
+      text += `💵 To'lov usuli: ${app.payment_method}\n`;
+    }
+    
     text += `🏢 Filial: ${app.fillial?.name ?? "-"}\n`;
     
     if ((app as any).request?.orderid) {
@@ -260,6 +269,21 @@ const Applications = (): JSX.Element => {
           matchesPaid = isFinished && (a.paid === false || a.paid == null);
         }
       }
+      
+      // Payment method filter: only applies to paid applications
+      let matchesPaymentMethod = true;
+      if (paymentMethodFilter !== "all") {
+        const st = (a.status ?? "").toUpperCase();
+        const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+        
+        if (isFinished && a.paid) {
+          matchesPaymentMethod = a.payment_method === paymentMethodFilter;
+        } else {
+          // If not paid, don't show in payment method filter results
+          matchesPaymentMethod = false;
+        }
+      }
+      
       const matchesFillial = fillialFilter === "all" || a.fillial_id === Number(fillialFilter);
       // region may be stored on the fillial object; lookup in fillialsList
       const fillials = Array.isArray(fillialsList) ? fillialsList : [];
@@ -283,7 +307,7 @@ const Applications = (): JSX.Element => {
       const matchesMinAmount = (a.amount ?? 0) >= amountRange[0];
       const matchesMaxAmount = (a.amount ?? 0) <= amountRange[1];
 
-      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesFillial || !matchesRegion || !matchesMerchant || !matchesAgent || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
+      if (!matchesSearch || !matchesStatus || !matchesPaid || !matchesPaymentMethod || !matchesFillial || !matchesRegion || !matchesMerchant || !matchesAgent || !matchesExpiredMonth || !matchesMinAmount || !matchesMaxAmount) return false;
 
       if ((start || end) && a.createdAt) {
         const created = new Date(a.createdAt);
@@ -293,7 +317,7 @@ const Applications = (): JSX.Element => {
 
       return true;
     });
-  }, [applications, search, statusFilter, startDate, endDate, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId, selectedAgentId, agents]);
+  }, [applications, search, statusFilter, startDate, endDate, paidFilter, paymentMethodFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId, selectedAgentId, agents]);
 
   const stats = React.useMemo(() => {
     const items = filtered;
@@ -318,7 +342,7 @@ const Applications = (): JSX.Element => {
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setPage(1);
-  }, [search, statusFilter, paidFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate, selectedMerchantId, selectedAgentId]);
+  }, [search, statusFilter, paidFilter, paymentMethodFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, startDate, endDate, selectedMerchantId, selectedAgentId]);
 
   // Slice data for current page
   const pageData = React.useMemo(() => {
@@ -384,6 +408,16 @@ const Applications = (): JSX.Element => {
               { value: "unpaid", label: "To'lanmadi" }
             ]}
             className="flex-1 min-w-[130px] sm:flex-initial sm:w-auto"
+          />
+          <CustomSelect
+            value={paymentMethodFilter}
+            onChange={setPaymentMethodFilter}
+            options={[
+              { value: "all", label: "Barcha to'lov usullari" },
+              { value: "Sho't faktura", label: "Sho't faktura" },
+              { value: "Bank orqali (SQB)", label: "Bank orqali (SQB)" }
+            ]}
+            className="flex-1 min-w-[160px] sm:flex-initial sm:w-auto"
           />
           <CustomSelect
             value={String(selectedMerchantId)}
@@ -573,6 +607,7 @@ const Applications = (): JSX.Element => {
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden xl:table-cell">Filial</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center">Grafik</th>
               <th className="px-2 sm:px-6 py-2 sm:py-3 text-center">Holat</th>
+              <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden lg:table-cell">To'lov usuli</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden lg:table-cell">Muddat</th>
               <th className="px-2 sm:px-4 py-2 sm:py-3 text-center hidden xl:table-cell">Yaratildi</th>
             </tr>
@@ -724,6 +759,25 @@ const Applications = (): JSX.Element => {
                 </td>
                 <td className="px-2 sm:px-6 py-2 text-center">{(() => { const b = appStatusBadge(a.status, true); return <span className={b.className}>{b.label}</span>; })()}</td>
                 <td className="px-2 sm:px-4 py-2 text-center hidden lg:table-cell">
+                  {(() => {
+                    const st = (a.status ?? "").toUpperCase();
+                    const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+                    if (isFinished && a.paid && a.payment_method) {
+                      const isBankMethod = a.payment_method === "Bank orqali";
+                      return (
+                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                          isBankMethod 
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                            : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                        }`}>
+                          {a.payment_method}
+                        </span>
+                      );
+                    }
+                    return <span className="text-gray-400 dark:text-gray-500">-</span>;
+                  })()}
+                </td>
+                <td className="px-2 sm:px-4 py-2 text-center hidden lg:table-cell">
                   {a.expired_month ? (
                     <span className="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300">
                       {a.expired_month} oy
@@ -738,7 +792,7 @@ const Applications = (): JSX.Element => {
             })}
             {pageData.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                <td colSpan={12} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                   Hech qanday natija topilmadi
                 </td>
               </tr>
@@ -797,17 +851,47 @@ const Applications = (): JSX.Element => {
                   
                   <div>
                     <strong className="text-gray-900 dark:text-white block mb-2">Ariza beruvchi:</strong>
-                    <AvatarName
-                      image={(selected as any).image ?? null}
-                      name={selected.fullname}
-                      subtitle={selected.passport ?? undefined}
-                      size="md"
-                    />
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-navy-700 text-gray-700 dark:text-gray-300 overflow-hidden flex-shrink-0 w-10 h-10 text-base">
+                        {(selected as any).image ? (
+                          <img src={(selected as any).image} alt={selected.fullname} className="w-full h-full object-cover rounded-full" />
+                        ) : (
+                          <span className="font-semibold">{selected.fullname.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{selected.fullname}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{selected.passport}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{formatPhone(selected.phone)}</div>
+                      </div>
+                    </div>
                   </div>
-                  <div><strong className="text-gray-900 dark:text-white">Telefon:</strong> <span className="text-gray-700 dark:text-gray-300">{formatPhone(selected.phone)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">Tovarlar summasi:</strong> <span className="text-gray-700 dark:text-gray-300">{formatMoney(selected.amount)}</span></div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov summasi:</strong> <span className="font-semibold text-brand-500 dark:text-brand-400">{formatMoney(selected.payment_amount || selected.amount)}</span></div>
+                  <div className="flex items-center gap-2">
+                    <strong className="text-gray-900 dark:text-white whitespace-nowrap">Holat:</strong>
+                    {(() => { const b = appStatusBadge(selected.status, true); return <span className={`${b.className} inline-block max-w-[200px]`}>{b.label}</span>; })()}
+                  </div>
                   <div><strong className="text-gray-900 dark:text-white">To'lov:</strong> {selected.paid ? <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span> : <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>}</div>
+                  {(() => {
+                    const st = (selected.status ?? "").toUpperCase();
+                    const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+                    if (isFinished && selected.paid && selected.payment_method) {
+                      return (
+                        <div>
+                          <strong className="text-gray-900 dark:text-white">To'lov usuli:</strong>{" "}
+                          <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                            selected.payment_method === "Sho't faktura"
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                              : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                          }`}>
+                            {selected.payment_method}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <div><strong className="text-gray-900 dark:text-white">Filial:</strong> <span className="text-gray-700 dark:text-gray-300">{selected.fillial?.name ?? "-"}</span></div>
                   
                   {/* Order ID */}

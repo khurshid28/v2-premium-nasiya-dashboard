@@ -170,6 +170,7 @@ export interface Zayavka {
   user_id?: number;
   myid_id?: number | null;
   paid?: boolean | null;
+  payment_method?: string | null;
   products?: Product[];
   bank?: any;
   fillial?: Fillial;

@@ -24,7 +24,7 @@ interface PermissionItem {
   createdAt: string;
 }
 
-type TabType = "merchant" | "fillial" | "customer";
+type TabType = "merchant" | "fillial" | "customer" | "workplace";
 
 const MOCK_MERCHANTS: PermissionItem[] = [
   {
@@ -167,6 +167,50 @@ const MOCK_CUSTOMERS: PermissionItem[] = [
   },
 ];
 
+const MOCK_WORKPLACES: PermissionItem[] = [
+  {
+    id: 1,
+    name: "SAMSUNG ELECTRONICS MCHJ",
+    phone: "+998901234561",
+    status: "ACTIVE",
+    createdAt: "2024-01-10",
+  },
+  {
+    id: 2,
+    name: "LG ELECTRONICS MCHJ",
+    phone: "+998902345672",
+    status: "BLOCKED",
+    reason: "Ishchilarning ish haqi to'lanmayapti",
+    blockedAt: "2024-11-22",
+    blockedUntil: "2025-03-22",
+    createdAt: "2024-02-05",
+  },
+  {
+    id: 3,
+    name: "ARTEL MCHJ",
+    phone: "+998903456783",
+    status: "ACTIVE",
+    createdAt: "2024-03-12",
+  },
+  {
+    id: 4,
+    name: "COCA-COLA ICHIMLIKLARI MCHJ",
+    phone: "+998904567894",
+    status: "BLOCKED",
+    reason: "Ishchilar qisqartirish jarayonida",
+    blockedAt: "2024-12-01",
+    blockedUntil: "2025-06-01",
+    createdAt: "2024-04-20",
+  },
+  {
+    id: 5,
+    name: "NESTLE UZBEKISTAN MCHJ",
+    phone: "+998905678905",
+    status: "ACTIVE",
+    createdAt: "2024-05-15",
+  },
+];
+
 const Permissions = () => {
   const [activeTab, setActiveTab] = useState<TabType>("merchant");
   const [search, setSearch] = useState("");
@@ -175,6 +219,7 @@ const Permissions = () => {
   const [merchants, setMerchants] = useState<PermissionItem[]>(MOCK_MERCHANTS);
   const [fillials, setFillials] = useState<PermissionItem[]>(MOCK_FILLIALS);
   const [customers, setCustomers] = useState<PermissionItem[]>(MOCK_CUSTOMERS);
+  const [workplaces, setWorkplaces] = useState<PermissionItem[]>(MOCK_WORKPLACES);
 
   // Modal states
   const [showBlockListModal, setShowBlockListModal] = useState(false);
@@ -204,6 +249,8 @@ const Permissions = () => {
         return fillials;
       case "customer":
         return customers;
+      case "workplace":
+        return workplaces;
       default:
         return [];
     }
@@ -218,6 +265,8 @@ const Permissions = () => {
         return setFillials;
       case "customer":
         return setCustomers;
+      case "workplace":
+        return setWorkplaces;
       default:
         return setMerchants;
     }
@@ -237,6 +286,9 @@ const Permissions = () => {
         break;
       case "customer":
         data = customers;
+        break;
+      case "workplace":
+        data = workplaces;
         break;
     }
     
@@ -532,6 +584,8 @@ const Permissions = () => {
         return <Home size={18} />;
       case "customer":
         return <User size={18} />;
+      case "workplace":
+        return <Building size={18} />;
     }
   };
 
@@ -543,6 +597,8 @@ const Permissions = () => {
         return "Filiallar";
       case "customer":
         return "Mijozlar";
+      case "workplace":
+        return "Ish joylari";
     }
   };
 
@@ -555,13 +611,13 @@ const Permissions = () => {
             Ruxsat va Blocklar
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Merchantlar, filiallar va mijozlarni boshqarish va bloklash
+            Merchantlar, filiallar, mijozlar va ish joylarini boshqarish va bloklash
           </p>
         </div>
 
         {/* Tabs */}
         <div className="mb-6 flex gap-2 border-b border-gray-200 dark:border-gray-700">
-          {(["merchant", "fillial", "customer"] as TabType[]).map((tab) => (
+          {(["merchant", "fillial", "customer", "workplace"] as TabType[]).map((tab) => (
             <button
               key={tab}
               onClick={() => {

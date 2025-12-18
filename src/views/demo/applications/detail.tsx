@@ -25,14 +25,43 @@ type Application = {
   createdAt?: string;
   updatedAt?: string | null;
   merchant?: { id: number; name: string } | null;
-  fillial?: { id: number; name: string; region?: string } | null;
+  fillial?: { 
+    id: number; 
+    name: string; 
+    region?: string;
+    nds?: string;
+    hisob_raqam?: string;
+    bank_name?: string;
+    mfo?: string;
+    inn?: string;
+    director_name?: string;
+    director_phone?: string;
+  } | null;
   user?: { id: number; fullname: string; phone?: string | null; image?: string | null } | null;
   myid_id?: number | null;
   paid?: boolean | null;
+  payment_method?: string | null;
   fcmToken?: string | null;
+  workplace?: {
+    company_name?: string;
+    position?: string;
+    work_experience?: string;
+    monthly_income?: number;
+    address?: string;
+    inn?: string;
+    phone?: string;
+    director_name?: string | null;
+    work_schedule?: string;
+  } | null;
   products?: { id: number; name: string; price: number; count?: number | null }[];
   payments?: { date: string; prAmount: number; totalAmount: number; remainingMainDebt: number; paid?: boolean }[];
   paymentHistory?: { id: string; date: string; amount: number; provider: string; transactionId?: string; status: string }[];
+  statusHistory?: { 
+    status: string; 
+    date: string; 
+    timestamp: number;
+    changes?: { field: string; value: any; label: string; isAmount?: boolean }[];
+  }[];
 };
 
 const ApplicationDetail = (): JSX.Element => {
@@ -46,7 +75,7 @@ const ApplicationDetail = (): JSX.Element => {
 
   const [application, setApplication] = React.useState<Application | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'debt' | 'payments' | 'history'>('application');
+  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'debt' | 'payments' | 'history' | 'operations'>('application');
 
   // Debug logging for payment history
   React.useEffect(() => {
@@ -145,6 +174,16 @@ const ApplicationDetail = (): JSX.Element => {
             Merchant
           </button>
           <button
+            onClick={() => setActiveTab('workplace')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === 'workplace'
+                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Ish joyi
+          </button>
+          <button
             onClick={() => setActiveTab('debt')}
             className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
               activeTab === 'debt'
@@ -174,23 +213,29 @@ const ApplicationDetail = (): JSX.Element => {
           >
             So'ndirish
           </button>
+          <button
+            onClick={() => setActiveTab('operations')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === 'operations'
+                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Amaliyotlar
+          </button>
         </div>
 
         {/* Tab Content */}
         <div className="p-6">
           {activeTab === 'application' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">F.I.O</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.fullname}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Telefon</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{formatPhone(application.phone)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Pasport</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.passport || '—'}</p>
+              <div className="md:col-span-2">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">Ariza beruvchi</p>
+                <div className="bg-gray-50 dark:bg-navy-800 p-4 rounded-lg space-y-2">
+                  <p className="text-base font-medium text-navy-700 dark:text-white">{application.fullname}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{application.passport || '—'}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">{formatPhone(application.phone)}</p>
+                </div>
               </div>
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
@@ -199,6 +244,37 @@ const ApplicationDetail = (): JSX.Element => {
                   return <span className={badge.className}>{badge.label}</span>;
                 })()}
               </div>
+              <div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">To'langan</p>
+                <p className="text-base font-medium text-navy-700 dark:text-white">
+                  {application.paid ? (
+                    <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300">To'landi</span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-2 py-1 text-xs font-medium text-gray-800 dark:text-gray-300">To'lanmadi</span>
+                  )}
+                </p>
+              </div>
+              {(() => {
+                const st = (application.status ?? "").toUpperCase();
+                const isFinished = st === "FINISHED" || st === "COMPLETED" || st === "ACTIVE";
+                if (isFinished && application.paid && application.payment_method) {
+                  return (
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">To'lov usuli</p>
+                      <p className="text-base font-medium text-navy-700 dark:text-white">
+                        <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                          application.payment_method === "Sho't faktura"
+                            ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                            : 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                        }`}>
+                          {application.payment_method}
+                        </span>
+                      </p>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Summa</p>
                 <p className="text-base font-medium text-navy-700 dark:text-white">{formatMoneyWithUZS(application.amount)}</p>
@@ -218,10 +294,6 @@ const ApplicationDetail = (): JSX.Element => {
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Yaratilgan</p>
                 <p className="text-base font-medium text-navy-700 dark:text-white">{formatDateNoSeconds(application.createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">To'langan</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.paid ? 'Ha' : 'Yo\'q'}</p>
               </div>
               {application.products && application.products.length > 0 && (
                 <div className="col-span-2">
@@ -243,27 +315,154 @@ const ApplicationDetail = (): JSX.Element => {
           )}
 
           {activeTab === 'merchant' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Merchant</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.merchant?.name || '—'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Fillial</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial?.name || '—'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Hudud</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial?.region || '—'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Agent</p>
-                <p className="text-base font-medium text-navy-700 dark:text-white">{application.user?.fullname || '—'}</p>
-              </div>
-              {application.user?.phone && (
+            <div className="space-y-6">
+              {/* Merchant & Fillial Info */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Agent telefoni</p>
-                  <p className="text-base font-medium text-navy-700 dark:text-white">{formatPhone(application.user.phone)}</p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Merchant</p>
+                  <p className="text-base font-medium text-navy-700 dark:text-white">{application.merchant?.name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Fillial</p>
+                  <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial?.name || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Hudud</p>
+                  <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial?.region || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Agent</p>
+                  <p className="text-base font-medium text-navy-700 dark:text-white">{application.user?.fullname || '—'}</p>
+                </div>
+                {application.user?.phone && (
+                  <div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Agent telefoni</p>
+                    <p className="text-base font-medium text-navy-700 dark:text-white">{formatPhone(application.user.phone)}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Fillial Bank Details */}
+              {(application.fillial?.hisob_raqam || application.fillial?.inn || application.fillial?.mfo) && (
+                <Card extra="p-5">
+                  <h4 className="mb-4 text-lg font-bold text-navy-700 dark:text-white">Fillial bank ma'lumotlari</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {application.fillial?.hisob_raqam && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Hisob raqam</p>
+                        <p className="text-base font-mono font-medium text-navy-700 dark:text-white">{application.fillial.hisob_raqam}</p>
+                      </div>
+                    )}
+                    {application.fillial?.bank_name && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Bank nomi</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial.bank_name}</p>
+                      </div>
+                    )}
+                    {application.fillial?.inn && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">INN</p>
+                        <p className="text-base font-mono font-medium text-navy-700 dark:text-white">{application.fillial.inn}</p>
+                      </div>
+                    )}
+                    {application.fillial?.mfo && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">MFO</p>
+                        <p className="text-base font-mono font-medium text-navy-700 dark:text-white">{application.fillial.mfo}</p>
+                      </div>
+                    )}
+                    {application.fillial?.nds && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">NDS</p>
+                        <p className="text-base font-mono font-medium text-navy-700 dark:text-white">{application.fillial.nds}</p>
+                      </div>
+                    )}
+                    {application.fillial?.director_name && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Direktor</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">{application.fillial.director_name}</p>
+                      </div>
+                    )}
+                    {application.fillial?.director_phone && (
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Direktor telefoni</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">{formatPhone(application.fillial.director_phone)}</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'workplace' && (
+            <div className="space-y-6">
+              {application.workplace ? (
+                <>
+                  {/* Workplace Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Korxona nomi</p>
+                      <p className="text-base font-medium text-navy-700 dark:text-white">{application.workplace.company_name || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Lavozim</p>
+                      <p className="text-base font-medium text-navy-700 dark:text-white">{application.workplace.position || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Ish tajribasi</p>
+                      <p className="text-base font-medium text-navy-700 dark:text-white">
+                        {application.workplace.work_experience ? `${application.workplace.work_experience} yil` : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Oylik daromad</p>
+                      <p className="text-base font-medium text-navy-700 dark:text-white">
+                        {application.workplace.monthly_income ? formatMoneyWithUZS(application.workplace.monthly_income) : '—'}
+                      </p>
+                    </div>
+                    {application.workplace.address && (
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Manzil</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">{application.workplace.address}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Details */}
+                  <Card extra="p-5">
+                    <h4 className="mb-4 text-lg font-bold text-navy-700 dark:text-white">Qo'shimcha ma'lumotlar</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {application.workplace.inn && (
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">INN</p>
+                          <p className="text-base font-mono font-medium text-navy-700 dark:text-white">{application.workplace.inn}</p>
+                        </div>
+                      )}
+                      {application.workplace.phone && (
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Telefon</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">{formatPhone(application.workplace.phone)}</p>
+                        </div>
+                      )}
+                      {application.workplace.director_name && (
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Rahbar</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">{application.workplace.director_name}</p>
+                        </div>
+                      )}
+                      {application.workplace.work_schedule && (
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Ish tartibi</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">{application.workplace.work_schedule}</p>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">Ish joyi ma'lumotlari mavjud emas</p>
                 </div>
               )}
             </div>
@@ -459,6 +658,71 @@ const ApplicationDetail = (): JSX.Element => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-600 dark:text-gray-400">So'ndirish tarixi mavjud emas</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'operations' && (
+            <div>
+              {application.statusHistory && application.statusHistory.length > 0 ? (
+                <div className="space-y-4">
+                  {application.statusHistory.map((history, index) => {
+                    const date = new Date(history.date);
+                    const formattedDate = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
+                    const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+                    
+                    // Status labels
+                    const statusLabels: { [key: string]: { label: string; color: string } } = {
+                      'CREATED': { label: 'Ariza yaratildi', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+                      'ADDED_DETAIL': { label: 'Ma\'lumotlar qo\'shildi', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
+                      'WAITING_SCORING': { label: 'Skoringda kutilmoqda', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+                      'LIMIT': { label: 'Limit tayinlandi', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+                      'CANCELED_BY_SCORING': { label: 'Skoring tomonidan rad etildi', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
+                      'CANCELED_BY_CLIENT': { label: 'Mijoz tomonidan bekor qilindi', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+                      'CANCELED_BY_DAILY': { label: 'Kunlik limit tomonidan bekor qilindi', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
+                      'ADDED_PRODUCT': { label: 'Mahsulot qo\'shildi', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+                      'WAITING_BANK_UPDATE': { label: 'Bank yangilanishida', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
+                      'WAITING_BANK_CONFIRM': { label: 'Bank tasdig\'ida', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200' },
+                      'CONFIRMED': { label: 'Tasdiqlandi', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+                      'FINISHED': { label: 'Yakunlandi', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' }
+                    };
+                    
+                    const statusInfo = statusLabels[history.status] || { label: history.status, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' };
+                    
+                    return (
+                      <div key={index} className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-navy-800 rounded-lg">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
+                              {statusInfo.label}
+                            </span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {formattedDate} {formattedTime}
+                            </span>
+                          </div>
+                          
+                          {/* Display changes */}
+                          {history.changes && history.changes.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              {history.changes.map((change, changeIndex) => (
+                                <div key={changeIndex} className="flex items-start gap-2 text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 min-w-[120px]">{change.label}:</span>
+                                  <span className="font-medium text-gray-900 dark:text-white">
+                                    {change.isAmount ? formatMoneyWithUZS(change.value) : change.value}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 dark:text-gray-400">Amaliyotlar tarixi mavjud emas</p>
                 </div>
               )}
             </div>
