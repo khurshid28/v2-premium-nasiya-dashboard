@@ -1,24 +1,26 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
 import { Search, Plus, Eye, Settings, Clock, Check } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
+import { scoringApi, ScoringModel as ApiScoringModel } from "lib/api/scoring";
 
 // Types
 type ModelStatus = "active" | "inactive" | "draft";
-type ModelCategory = "official" | "card_turnover" | "pensioner" | "military";
+type ModelCategory = "OFFICIAL" | "CARD_TURNOVER" | "PENSIONER" | "MILITARY";
 
 type ScoringCriteria = {
-  id: string;
+  id: number;
   name: string;
   weight: number;
   maxScore: number;
 };
 
 type CategoryConfig = {
+  id?: number;
   category: ModelCategory;
-  minAge?: number;
-  maxAge?: number;
+  minAge: number;
+  maxAge: number;
   criterias: ScoringCriteria[];
 };
 
@@ -26,94 +28,21 @@ type ScoringModel = {
   id: number;
   name: string;
   version: string;
-  status: ModelStatus;
-  createdDate: string;
-  activatedDate?: string;
-  minPassScore: number;
-  maxLimitAmount: number;
-  minLimitAmount: number;
-  maxProcessingTime: number;
+  isActive: boolean;
   categories: CategoryConfig[];
-  totalApplications?: number;
-  successRate?: number;
-  previousModelName?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 const CATEGORY_LABELS: Record<ModelCategory, string> = {
-  official: "Rasmiy ish joyi",
-  card_turnover: "Karta aylanma",
-  pensioner: "Pensiyaner",
-  military: "Harbiylar",
+  OFFICIAL: "Rasmiy ish joyi",
+  CARD_TURNOVER: "Karta aylanma",
+  PENSIONER: "Pensiyaner",
+  MILITARY: "Harbiylar",
 };
 
-// Mock Data
-const MOCK_SCORING_MODELS: ScoringModel[] = [
-  {
-    id: 1,
-    name: "Premium Model",
-    version: "v2.1",
-    status: "active",
-    createdDate: "2024-11-15",
-    activatedDate: "2024-11-20",
-    minPassScore: 300,
-    maxLimitAmount: 50000000,
-    minLimitAmount: 1000000,
-    maxProcessingTime: 20,
-    categories: [
-      {
-        category: "official",
-        minAge: 21,
-        maxAge: 65,
-        criterias: [
-          { id: "c1", name: "Kredit tarixi", weight: 30, maxScore: 120 },
-          { id: "c2", name: "Daromad darajasi", weight: 25, maxScore: 100 },
-          { id: "c3", name: "Ish faoliyati", weight: 20, maxScore: 80 },
-          { id: "c4", name: "Yosh va tajriba", weight: 15, maxScore: 60 },
-          { id: "c5", name: "Qarz yuklamasi", weight: 10, maxScore: 40 },
-        ],
-      },
-      {
-        category: "card_turnover",
-        minAge: 18,
-        maxAge: 70,
-        criterias: [
-          { id: "c1", name: "Karta aylanmasi", weight: 40, maxScore: 160 },
-          { id: "c2", name: "O'rtacha balans", weight: 30, maxScore: 120 },
-          { id: "c3", name: "Muntazamlik", weight: 30, maxScore: 120 },
-        ],
-      },
-    ],
-    totalApplications: 1250,
-    successRate: 78,
-  },
-  {
-    id: 2,
-    name: "Standard Model",
-    version: "v1.0",
-    status: "draft",
-    createdDate: "2024-12-01",
-    minPassScore: 250,
-    maxLimitAmount: 20000000,
-    minLimitAmount: 500000,
-    maxProcessingTime: 15,
-    categories: [
-      {
-        category: "pensioner",
-        minAge: 55,
-        maxAge: 75,
-        criterias: [
-          { id: "c1", name: "Pensiya miqdori", weight: 50, maxScore: 200 },
-          { id: "c2", name: "Kredit tarixi", weight: 30, maxScore: 120 },
-          { id: "c3", name: "Yosh", weight: 20, maxScore: 80 },
-        ],
-      },
-    ],
-  },
-];
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("uz-UZ").format(amount) + " so'm";
-};
+// Mock Data - will be replaced with API
+// const MOCK_SCORING_MODELS: ScoringModel[] = [];
 
 const formatDate = (dateString: string) => {
   const d = new Date(dateString);
@@ -131,33 +60,50 @@ export default function ScoringModels() {
   const [selectedModel, setSelectedModel] = useState<ScoringModel | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [models, setModels] = useState<ScoringModel[]>([]);
+
+  // Load scoring models from API
+  useEffect(() => {
+    loadModels();
+  }, []);
+
+  const loadModels = async () => {
+    try {
+      setLoading(true);
+      const response = await scoringApi.getScoringModels();
+      setModels(response.data);
+    } catch (error) {
+      console.error('Error loading scoring models:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Create Model Form State
   const [modelName, setModelName] = useState("");
   const [modelVersion, setModelVersion] = useState("");
-  const [maxProcessingTime, setMaxProcessingTime] = useState(20);
-  const [minPassScore, setMinPassScore] = useState(300);
-  const [globalMinLimit, setGlobalMinLimit] = useState(1000000);
-  const [globalMaxLimit, setGlobalMaxLimit] = useState(50000000);
   const [selectedCategories, setSelectedCategories] = useState<ModelCategory[]>([]);
   const [categoryConfigs, setCategoryConfigs] = useState<Record<ModelCategory, Partial<CategoryConfig>>>({
-    official: {},
-    card_turnover: {},
-    pensioner: {},
-    military: {},
+    OFFICIAL: {},
+    CARD_TURNOVER: {},
+    PENSIONER: {},
+    MILITARY: {},
   });
 
   const filteredModels = useMemo(() => {
-    return MOCK_SCORING_MODELS.filter((model) => {
+    return models.filter((model) => {
       const matchesSearch =
         model.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         model.version.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const matchesStatus = filterStatus === "all" || model.status === filterStatus;
+      const matchesStatus = filterStatus === "all" || 
+        (filterStatus === "active" && model.isActive) ||
+        (filterStatus === "inactive" && !model.isActive);
 
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, filterStatus]);
+  }, [searchQuery, filterStatus, models]);
 
   const totalPages = Math.ceil(filteredModels.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
@@ -165,34 +111,21 @@ export default function ScoringModels() {
   const currentModels = filteredModels.slice(startIndex, endIndex);
 
   const stats = useMemo(() => {
-    const total = MOCK_SCORING_MODELS.length;
-    const active = MOCK_SCORING_MODELS.filter((m) => m.status === "active").length;
-    const inactive = MOCK_SCORING_MODELS.filter((m) => m.status === "inactive").length;
-    const draft = MOCK_SCORING_MODELS.filter((m) => m.status === "draft").length;
+    const total = models.length;
+    const active = models.filter((m) => m.isActive).length;
+    const inactive = models.filter((m) => !m.isActive).length;
 
-    return { total, active, inactive, draft };
-  }, []);
+    return { total, active, inactive, draft: 0 };
+  }, [models]);
 
-  const getStatusBadge = (status: ModelStatus) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
-      case "inactive":
-        return "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
-      case "draft":
-        return "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-    }
+  const getStatusBadge = (isActive: boolean) => {
+    return isActive
+      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+      : "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
   };
 
-  const getStatusText = (status: ModelStatus) => {
-    switch (status) {
-      case "active":
-        return "Faol";
-      case "inactive":
-        return "Faol emas";
-      case "draft":
-        return "Qoralama";
-    }
+  const getStatusText = (isActive: boolean) => {
+    return isActive ? "Faol" : "Faol emas";
   };
 
   const toggleCategory = (category: ModelCategory) => {
@@ -210,9 +143,6 @@ export default function ScoringModels() {
         ...categoryConfigs,
         [category]: {
           category,
-          minPassScore: 300,
-          maxLimitAmount: 50000000,
-          minLimitAmount: 1000000,
           minAge: 21,
           maxAge: 65,
           criterias: [],
@@ -238,7 +168,7 @@ export default function ScoringModels() {
   const addCriteriaToCategory = (category: ModelCategory) => {
     const config = categoryConfigs[category];
     const newCriteria: ScoringCriteria = {
-      id: `c${Date.now()}`,
+      id: Date.now(),
       name: "",
       weight: 0,
       maxScore: 0,
@@ -273,7 +203,7 @@ export default function ScoringModels() {
     });
   };
 
-  const removeCriteria = (category: ModelCategory, criteriaId: string) => {
+  const removeCriteria = (category: ModelCategory, criteriaId: number) => {
     const config = categoryConfigs[category];
     setCategoryConfigs({
       ...categoryConfigs,
@@ -385,13 +315,10 @@ export default function ScoringModels() {
                       <div>
                         <h3 className="text-lg font-bold text-navy-700 dark:text-white">{model.name}</h3>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{model.version}</p>
-                        {model.previousModelName && (
-                          <p className="mt-0.5 text-xs text-gray-500">Oldingi: {model.previousModelName}</p>
-                        )}
                       </div>
                     </div>
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusBadge(model.status)}`}>
-                      {getStatusText(model.status)}
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getStatusBadge(model.isActive)}`}>
+                      {getStatusText(model.isActive)}
                     </span>
                   </div>
 
@@ -399,47 +326,12 @@ export default function ScoringModels() {
                   <div className="flex-grow space-y-4">
                     {/* Stats Grid */}
                     <div className="space-y-3">
-                      {/* Processing Time */}
+                      {/* Created Date */}
                       <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
-                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Maksimal vaqt</span>
+                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Yaratilgan sana</span>
                         <div className="flex items-center gap-1.5 text-sm font-bold text-purple-600 dark:text-purple-400">
                           <Clock className="h-4 w-4" />
-                          {model.maxProcessingTime} min
-                        </div>
-                      </div>
-
-                      {/* Statistics if available */}
-                      {model.totalApplications !== undefined && (
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
-                            <p className="text-xs text-gray-600 dark:text-gray-400">Arizalar</p>
-                            <p className="text-sm font-bold text-navy-700 dark:text-white">{model.totalApplications.toLocaleString()}</p>
-                          </div>
-                          {model.successRate !== undefined && (
-                            <div className="rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-900/50">
-                              <p className="text-xs text-gray-600 dark:text-gray-400">Muvaffaqiyat</p>
-                              <p className="text-sm font-bold text-green-600 dark:text-green-400">{model.successRate}%</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Global Parameters Summary */}
-                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 dark:border-purple-900/50 dark:bg-purple-900/20">
-                      <p className="mb-3 text-xs font-bold text-purple-700 dark:text-purple-400">Umumiy parametrlar</p>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-[10px] text-gray-600 dark:text-gray-400">Min ball</p>
-                          <p className="text-sm font-bold text-navy-700 dark:text-white">{model.minPassScore}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-600 dark:text-gray-400">Min limit</p>
-                          <p className="text-[10px] font-bold text-navy-700 dark:text-white">{formatCurrency(model.minLimitAmount)}</p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] text-gray-600 dark:text-gray-400">Max limit</p>
-                          <p className="text-[10px] font-bold text-navy-700 dark:text-white">{formatCurrency(model.maxLimitAmount)}</p>
+                          {formatDate(model.createdAt)}
                         </div>
                       </div>
                     </div>
@@ -808,12 +700,12 @@ export default function ScoringModels() {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold text-white">{selectedModel.name}</h3>
-                    <p className="mt-1 text-sm text-white/80">{selectedModel.version} - {getStatusText(selectedModel.status)}</p>
+                    <p className="mt-1 text-sm text-white/80">{selectedModel.version} - {getStatusText(selectedModel.isActive)}</p>
                   </div>
                 </div>
                 <div className="rounded-xl bg-white/20 px-4 py-2 backdrop-blur-sm">
                   <p className="text-xs text-white/70">Yaratilgan</p>
-                  <p className="text-sm font-bold text-white">{formatDate(selectedModel.createdDate)}</p>
+                  <p className="text-sm font-bold text-white">{formatDate(selectedModel.createdAt)}</p>
                 </div>
               </div>
             </div>
@@ -821,47 +713,11 @@ export default function ScoringModels() {
             {/* Modal Content */}
             <div className="p-6 sm:p-8">
               <div className="space-y-6">
-                {/* Activation Date */}
-                {selectedModel.activatedDate && (
-                  <div className="rounded-xl border-2 border-green-200 bg-gradient-to-r from-green-50 to-white p-4 dark:border-green-900/50 dark:from-green-900/20 dark:to-navy-800">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-green-700 dark:text-green-400">Faollashtirilgan sana</p>
-                      <p className="text-lg font-bold text-green-700 dark:text-green-400">{formatDate(selectedModel.activatedDate)}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Global Parameters Display */}
-                <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-5 dark:border-purple-900/50 dark:from-purple-900/20 dark:to-navy-800">
-                  <h4 className="mb-4 text-base font-bold text-purple-700 dark:text-purple-400">Umumiy parametrlar (Barcha kategoriyalar uchun)</h4>
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Min o'tish bali</p>
-                      <p className="mt-1 text-lg font-bold text-navy-700 dark:text-white">{selectedModel.minPassScore}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Min limit</p>
-                      <p className="mt-1 text-sm font-bold text-navy-700 dark:text-white">{formatCurrency(selectedModel.minLimitAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Max limit</p>
-                      <p className="mt-1 text-sm font-bold text-navy-700 dark:text-white">{formatCurrency(selectedModel.maxLimitAmount)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Max vaqt</p>
-                      <p className="mt-1 text-lg font-bold text-purple-700 dark:text-purple-400">{selectedModel.maxProcessingTime} min</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Processing Time */}
-                <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-5 dark:border-purple-900/50 dark:from-purple-900/20 dark:to-navy-800">
+                {/* Updated Date */}
+                <div className="rounded-xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-white p-4 dark:border-blue-900/50 dark:from-blue-900/20 dark:to-navy-800">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                      <span className="font-bold text-purple-700 dark:text-purple-400">Maksimal vaqt</span>
-                    </div>
-                    <span className="text-xl font-bold text-purple-700 dark:text-purple-400">{selectedModel.maxProcessingTime} daqiqa</span>
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-400">Oxirgi yangilanish</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-400">{formatDate(selectedModel.updatedAt)}</p>
                   </div>
                 </div>
 

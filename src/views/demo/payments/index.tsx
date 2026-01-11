@@ -1,58 +1,66 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
 import { Eye, Plus, Search } from "tabler-icons-react";
 import CustomSelect from "components/dropdown/CustomSelect";
 import Pagination from "components/pagination";
+import { paymentApi, Payment as ApiPayment, PaymentProvider, PaymentStatus } from "lib/api/payment";
 
-// Payment Provider Types
-type PaymentProvider = "PLUM" | "PAYME" | "AUTO" | "MIB";
+// Payment Provider Types - mapped to API
+type Provider = PaymentProvider;
 
-// Payment Status Types
-type PaymentStatus = "completed" | "pending" | "failed";
+// Payment Status Types - mapped to API
+type Status = PaymentStatus;
 
-// Payment Interface
-interface Payment {
-  id: string;
-  applicationId: string;
-  customerName: string;
-  customerPhone: string;
-  amount: number;
-  provider: PaymentProvider;
-  paymentDate: string;
-  status: PaymentStatus;
-  branch: string;
-  transactionId?: string;
-  notes?: string;
+// Payment Interface - using API type
+interface Payment extends ApiPayment {
+  customerName?: string;
+  customerPhone?: string;
+  applicationId?: string;
+  branch?: string;
 }
 
-// Provider Labels
-const PROVIDER_LABELS: Record<PaymentProvider, string> = {
+// Provider Labels - updated to match API
+const PROVIDER_LABELS: Record<Provider, string> = {
   PLUM: "PLUM",
   PAYME: "PAYME",
+  CLICK: "CLICK",
+  UZUM: "UZUM",
+  APELSIN: "APELSIN",
   AUTO: "AUTO",
   MIB: "MIB (Qo'lda)",
+  CASH: "Naqd",
 };
 
-// Provider Colors
-const PROVIDER_COLORS: Record<PaymentProvider, string> = {
+// Provider Colors - updated
+const PROVIDER_COLORS: Record<Provider, string> = {
   PLUM: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   PAYME: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  CLICK: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400",
+  UZUM: "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400",
+  APELSIN: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   AUTO: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  MIB: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+  MIB: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  CASH: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
 };
 
-// Status Labels
-const STATUS_LABELS: Record<PaymentStatus, string> = {
-  completed: "Muvaffaqiyatli",
-  pending: "Kutilmoqda",
-  failed: "Muvaffaqiyatsiz",
+// Status Labels - updated to match API
+const STATUS_LABELS: Record<Status, string> = {
+  COMPLETED: "Muvaffaqiyatli",
+  PENDING: "Kutilmoqda",
+  PROCESSING: "Jarayonda",
+  FAILED: "Muvaffaqiyatsiz",
+  CANCELLED: "Bekor qilingan",
+  REFUNDED: "Qaytarilgan",
 };
 
-// Status Colors
-const STATUS_COLORS: Record<PaymentStatus, string> = {
-  completed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  failed: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+// Status Colors - updated
+const STATUS_COLORS: Record<Status, string> = {
+  COMPLETED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  PENDING: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  PROCESSING: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+  FAILED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  CANCELLED: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400",
+  REFUNDED: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
 };
 
 // Mock Data
@@ -121,9 +129,11 @@ const mockPayments: Payment[] = [
 
 const Payments = () => {
   // State
-  const [payments] = useState<Payment[]>(mockPayments);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterProvider, setFilterProvider] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterBranch, setFilterBranch] = useState<string>("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo, setFilterDateTo] = useState("");
@@ -132,6 +142,38 @@ const Payments = () => {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddMibModal, setShowAddMibModal] = useState(false);
+
+  // Load payments from API
+  useEffect(() => {
+    loadPayments();
+  }, [filterProvider, filterStatus, filterDateFrom, filterDateTo]);
+
+  const loadPayments = async () => {
+    try {
+      setLoading(true);
+      const filters: any = {};
+      
+      if (filterProvider !== 'all') {
+        filters.provider = filterProvider;
+      }
+      if (filterStatus !== 'all') {
+        filters.status = filterStatus;
+      }
+      if (filterDateFrom) {
+        filters.startDate = filterDateFrom;
+      }
+      if (filterDateTo) {
+        filters.endDate = filterDateTo;
+      }
+      
+      const response = await paymentApi.getPayments(filters);
+      setPayments(response.data);
+    } catch (error) {
+      console.error('Error loading payments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // MIB Form State
   const [mibApplicationId, setMibApplicationId] = useState("");
@@ -209,31 +251,34 @@ const Payments = () => {
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
       const matchesSearch =
-        payment.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        payment.applicationId.includes(searchQuery) ||
-        payment.customerPhone.includes(searchQuery);
+        (payment.client?.full_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (payment.zayavka_id?.toString() || "").includes(searchQuery) ||
+        (payment.client?.phone || "").includes(searchQuery) ||
+        (payment.transactionId || "").includes(searchQuery);
 
       const matchesProvider = filterProvider === "all" || payment.provider === filterProvider;
-      const matchesBranch = filterBranch === "all" || payment.branch === filterBranch;
+      const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
 
       // Date range filter
       let matchesDateRange = true;
       if (filterDateFrom || filterDateTo) {
-        const paymentDate = new Date(payment.paymentDate);
-        if (filterDateFrom) {
-          const fromDate = new Date(filterDateFrom);
-          matchesDateRange = matchesDateRange && paymentDate >= fromDate;
-        }
-        if (filterDateTo) {
-          const toDate = new Date(filterDateTo);
-          toDate.setHours(23, 59, 59, 999);
-          matchesDateRange = matchesDateRange && paymentDate <= toDate;
+        const paymentDate = payment.paymentDate ? new Date(payment.paymentDate) : null;
+        if (paymentDate) {
+          if (filterDateFrom) {
+            const fromDate = new Date(filterDateFrom);
+            matchesDateRange = matchesDateRange && paymentDate >= fromDate;
+          }
+          if (filterDateTo) {
+            const toDate = new Date(filterDateTo);
+            toDate.setHours(23, 59, 59, 999);
+            matchesDateRange = matchesDateRange && paymentDate <= toDate;
+          }
         }
       }
 
-      return matchesSearch && matchesProvider && matchesBranch && matchesDateRange;
+      return matchesSearch && matchesProvider && matchesStatus && matchesDateRange;
     });
-  }, [payments, searchQuery, filterProvider, filterBranch, filterDateFrom, filterDateTo]);
+  }, [payments, searchQuery, filterProvider, filterStatus, filterDateFrom, filterDateTo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / pageSize);

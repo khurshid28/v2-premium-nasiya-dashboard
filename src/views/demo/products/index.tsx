@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Plus, Search, Upload, Package, Tag, Edit, Trash, X } from "tabler-icons-react";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
 import Toast from "components/toast/Toast";
+import { productApi, Category as ApiCategory, Product as ApiProduct } from "lib/api/product";
 
 // Mock data for merchants and fillials
 const MOCK_MERCHANTS = [
@@ -467,6 +468,45 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [priceRange, setPriceRange] = useState<string>("all");
+  
+  // API State
+  const [categories, setCategories] = useState<ApiCategory[]>([]);
+  const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  // Load data from API
+  useEffect(() => {
+    loadCategories();
+    loadProducts();
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await productApi.getCategories();
+      setCategories(response.data);
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      setToast({ isOpen: true, message: "Kategoriyalarni yuklashda xatolik", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await productApi.getProducts();
+      setProducts(response.data);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      setToast({ isOpen: true, message: "Mahsulotlarni yuklashda xatolik", type: "error" });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Modal states
   const [showProductModal, setShowProductModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -512,15 +552,12 @@ export default function Products() {
   const [categoryMerchantSearch, setCategoryMerchantSearch] = useState("");
   const [categoryFilialSearch, setCategoryFilialSearch] = useState("");
 
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS);
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-
   // Filter products
   const filteredProducts = useMemo(() => {
     let filtered = products;
 
     if (selectedCategory !== "all") {
-      filtered = filtered.filter((p) => p.category === selectedCategory);
+      filtered = filtered.filter((p) => p.category?.name === selectedCategory || String(p.category_id) === selectedCategory);
     }
 
     if (priceRange !== "all") {
@@ -541,7 +578,7 @@ export default function Products() {
         (p) =>
           p.name.toLowerCase().includes(query) ||
           p.barcode.includes(query) ||
-          p.category.toLowerCase().includes(query)
+          (p.category?.name || "").toLowerCase().includes(query)
       );
     }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
 import { 
   Lock,
@@ -10,14 +10,15 @@ import {
   Clock
 } from "tabler-icons-react";
 import Toast from "components/toast/ToastNew";
+import { blockApi, Block } from "lib/api/block";
 
-// Mock data types
+// Types from API
 interface PermissionItem {
   id: number;
   name: string;
   phone?: string;
   passport?: string;
-  status: "ACTIVE" | "BLOCKED";
+  status: "WORKING" | "BLOCKED";
   reason?: string;
   blockedAt?: string;
   blockedUntil?: string;
@@ -26,56 +27,58 @@ interface PermissionItem {
 
 type TabType = "merchant" | "fillial" | "customer" | "workplace";
 
-const MOCK_MERCHANTS: PermissionItem[] = [
-  {
-    id: 1,
-    name: "ARTEL ELECTRONICS",
-    phone: "+998901234567",
-    status: "ACTIVE",
-    createdAt: "2024-01-15",
-  },
-  {
-    id: 2,
-    name: "UZUM MARKET",
-    phone: "+998902345678",
-    status: "BLOCKED",
-    reason: "Shartnoma buzildi",
-    blockedAt: "2024-11-20",
-    blockedUntil: "2025-02-20",
-    createdAt: "2024-02-10",
-  },
-  {
-    id: 3,
-    name: "TEXNOMART",
-    phone: "+998903456789",
-    status: "ACTIVE",
-    createdAt: "2024-03-05",
-  },
-  {
-    id: 4,
-    name: "MEDIAPARK",
-    phone: "+998904567890",
-    status: "BLOCKED",
-    reason: "To'lov kechiktirildi",
-    blockedAt: "2024-12-01",
-    blockedUntil: "2025-12-01",
-    createdAt: "2024-04-12",
-  },
-];
+const Permissions = () => {
+  const [activeTab, setActiveTab] = useState<TabType>("merchant");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-const MOCK_FILLIALS: PermissionItem[] = [
+  // Load blocks from API
+  useEffect(() => {
+    loadBlocks();
+  }, [activeTab]);
+
+  const loadBlocks = async () => {
+    try {
+      setLoading(true);
+      const entityType = activeTab === "customer" ? "user" : activeTab === "workplace" ? "user" : activeTab;
+      const response = await blockApi.getBlocks({ entityType: entityType.toUpperCase() as any });
+      setBlocks(response.data);
+    } catch (error) {
+      console.error('Error loading blocks:', error);
+      setToast({ type: "error", message: "Block'larni yuklashda xatolik" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Convert API blocks to PermissionItem format
+  const convertBlockToItem = (block: Block): PermissionItem => ({
+    id: block.id,
+    name: block.merchant?.name || block.fillial?.name || block.user?.full_name || "N/A",
+    phone: block.merchant?.phone || block.fillial?.phone || block.user?.phone,
+    passport: block.user?.passport,
+    status: block.isActive ? "BLOCKED" : "WORKING",
+    reason: block.reason,
+    blockedAt: block.createdAt,
+    blockedUntil: block.blockedUntil,
+    createdAt: block.createdAt
+  });
+
+const MOCK_FILLIALS_OLD: any[] = [
   {
     id: 1,
     name: "Chilonzor filiali",
     phone: "+998901111111",
-    status: "ACTIVE",
+    status: "WORKING",
     createdAt: "2024-01-20",
   },
   {
     id: 2,
     name: "Sergeli filiali",
     phone: "+998902222222",
-    status: "ACTIVE",
+    status: "WORKING",
     createdAt: "2024-02-15",
   },
   {
@@ -240,20 +243,9 @@ const Permissions = () => {
   const [toastMessage, setToastMessage] = useState("");
   const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
-  // Get current data based on active tab
+  // Get current data based on active tab - using API blocks
   const getCurrentData = (): PermissionItem[] => {
-    switch (activeTab) {
-      case "merchant":
-        return merchants;
-      case "fillial":
-        return fillials;
-      case "customer":
-        return customers;
-      case "workplace":
-        return workplaces;
-      default:
-        return [];
-    }
+    return blocks.map(convertBlockToItem);
   };
 
   // Get setter based on active tab
@@ -274,26 +266,10 @@ const Permissions = () => {
 
   // Filter data - show only blocked items
   const filteredData = useMemo(() => {
-    let data: PermissionItem[] = [];
-    
-    // Get data based on active tab
-    switch (activeTab) {
-      case "merchant":
-        data = merchants;
-        break;
-      case "fillial":
-        data = fillials;
-        break;
-      case "customer":
-        data = customers;
-        break;
-      case "workplace":
-        data = workplaces;
-        break;
-    }
+    let data = getCurrentData();
     
     // Only show blocked items
-    data = data.filter(item => item.status === "BLOCKED");
+    data = data.filter(item => item.status === \"BLOCKED\");
     
     // Search filter
     if (search.trim()) {
