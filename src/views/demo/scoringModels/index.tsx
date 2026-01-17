@@ -69,6 +69,7 @@ export default function ScoringModels() {
   const [minPassScore, setMinPassScore] = useState(300);
   const [globalMinLimit, setGlobalMinLimit] = useState(1000000);
   const [globalMaxLimit, setGlobalMaxLimit] = useState(50000000);
+  const [maxProcessingTime, setMaxProcessingTime] = useState(20);
 
   // Load scoring models from API
   useEffect(() => {
