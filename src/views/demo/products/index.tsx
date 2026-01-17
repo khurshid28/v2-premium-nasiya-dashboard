@@ -577,7 +577,7 @@ export default function Products() {
       filtered = filtered.filter(
         (p) =>
           p.name.toLowerCase().includes(query) ||
-          p.barcode.includes(query) ||
+          (p as any).barcode?.includes(query) ||
           (p.category?.name || "").toLowerCase().includes(query)
       );
     }
@@ -614,13 +614,13 @@ export default function Products() {
                   merchants: selectedMerchants,
                   fillials: selectedFillials,
                 },
-              }
+              } as any
             : p
         )
       );
     } else {
       // Add new product
-      const newProduct: Product = {
+      const newProduct = {
         id: Math.max(...products.map((p) => p.id)) + 1,
         name: productForm.name,
         barcode: productForm.barcode,
@@ -633,8 +633,8 @@ export default function Products() {
           merchants: selectedMerchants,
           fillials: selectedFillials,
         },
-      };
-      setProducts([...products, newProduct]);
+      } as any;
+      setProducts([...products, newProduct] as any);
     }
 
     setShowProductModal(false);
@@ -678,7 +678,7 @@ export default function Products() {
       );
     } else {
       // Add new category
-      const newCategory: Category = {
+      const newCategory = {
         id: Math.max(...categories.map((c) => c.id)) + 1,
         name: categoryForm.name,
         description: categoryForm.description,
@@ -688,8 +688,8 @@ export default function Products() {
           merchants: selectedCategoryMerchants,
           fillials: selectedCategoryFillials,
         },
-      };
-      setCategories([...categories, newCategory]);
+      } as any;
+      setCategories([...categories, newCategory] as any);
     }
 
     setShowCategoryModal(false);
@@ -722,7 +722,7 @@ export default function Products() {
   // Delete category
   const handleDeleteCategory = (id: number) => {
     const category = categories.find((c) => c.id === id);
-    if (category && category.productCount > 0) {
+    if (category && (category as any).productCount > 0) {
       setToast({ isOpen: true, message: "Bu kategoriyada mahsulotlar mavjud. Avval mahsulotlarni o'chiring.", type: "error" });
       return;
     }
@@ -736,14 +736,14 @@ export default function Products() {
     setEditingProduct(product);
     setProductForm({
       name: product.name,
-      barcode: product.barcode,
+      barcode: (product as any).barcode,
       category: product.category,
       price: product.price.toString(),
-      image: product.image || "",
-      description: product.description || "",
+      image: (product as any).image || "",
+      description: (product as any).description || "",
     });
-    setSelectedMerchants(product.availableFor.merchants);
-    setSelectedFillials(product.availableFor.fillials);
+    setSelectedMerchants((product as any).availableFor?.merchants || []);
+    setSelectedFillials((product as any).availableFor?.fillials || []);
     setShowProductModal(true);
   };
 
@@ -752,11 +752,11 @@ export default function Products() {
     setEditingCategory(category);
     setCategoryForm({
       name: category.name,
-      description: category.description,
-      image: category.image || "",
+      description: (category as any).description,
+      image: (category as any).image || "",
     });
-    setSelectedCategoryMerchants(category.availableFor.merchants);
-    setSelectedCategoryFillials(category.availableFor.fillials);
+    setSelectedCategoryMerchants((category as any).availableFor?.merchants || []);
+    setSelectedCategoryFillials((category as any).availableFor?.fillials || []);
     setShowCategoryModal(true);
   };
 
@@ -860,7 +860,7 @@ export default function Products() {
         },
       }));
 
-      setProducts([...products, ...importedProducts]);
+      setProducts([...products, ...importedProducts] as any);
       setToast({ isOpen: true, message: `Demo: ${importedProducts.length} ta mahsulot muvaffaqiyatli qo'shildi!`, type: "success" });
       setShowImportModal(false);
       setImportFile(null);
@@ -988,8 +988,8 @@ export default function Products() {
                   <div className="flex flex-col h-full">
                     {/* Product Image */}
                     <div className="mb-3 flex h-48 items-center justify-center overflow-hidden rounded-lg bg-gray-100 dark:bg-navy-700">
-                      {product.image ? (
-                        <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                      {(product as any).image ? (
+                        <img src={(product as any).image} alt={product.name} className="h-full w-full object-cover" />
                       ) : (
                         <Package size={64} className="text-gray-400" />
                       )}
@@ -999,13 +999,13 @@ export default function Products() {
                     <div className="flex-1">
                       <h3 className="text-base font-semibold text-navy-700 dark:text-white">{product.name}</h3>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium">Shtrix:</span> {product.barcode}
+                        <span className="font-medium">Shtrix:</span> {(product as any).barcode || 'N/A'}
                       </p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium">Kategoriya:</span> {product.category}
+                        <span className="font-medium">Kategoriya:</span> {(product.category as any)?.name || product.category || 'N/A'}
                       </p>
-                      {product.description && (
-                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{product.description}</p>
+                      {(product as any).description && (
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{(product as any).description}</p>
                       )}
                       <p className="mt-2 text-lg font-bold text-brand-500">{formatCurrency(product.price)}</p>
                       
@@ -1013,14 +1013,14 @@ export default function Products() {
                       <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Mavjudligi:</p>
                         <div className="flex flex-wrap gap-1">
-                          {product.availableFor.merchants.slice(0, 2).map((merchant, idx) => (
+                          {((product as any).availableFor?.merchants || []).slice(0, 2).map((merchant, idx) => (
                             <span key={idx} className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
                               {merchant}
                             </span>
                           ))}
-                          {product.availableFor.merchants.length > 2 && (
+                          {((product as any).availableFor?.merchants?.length || 0) > 2 && (
                             <span className="inline-block px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 rounded">
-                              +{product.availableFor.merchants.length - 2}
+                              +{((product as any).availableFor?.merchants?.length || 0) - 2}
                             </span>
                           )}
                         </div>
@@ -1030,7 +1030,7 @@ export default function Products() {
                     {/* Actions */}
                     <div className="mt-3 flex gap-2">
                       <button
-                        onClick={() => handleEditProduct(product)}
+                        onClick={() => handleEditProduct(product as any)}
                         className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-navy-800 dark:text-white dark:hover:bg-navy-700"
                       >
                         <Edit size={16} />
@@ -1076,25 +1076,25 @@ export default function Products() {
               {categories.map((category) => (
                 <Card key={category.id} extra="!p-5 hover:shadow-lg transition-shadow">
                   {/* Category Image */}
-                  {category.image && (
+                  {(category as any).image && (
                     <div className="mb-4 flex h-32 items-center justify-center overflow-hidden rounded-lg bg-gray-100 dark:bg-navy-700">
-                      <img src={category.image} alt={category.name} className="h-full w-full object-cover" />
+                      <img src={(category as any).image} alt={category.name} className="h-full w-full object-cover" />
                     </div>
                   )}
                   
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-navy-700 dark:text-white">{category.name}</h3>
-                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{category.description}</p>
+                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{(category as any).description}</p>
                       <p className="mt-3 text-sm font-medium text-brand-500">
-                        {category.productCount} ta mahsulot
+                        {(category as any).productCount} ta mahsulot
                       </p>
                       
                       {/* Availability badges */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1.5">Mavjud:</p>
                         <div className="flex flex-wrap gap-1">
-                          {category.availableFor.merchants.map((merchant, idx) => (
+                          {((category as any).availableFor?.merchants || []).map((merchant, idx) => (
                             <span key={idx} className="inline-block px-2 py-0.5 text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 rounded">
                               {merchant}
                             </span>
@@ -1105,7 +1105,7 @@ export default function Products() {
                   </div>
                   <div className="mt-4 flex gap-2">
                     <button
-                      onClick={() => handleEditCategory(category)}
+                      onClick={() => handleEditCategory(category as any)}
                       className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-navy-800 dark:text-white dark:hover:bg-navy-700"
                     >
                       <Edit size={16} />

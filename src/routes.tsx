@@ -14,10 +14,13 @@ import ReportsPage from "views/admin/reports";
 // Auth import
 import SignIn from "views/auth/SignIn";
 
+// Admin imports
+import CustomersAdmin from "views/admin/customers";
+
 // Demo imports
 import Permissions from "views/demo/permissions";
 import Debts from "views/demo/debts";
-import Customers from "views/demo/customers";
+import CustomersWithApi from "views/demo/customers/CustomersWithApi";
 import ScoringHistory from "views/demo/scoringHistory";
 import ScoringModels from "views/demo/scoringModels";
 import Payments from "views/demo/payments";
@@ -137,6 +140,20 @@ const routes = [
     component: <Users />,
   },
   {
+    name: "Mijozlar",
+    layout: "/super",
+    path: "customers",
+    icon: <UsersIcon size={20} />,
+    component: <CustomersAdmin />,
+  },
+  {
+    name: "Mijozlar",
+    layout: "/admin",
+    path: "customers",
+    icon: <UsersIcon size={20} />,
+    component: <CustomersAdmin />,
+  },
+  {
     name: "Operatorlar",
     layout: "/demo",
     path: "users",
@@ -175,49 +192,42 @@ const routes = [
   },
   {
     name: "Ruxsat va Blocklar",
-    layout: "/admin",
+    layout: "/demo",
     path: "permissions",
     icon: <ShieldLock size={20} />,
     component: <Permissions />,
   },
   {
     name: "Qarzdorlik",
-    layout: "/admin",
+    layout: "/demo",
     path: "debts",
     icon: <Receipt size={20} />,
     component: <Debts />,
   },
   {
-    name: "Mijozlar",
-    layout: "/admin",
-    path: "customers",
-    icon: <UsersIcon size={20} />,
-    component: <Customers />,
-  },
-  {
     name: "Skoring tarixi",
-    layout: "/admin",
+    layout: "/demo",
     path: "scoring-history",
     icon: <Clock size={20} />,
     component: <ScoringHistory />,
   },
   {
     name: "Skoring modellari",
-    layout: "/admin",
+    layout: "/demo",
     path: "scoring-models",
     icon: <Settings size={20} />,
     component: <ScoringModels />,
   },
   {
     name: "To'lovlar",
-    layout: "/admin",
+    layout: "/demo",
     path: "payments",
     icon: <CreditCard size={20} />,
     component: <Payments />,
   },
   {
     name: "Mahsulotlar",
-    layout: "/admin",
+    layout: "/demo",
     path: "products",
     icon: <Package size={20} />,
     component: <Products />,

@@ -64,64 +64,67 @@ const STATUS_COLORS: Record<Status, string> = {
 };
 
 // Mock Data
-const mockPayments: Payment[] = [
+const mockPayments = [
   {
-    id: "PAY001",
+    id: 1,
     applicationId: "1",
     customerName: "Aziz Valiyev",
     customerPhone: "+998901234567",
     amount: 5000000,
     provider: "PAYME",
+    paymentType: "MONTHLY",
     paymentDate: "2024-12-05T14:30:00",
-    status: "completed",
+    status: "COMPLETED",
     branch: "Chilonzor filiali",
     transactionId: "TXN123456789",
-  },
+    createdAt: "2024-12-05T14:30:00",
+    updatedAt: "2024-12-05T14:30:00",
+  } as any,
   {
-    id: "PAY002",
+    id: 2,
     applicationId: "2",
     customerName: "Dilnoza Karimova",
     customerPhone: "+998902345678",
     amount: 3500000,
     provider: "PLUM",
     paymentDate: "2024-12-05T10:15:00",
-    status: "completed",
+    status: "COMPLETED",
     branch: "Yunusobod filiali",
     transactionId: "PLM987654321",
   },
   {
-    id: "PAY003",
+    id: 3,
     applicationId: "3",
     customerName: "Bobur Aliyev",
     customerPhone: "+998903456789",
     amount: 2000000,
     provider: "MIB",
     paymentDate: "2024-12-04T16:45:00",
-    status: "completed",
+    status: "COMPLETED",
     branch: "Sergeli filiali",
     notes: "Naqd pul qabul qilindi",
   },
   {
-    id: "PAY004",
+    id: 4,
     applicationId: "4",
     customerName: "Gulnora Tursunova",
     customerPhone: "+998904567890",
     amount: 7500000,
     provider: "AUTO",
     paymentDate: "2024-12-04T12:20:00",
-    status: "completed",
+    status: "COMPLETED",
     branch: "Chilonzor filiali",
     transactionId: "AUTO555888999",
   },
   {
-    id: "PAY005",
+    id: 5,
     applicationId: "5",
     customerName: "Jasur Rahmonov",
     customerPhone: "+998905678901",
     amount: 4200000,
     provider: "PAYME",
     paymentDate: "2024-12-03T09:30:00",
-    status: "completed",
+    status: "COMPLETED",
     branch: "Yunusobod filiali",
     transactionId: "TXN999888777",
   },
@@ -290,7 +293,7 @@ const Payments = () => {
   // Statistics
   const stats = {
     total: payments.length,
-    completed: payments.filter((p) => p.status === "completed").length,
+    completed: payments.filter((p: any) => p.status === "COMPLETED").length,
   };
 
   // Handle Add MIB Payment

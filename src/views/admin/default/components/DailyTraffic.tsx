@@ -56,51 +56,51 @@ const DailyTraffic: React.FC<DailyTrafficProps> = ({
         }
 
         if (fillialId !== "all") {
-          applications = applications.filter(app => app.fillial_id === fillialId);
+          applications = applications.filter((app: any) => app.fillial_id === fillialId);
         } else if (region !== "all") {
-          const regionFillials = fillialsList.filter(f => f.region === region);
-          const regionFillialIds = regionFillials.map(f => f.id);
-          applications = applications.filter(app => regionFillialIds.includes(app.fillial_id));
+          const regionFillials = fillialsList.filter((f: any) => f.region === region);
+          const regionFillialIds = regionFillials.map((f: any) => f.id);
+          applications = applications.filter((app: any) => regionFillialIds.includes(app.fillial_id));
         }
 
         if (search.trim()) {
           const searchLower = search.toLowerCase();
-          const matchingFillials = fillialsList.filter(f => 
+          const matchingFillials = fillialsList.filter((f: any) => 
             f.name?.toLowerCase().includes(searchLower) || 
             f.address?.toLowerCase().includes(searchLower)
           );
-          const matchingFillialIds = matchingFillials.map(f => f.id);
-          applications = applications.filter(app => matchingFillialIds.includes(app.fillial_id));
+          const matchingFillialIds = matchingFillials.map((f: any) => f.id);
+          applications = applications.filter((app: any) => matchingFillialIds.includes(app.fillial_id));
         }
 
         // Filter by expired month
         if (expiredMonth !== "all") {
-          applications = applications.filter(app => app.expired_month && app.expired_month === String(expiredMonth));
+          applications = applications.filter((app: any) => app.expired_month && app.expired_month === String(expiredMonth));
         }
         
         // Get today's approved applications
         const today = new Date();
-        const todayApprovedApps = applications.filter(app => {
+        const todayApprovedApps = applications.filter((app: any) => {
           if (!app.createdAt || !isApproved(app.status)) return false;
           const appDate = new Date(app.createdAt);
           return appDate.toDateString() === today.toDateString();
         });
         
         // Calculate total amount for today's approved applications
-        const totalAmount = todayApprovedApps.reduce((sum, app) => sum + (app.amount || 0), 0);
+        const totalAmount = todayApprovedApps.reduce((sum: number, app: any) => sum + (app.amount || 0), 0);
         setDailyAmount(totalAmount);
         
         // Get yesterday's approved applications for comparison
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayApprovedApps = applications.filter(app => {
+        const yesterdayApprovedApps = applications.filter((app: any) => {
           if (!app.createdAt || !isApproved(app.status)) return false;
           const appDate = new Date(app.createdAt);
           return appDate.toDateString() === yesterday.toDateString();
         });
         
         // Calculate yesterday's total amount
-        const yesterdayAmount = yesterdayApprovedApps.reduce((sum, app) => sum + (app.amount || 0), 0);
+        const yesterdayAmount = yesterdayApprovedApps.reduce((sum: number, app: any) => sum + (app.amount || 0), 0);
         
         // Calculate growth percentage (today vs yesterday)
         let percent = 0;

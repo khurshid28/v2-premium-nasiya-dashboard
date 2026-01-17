@@ -159,7 +159,7 @@ const Dashboard = (): JSX.Element => {
           console.log(`DEBUG: Before month filter: ${filteredApps.length} apps`);
           // Log first few apps' expired_month values for debugging
           const sampleApps = filteredApps.slice(0, 5);
-          console.log(`DEBUG: Sample expired_month values:`, sampleApps.map(a => ({ id: a.id, expired_month: a.expired_month })));
+          console.log(`DEBUG: Sample expired_month values:`, sampleApps.map((a: any) => ({ id: a.id, expired_month: a.expired_month })));
           const monthlyApps = filteredApps.filter((a: any) => a.expired_month && a.expired_month === String(selectedExpiredMonth));
           console.log(`DEBUG: After month filter: ${monthlyApps.length} apps`);
           filteredApps = monthlyApps;

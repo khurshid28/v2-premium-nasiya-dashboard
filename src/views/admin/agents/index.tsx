@@ -95,7 +95,7 @@ const Agents = (): JSX.Element => {
   React.useEffect(() => {
     let mounted = true;
     api.listMerchants({ page: 1, pageSize: 100 })
-      .then((res) => {
+      .then((res: any) => {
         if (!mounted) return;
         setMerchants(res?.items || []);
       })

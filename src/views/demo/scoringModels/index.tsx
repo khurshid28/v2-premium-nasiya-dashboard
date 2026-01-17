@@ -52,6 +52,10 @@ const formatDate = (dateString: string) => {
   return `${day}.${month}.${year}`;
 };
 
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("uz-UZ").format(amount);
+};
+
 export default function ScoringModels() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -62,6 +66,9 @@ export default function ScoringModels() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [models, setModels] = useState<ScoringModel[]>([]);
+  const [minPassScore, setMinPassScore] = useState(300);
+  const [globalMinLimit, setGlobalMinLimit] = useState(1000000);
+  const [globalMaxLimit, setGlobalMaxLimit] = useState(50000000);
 
   // Load scoring models from API
   useEffect(() => {
@@ -72,7 +79,7 @@ export default function ScoringModels() {
     try {
       setLoading(true);
       const response = await scoringApi.getScoringModels();
-      setModels(response.data);
+      setModels(response.data as any);
     } catch (error) {
       console.error('Error loading scoring models:', error);
     } finally {
@@ -191,7 +198,7 @@ export default function ScoringModels() {
   ) => {
     const config = categoryConfigs[category];
     const updatedCriterias = (config.criterias || []).map((c) =>
-      c.id === criteriaId ? { ...c, [field]: value } : c
+      (c.id as any) == criteriaId ? { ...c, [field]: value } : c
     );
 
     setCategoryConfigs({

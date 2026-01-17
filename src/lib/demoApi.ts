@@ -449,6 +449,22 @@ const demoApi = {
   },
   // Dashboard
   getDashboardStats,
-};
+  // Demo-specific functions (these will return empty arrays in demo mode)
+  // For actual functionality, use the real API from api.ts
+  listCustomers: async () => ({ value: [] as any[], Count: 0, totalPages: 1 }),
+  getCustomer: async (id: number) => ({} as any),
+  createCustomer: async (payload: any) => ({} as any),
+  updateCustomer: async (id: number, payload: any) => ({} as any),
+  deleteCustomer: async (id: number) => Promise.resolve(),
+  getCustomerDebts: async () => ({ value: [] as any[], Count: 0 }),
+  listPayments: async () => ({ value: [] as any[], Count: 0 }),
+  getPayment: async (id: number) => ({} as any),
+  getPaymentStats: async () => ({ totalPayments: 0, completedPayments: 0, totalAmount: 0, byProvider: [] as any[] }),
+  listProducts: async () => ({ value: [] as any[], Count: 0 }),
+  getProduct: async (id: number) => ({} as any),
+  listProductCategories: async () => ({ value: [] as any[], Count: 0 }),
+  listScoringModels: async () => ({ value: [] as any[], Count: 0 }),
+  getScoringModel: async (id: number) => ({} as any),
+} as any; // Type assertion to allow additional properties
 
 export default demoApi;

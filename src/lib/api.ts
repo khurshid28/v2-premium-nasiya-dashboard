@@ -605,6 +605,145 @@ export async function updateAdminPassword(id: number, payload: { password: strin
   return handleResponse<void>(res);
 }
 
+// Customers (Clients)
+export async function listCustomers(params?: {
+  search?: string;
+  region?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/client/with-stats${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function getCustomer(id: number): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/client/${id}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function createCustomer(payload: any): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/client`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function updateCustomer(id: number, payload: any): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/client/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse(res);
+}
+
+export async function deleteCustomer(id: number): Promise<void> {
+  const res = await fetchWithRetry(`${API_BASE}/client/${id}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+  });
+  return handleResponse<void>(res);
+}
+
+export async function getCustomerDebts(params?: {
+  region?: string;
+  hasDebt?: boolean;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/client/debts${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// Payments
+export async function listPayments(params?: {
+  status?: string;
+  provider?: string;
+  zayavka_id?: number;
+  client_id?: number;
+  merchant_id?: number;
+  fillial_id?: number;
+  startDate?: string;
+  endDate?: string;
+  search?: string;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/payment${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function getPayment(id: number): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/payment/${id}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function getPaymentStats(params?: {
+  startDate?: string;
+  endDate?: string;
+  merchant_id?: number;
+  fillial_id?: number;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/payment/stats${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// Products
+export async function listProducts(params?: {
+  merchant_id?: number;
+  fillial_id?: number;
+  category_id?: number;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/product${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function getProduct(id: number): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/product/${id}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function listProductCategories(params?: {
+  merchant_id?: number;
+  fillial_id?: number;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/product/category${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+// Scoring
+export async function listScoringModels(params?: {
+  status?: string;
+}): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/scoring${qs(params)}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
+export async function getScoringModel(id: number): Promise<any> {
+  const res = await fetchWithRetry(`${API_BASE}/scoring/${id}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 // NOTE:
 // - The endpoints above assume these paths: /user/all, /fillial/all, /app/all.
 //   If your NestJS controllers use different paths, adjust API_BASE or endpoint paths accordingly.
@@ -658,6 +797,21 @@ const api = {
   updateAdmin,
   deleteAdmin,
   updateAdminPassword,
+  // Customers
+  listCustomers,
+  getCustomer,
+  getCustomerDebts,
+  // Payments
+  listPayments,
+  getPayment,
+  getPaymentStats,
+  // Products
+  listProducts,
+  getProduct,
+  listProductCategories,
+  // Scoring
+  listScoringModels,
+  getScoringModel,
 };
 
 export default api;
