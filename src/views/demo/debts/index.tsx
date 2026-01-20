@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { User, FileText, BuildingStore, Search, Home } from "tabler-icons-react";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
+import Pagination from "components/pagination";
 
 // Types
 type CustomerDebt = {
@@ -410,6 +411,8 @@ export default function Debts() {
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState<CustomerDebt | ApplicationDebt | MerchantDebt | FillialDebt | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Get unique regions
   const regions = useMemo(() => {
@@ -481,6 +484,19 @@ export default function Debts() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, searchQuery, selectedRegion]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    return filteredData.slice(start, end);
+  }, [filteredData, currentPage, pageSize]);
+
+  // Reset to first page when filters change
+  const resetPagination = () => {
+    setCurrentPage(1);
+  };
 
   // Calculate totals
   const totals = useMemo(() => {
@@ -632,7 +648,10 @@ export default function Debts() {
               type="text"
               placeholder={`${getTabLabel(activeTab)} bo'yicha qidirish...`}
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                resetPagination();
+              }}
               className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-brand-500 dark:border-gray-700 dark:bg-navy-900 dark:text-white"
             />
           </div>
@@ -640,7 +659,10 @@ export default function Debts() {
           {activeTab === "fillials" && (
             <CustomSelect
               value={selectedRegion}
-              onChange={setSelectedRegion}
+              onChange={(val) => {
+                setSelectedRegion(val);
+                resetPagination();
+              }}
               options={[
                 { value: "all", label: "Barcha hududlar" },
                 ...regions.map((region) => ({
@@ -745,7 +767,8 @@ export default function Debts() {
                   </td>
                 </tr>
               ) : (
-                filteredData.map((item, index) => {
+                paginatedData.map((item, index) => {
+                  const actualIndex = (currentPage - 1) * pageSize + index + 1;
                   if (activeTab === "customers") {
                     const customer = item as CustomerDebt;
                     const unpaidApplications = customer.applications.filter(app => !app.isPaid).length;
@@ -936,6 +959,36 @@ export default function Debts() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {filteredData.length > 0 && (
+          <div className="mt-6 flex items-center justify-between gap-4">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
+              {filteredData.length} dan {paginatedData.length} ta ko'rsatilmoqda
+            </div>
+            <div className="flex items-center gap-3">
+              <CustomSelect
+                value={String(pageSize)}
+                onChange={(value) => {
+                  setPageSize(Number(value));
+                  setCurrentPage(1);
+                }}
+                options={[
+                  { value: "10", label: "10 ta" },
+                  { value: "25", label: "25 ta" },
+                  { value: "50", label: "50 ta" },
+                  { value: "100", label: "100 ta" },
+                ]}
+                className="min-w-[120px]"
+              />
+              <Pagination 
+                page={currentPage} 
+                totalPages={totalPages} 
+                onPageChange={(p) => setCurrentPage(p)} 
+              />
+            </div>
+          </div>
+        )}
 
         {/* Footer Summary */}
         {filteredData.length > 0 && (

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Card from "components/card";
 import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin } from "tabler-icons-react";
 import Pagination from "components/pagination";
@@ -22,6 +22,9 @@ type Customer = {
   completedApplications: number;
   rejectedApplications: number;
   debt: number;
+  workPlace?: string; // Ishxona (kompaniya nomi) - eski field
+  zayavkalar?: any[]; // Backend dan kelgan arizalar
+  workplaces?: any[]; // Backend dan kelgan ishxonalar
 };
 
 export default function CustomersWithApi() {
@@ -31,30 +34,42 @@ export default function CustomersWithApi() {
     return isDemoMode ? demoApi : apiReal;
   }, [location.pathname]);
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]); // Barcha mijozlar
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [customerApplications, setCustomerApplications] = useState<any[]>([]);
+  const [loadingApplications, setLoadingApplications] = useState(false);
+  const navigate = useNavigate();
 
-  // Load customers
+  // Load all customers once on mount
   useEffect(() => {
     loadCustomers();
-  }, [currentPage, api]);
+  }, [api]);
+
+  // Load customer applications when modal opens
+  useEffect(() => {
+    if (showViewModal && selectedCustomer) {
+      loadCustomerApplications(selectedCustomer.id);
+    }
+  }, [showViewModal, selectedCustomer, api]);
 
   const loadCustomers = async () => {
     try {
       setLoading(true);
-      const response = await api.listCustomers({
-        page: currentPage,
-        pageSize,
-      });
+      const response = await api.listCustomers();
       
-      if (response && response.value) {
-        setCustomers(response.value);
-        setTotalPages(response.totalPages || 1);
+      // API qaytargan format: { items: [...], total: 141, page: 1, pageSize: 20 }
+      if (response && response.items && Array.isArray(response.items)) {
+        // Barcha mijozlarni saqlash
+        setAllCustomers(response.items);
+      } else if (response && response.value && Array.isArray(response.value)) {
+        // Agar eski formatda kelsa
+        setAllCustomers(response.value);
       }
     } catch (error) {
       console.error("Failed to load customers:", error);
@@ -63,27 +78,50 @@ export default function CustomersWithApi() {
     }
   };
 
+  const loadCustomerApplications = async (clientId: number) => {
+    try {
+      setLoadingApplications(true);
+      setCustomerApplications([]);
+      const response = await api.listApplications({ 
+        clientId,
+        pageSize: 100 
+      });
+      
+      if (response && response.items && Array.isArray(response.items)) {
+        setCustomerApplications(response.items);
+      } else if (response && response.value && Array.isArray(response.value)) {
+        setCustomerApplications(response.value);
+      }
+    } catch (error) {
+      console.error("Failed to load customer applications:", error);
+      setCustomerApplications([]);
+    } finally {
+      setLoadingApplications(false);
+    }
+  };
+
   // Get unique regions
   const regions = useMemo(() => {
     const uniqueRegions = new Set<string>();
-    customers.forEach(customer => {
+    allCustomers.forEach(customer => {
       if (customer.region) {
         uniqueRegions.add(customer.region);
       }
     });
     return Array.from(uniqueRegions).sort();
-  }, [customers]);
+  }, [allCustomers]);
 
   // Filter customers
   const filteredCustomers = useMemo(() => {
-    return customers.filter(customer => {
+    return allCustomers.filter(customer => {
       // Search filter
       if (searchQuery.trim()) {
         const searchLower = searchQuery.toLowerCase();
         const matchesSearch = 
           customer.fullName.toLowerCase().includes(searchLower) ||
           customer.phone?.toLowerCase().includes(searchLower) ||
-          customer.passport?.toLowerCase().includes(searchLower);
+          customer.passport?.toLowerCase().includes(searchLower) ||
+          (customer.workPlace && customer.workPlace.toLowerCase().includes(searchLower));
         
         if (!matchesSearch) return false;
       }
@@ -95,15 +133,39 @@ export default function CustomersWithApi() {
 
       return true;
     });
-  }, [customers, searchQuery, selectedRegion]);
+  }, [allCustomers, searchQuery, selectedRegion]);
 
-  // Calculate stats
+  // Client-side pagination
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredCustomers.slice(startIndex, endIndex);
+  }, [filteredCustomers, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+
+  // Calculate stats - filterlangan mijozlar uchun statistika
   const stats = useMemo(() => {
     return {
       totalCustomers: filteredCustomers.length,
-      activeApplications: filteredCustomers.reduce((sum, c) => sum + c.activeApplications, 0),
-      completedApplications: filteredCustomers.reduce((sum, c) => sum + c.completedApplications, 0),
-      rejectedApplications: filteredCustomers.reduce((sum, c) => sum + c.rejectedApplications, 0),
+      activeApplications: filteredCustomers.reduce((sum, c) => {
+        if (c.zayavkalar && Array.isArray(c.zayavkalar)) {
+          return sum + c.zayavkalar.filter((z: any) => z.status === 'CONFIRMED' || z.status === 'ACTIVE').length;
+        }
+        return sum + (c.activeApplications || 0);
+      }, 0),
+      completedApplications: filteredCustomers.reduce((sum, c) => {
+        if (c.zayavkalar && Array.isArray(c.zayavkalar)) {
+          return sum + c.zayavkalar.filter((z: any) => z.status === 'FINISHED' || z.status === 'COMPLETED').length;
+        }
+        return sum + (c.completedApplications || 0);
+      }, 0),
+      rejectedApplications: filteredCustomers.reduce((sum, c) => {
+        if (c.zayavkalar && Array.isArray(c.zayavkalar)) {
+          return sum + c.zayavkalar.filter((z: any) => z.status && (z.status.includes('CANCELED') || z.status === 'REJECTED')).length;
+        }
+        return sum + (c.rejectedApplications || 0);
+      }, 0),
     };
   }, [filteredCustomers]);
 
@@ -113,8 +175,48 @@ export default function CustomersWithApi() {
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("uz-UZ");
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return '';
+      return date.toLocaleDateString("uz-UZ");
+    } catch {
+      return '';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    const statusMap: { [key: string]: string } = {
+      // Confirmed
+      'CONFIRMED': 'Tasdiqlangan',
+      
+      // Finished - multiple real statuses
+      'FINISHED': 'Tugatilgan',
+      'COMPLETED': 'Tugatilgan',
+      'ACTIVE': 'Tugatilgan',
+      
+      // Rejected - multiple cancellation statuses from enum
+      'CANCELED_BY_SCORING': 'Rad qilingan',
+      'CANCELED_BY_CLIENT': 'Rad qilingan',
+      'CANCELED_BY_DAILY': 'Rad qilingan',
+      'CANCELLED': 'Rad qilingan',
+      'CANCELED': 'Rad qilingan',
+      'REJECTED': 'Rad qilingan',
+      
+      // Limit
+      'LIMIT': 'Limit',
+      
+      // Pending - waiting statuses from enum
+      'CREATED': 'Kutilmoqda',
+      'ADDED_DETAIL': 'Kutilmoqda',
+      'WAITING_SCORING': 'Kutilmoqda',
+      'ADDED_PRODUCT': 'Kutilmoqda',
+      'WAITING_BANK_UPDATE': 'Kutilmoqda',
+      'WAITING_BANK_CONFIRM': 'Kutilmoqda',
+      'PENDING': 'Kutilmoqda',
+      'IN_PROGRESS': 'Kutilmoqda',
+      'NEW': 'Kutilmoqda'
+    };
+    return statusMap[status] || status;
   };
 
   if (loading) {
@@ -235,6 +337,9 @@ export default function CustomersWithApi() {
               <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
                 Hudud
               </th>
+              <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                Ishxona
+              </th>
               <th className="pb-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
                 Arizalar
               </th>
@@ -247,9 +352,14 @@ export default function CustomersWithApi() {
             </tr>
           </thead>
           <tbody>
-            {filteredCustomers.map((customer, index) => (
+            {paginatedCustomers.map((customer, index) => (
               <tr 
                 key={customer.id}
+                onClick={() => {
+                  setSelectedCustomer(customer);
+                  setShowViewModal(true);
+                  loadCustomerApplications(customer.id);
+                }}
                 className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-800"
               >
                 <td className="py-4 text-sm text-gray-600 dark:text-gray-400">
@@ -257,8 +367,13 @@ export default function CustomersWithApi() {
                 </td>
                 <td className="py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">
+                    <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">
                       {customer.fullName.charAt(0).toUpperCase()}
+                      {customer.activeApplications > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white ring-2 ring-white dark:ring-navy-900">
+                          {customer.activeApplications}
+                        </span>
+                      )}
                     </div>
                     <div>
                       <p className="font-semibold text-navy-700 dark:text-white">
@@ -280,13 +395,18 @@ export default function CustomersWithApi() {
                     {customer.region}
                   </div>
                 </td>
+                <td className="py-4 text-sm text-navy-700 dark:text-white">
+                  {customer.workplaces && customer.workplaces.length > 0 && customer.workplaces[0].workplace 
+                    ? customer.workplaces[0].workplace.name 
+                    : customer.workPlace || '—'}
+                </td>
                 <td className="py-4 text-center text-sm">
                   <div className="flex items-center justify-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                      {customer.activeApplications} faol
+                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                      ✓ {customer.zayavkalar ? customer.zayavkalar.filter((z: any) => z.status === 'CONFIRMED' || z.status === 'ACTIVE').length : customer.activeApplications} faol
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                      {customer.completedApplications} tugagan
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      ✓ {customer.zayavkalar ? customer.zayavkalar.filter((z: any) => z.status === 'FINISHED' || z.status === 'COMPLETED').length : customer.completedApplications} tugagan
                     </span>
                   </div>
                 </td>
@@ -312,7 +432,7 @@ export default function CustomersWithApi() {
           </tbody>
         </table>
 
-        {filteredCustomers.length === 0 && (
+        {paginatedCustomers.length === 0 && (
           <div className="py-12 text-center">
             <User className="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" />
             <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">
@@ -323,13 +443,213 @@ export default function CustomersWithApi() {
       </div>
 
       {/* Pagination */}
-      {filteredCustomers.length > 0 && (
+      {paginatedCustomers.length > 0 && totalPages > 1 && (
         <div className="mt-6">
           <Pagination
             page={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
           />
+        </div>
+      )}
+
+      {/* View Modal */}
+      {showViewModal && selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl dark:bg-navy-800">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 p-6 dark:border-gray-700">
+              <div className="flex items-center gap-4">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-2xl font-bold text-white">
+                  {selectedCustomer.fullName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-navy-700 dark:text-white">
+                    {selectedCustomer.fullName}
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {selectedCustomer.phone}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  setSelectedCustomer(null);
+                }}
+                className="text-gray-400 transition-colors hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Passport</label>
+                    <p className="mt-1 text-sm font-semibold text-navy-700 dark:text-white">{selectedCustomer.passport}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tug'ilgan sana</label>
+                    <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                      {selectedCustomer.birthDate ? formatDate(selectedCustomer.birthDate) : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Hudud</label>
+                    <p className="mt-1 text-sm text-navy-700 dark:text-white">{selectedCustomer.region}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Manzil</label>
+                    <p className="mt-1 text-sm text-navy-700 dark:text-white">{selectedCustomer.address}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Ishxona</label>
+                    <p className="mt-1 text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                      {selectedCustomer.workplaces && selectedCustomer.workplaces.length > 0 && selectedCustomer.workplaces[0].workplace 
+                        ? selectedCustomer.workplaces[0].workplace.name 
+                        : selectedCustomer.workPlace || <span className="text-gray-400">—</span>}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Jami arizalar</label>
+                    <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">
+                      {selectedCustomer.zayavkalar ? selectedCustomer.zayavkalar.length : selectedCustomer.totalApplications || 0}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="rounded-lg bg-green-50 p-3 text-center dark:bg-green-900/20">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Faol</p>
+                      <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                        {selectedCustomer.zayavkalar ? selectedCustomer.zayavkalar.filter((z: any) => z.status === 'CONFIRMED' || z.status === 'ACTIVE').length : selectedCustomer.activeApplications || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-blue-50 p-3 text-center dark:bg-blue-900/20">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Tugagan</p>
+                      <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                        {selectedCustomer.zayavkalar ? selectedCustomer.zayavkalar.filter((z: any) => z.status === 'FINISHED' || z.status === 'COMPLETED').length : selectedCustomer.completedApplications || 0}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-red-50 p-3 text-center dark:bg-red-900/20">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Rad</p>
+                      <p className="text-lg font-bold text-red-600 dark:text-red-400">
+                        {selectedCustomer.zayavkalar ? selectedCustomer.zayavkalar.filter((z: any) => z.status && (z.status.includes('CANCELED') || z.status === 'REJECTED')).length : selectedCustomer.rejectedApplications || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Qarzdorlik</label>
+                    <p className="mt-1 text-xl font-bold">
+                      {selectedCustomer.debt > 0 ? (
+                        <span className="text-red-600 dark:text-red-400">
+                          {formatCurrency(selectedCustomer.debt)} so'm
+                        </span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">Qarzi yo'q</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arizalar ro'yxati */}
+              <div className="mt-6">
+                <div className="mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-navy-700 dark:text-white">Arizalar</h4>
+                  {loadingApplications && (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent"></div>
+                  )}
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-2">
+                  {customerApplications.length === 0 && !loadingApplications ? (
+                    <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">Arizalar yo'q</p>
+                  ) : (
+                    customerApplications.map((app: any) => (
+                      <div
+                        key={app.id}
+                        onClick={() => {
+                          const basePath = location.pathname.startsWith('/demo') ? '/demo' : '/super';
+                          navigate(`${basePath}/applications/${app.id}`);
+                        }}
+                        className="flex items-center justify-between rounded-lg border border-gray-200 p-3 transition-all hover:border-brand-500 hover:bg-gray-50 cursor-pointer dark:border-gray-700 dark:hover:bg-navy-700"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                            // Green: Confirmed and Finished statuses
+                            app.status === 'CONFIRMED' || app.status === 'FINISHED' || app.status === 'COMPLETED' || app.status === 'ACTIVE'
+                              ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
+                            // Red: All cancellation/rejection statuses
+                            : app.status === 'REJECTED' || app.status === 'CANCELLED' || app.status === 'CANCELED' || 
+                              app.status === 'CANCELED_BY_SCORING' || app.status === 'CANCELED_BY_CLIENT' || app.status === 'CANCELED_BY_DAILY'
+                              ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                            // Yellow: Limit and all waiting/pending statuses
+                            : app.status === 'LIMIT' || app.status === 'PENDING' || app.status === 'CREATED' || 
+                              app.status === 'ADDED_DETAIL' || app.status === 'WAITING_SCORING' || app.status === 'ADDED_PRODUCT' || 
+                              app.status === 'WAITING_BANK_UPDATE' || app.status === 'WAITING_BANK_CONFIRM'
+                              ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            // Blue: Other statuses
+                            : 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            <FileText className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-navy-700 dark:text-white">
+                              #{app.id}{app.amount && app.amount > 0 ? ` - ${formatCurrency(app.amount)} so'm` : ''}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {formatDate(app.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={`inline-block rounded-full px-2 py-1 text-xs font-medium ${
+                            // Green: Confirmed and Finished statuses
+                            app.status === 'CONFIRMED' || app.status === 'FINISHED' || app.status === 'COMPLETED' || app.status === 'ACTIVE'
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            // Red: All cancellation/rejection statuses
+                            : app.status === 'REJECTED' || app.status === 'CANCELLED' || app.status === 'CANCELED' || 
+                              app.status === 'CANCELED_BY_SCORING' || app.status === 'CANCELED_BY_CLIENT' || app.status === 'CANCELED_BY_DAILY'
+                              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                            // Yellow: Limit and all waiting/pending statuses
+                            : app.status === 'LIMIT' || app.status === 'PENDING' || app.status === 'CREATED' || 
+                              app.status === 'ADDED_DETAIL' || app.status === 'WAITING_SCORING' || app.status === 'ADDED_PRODUCT' || 
+                              app.status === 'WAITING_BANK_UPDATE' || app.status === 'WAITING_BANK_CONFIRM'
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                            // Blue: Other statuses
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {getStatusText(app.status)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex justify-end border-t border-gray-200 p-4 dark:border-gray-700">
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  setSelectedCustomer(null);
+                }}
+                className="rounded-lg bg-gray-200 px-6 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 dark:bg-navy-700 dark:text-white dark:hover:bg-navy-600"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </Card>

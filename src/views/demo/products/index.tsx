@@ -1,28 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Plus, Search, Upload, Package, Tag, Edit, Trash, X } from "tabler-icons-react";
+import { Plus, Search, Upload, Package, Tag, Edit, Trash, X, Download } from "tabler-icons-react";
 import Card from "components/card";
 import CustomSelect from "components/dropdown/CustomSelect";
 import Toast from "components/toast/Toast";
 import { productApi, Category as ApiCategory, Product as ApiProduct } from "lib/api/product";
-
-// Mock data for merchants and fillials
-const MOCK_MERCHANTS = [
-  "Texnomart", "Mediapark", "Artel", "Makro", "Olcha", "Uzum Market", 
-  "TechnoPlus", "Mediastore", "ElectroShop", "Digital Store", "Smart Shop",
-  "MegaTech", "Premium Store", "Express Market", "City Shop", "UzbekTech",
-  "Modern Store", "Super Market", "Tech Center", "Best Buy UZ"
-];
-
-const MOCK_FILLIALS = [
-  "Chilonzor filiali", "Yunusobod filiali", "Sergeli filiali", "Yashnobod filiali",
-  "Mirzo Ulug'bek filiali", "Mirobod filiali", "Shayxontohur filiali", "Olmazor filiali",
-  "Bektemir filiali", "Uchtepa filiali", "Yakkasaroy filiali", "Hamza filiali",
-  "Samarkand filiali", "Buxoro filiali", "Namangan filiali", "Andijon filiali",
-  "Farg'ona filiali", "Qo'qon filiali", "Termiz filiali", "Urganch filiali",
-  "Nukus filiali", "Jizzax filiali", "Qarshi filiali", "Navoiy filiali",
-  "Guliston filiali", "Denov filiali", "Marg'ilon filiali", "Chirchiq filiali",
-  "Oltiariq filiali", "Asaka filiali"
-];
+import * as XLSX from 'xlsx';
 
 // Types
 type Category = {
@@ -472,21 +454,54 @@ export default function Products() {
   // API State
   const [categories, setCategories] = useState<ApiCategory[]>([]);
   const [products, setProducts] = useState<ApiProduct[]>([]);
+  const [merchants, setMerchants] = useState<any[]>([]);
+  const [fillials, setFillials] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Load data from API
   useEffect(() => {
     loadCategories();
     loadProducts();
+    loadMerchantsAndFillials();
   }, []);
+
+  const loadMerchantsAndFillials = async () => {
+    try {
+      const [merchantsRes, fillialsRes] = await Promise.all([
+        fetch(`${process.env.REACT_APP_API_BASE || "http://localhost:7777/api/v1"}/merchant/all`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        }),
+        fetch(`${process.env.REACT_APP_API_BASE || "http://localhost:7777/api/v1"}/fillial/all`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        })
+      ]);
+      
+      const merchantsData = await merchantsRes.json();
+      const fillialsData = await fillialsRes.json();
+      
+      // Handle both array and paginated response formats
+      setMerchants(Array.isArray(merchantsData) ? merchantsData : merchantsData.items || []);
+      setFillials(Array.isArray(fillialsData) ? fillialsData : fillialsData.items || []);
+    } catch (error) {
+      console.error('Error loading merchants/fillials:', error);
+    }
+  };
 
   const loadCategories = async () => {
     try {
       setLoading(true);
       const response = await productApi.getCategories();
-      setCategories(response.data);
+      // Ensure we always set an array
+      const categoriesData = Array.isArray(response.data) ? response.data : [];
+      // Map _count.products to productCount for compatibility
+      const mappedCategories = categoriesData.map((cat: any) => ({
+        ...cat,
+        productCount: cat._count?.products || 0,
+      }));
+      setCategories(mappedCategories);
     } catch (error) {
       console.error('Error loading categories:', error);
+      setCategories([]); // Set empty array on error
       setToast({ isOpen: true, message: "Kategoriyalarni yuklashda xatolik", type: "error" });
     } finally {
       setLoading(false);
@@ -497,9 +512,12 @@ export default function Products() {
     try {
       setLoading(true);
       const response = await productApi.getProducts();
-      setProducts(response.data);
+      // Ensure we always set an array
+      const productsData = Array.isArray(response.data) ? response.data : [];
+      setProducts(productsData);
     } catch (error) {
       console.error('Error loading products:', error);
+      setProducts([]); // Set empty array on error
       setToast({ isOpen: true, message: "Mahsulotlarni yuklashda xatolik", type: "error" });
     } finally {
       setLoading(false);
@@ -511,11 +529,32 @@ export default function Products() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importMerchants, setImportMerchants] = useState<string[]>([]);
-  const [importFillials, setImportFillials] = useState<string[]>([]);
+  const [importMerchants, setImportMerchants] = useState<number[]>([]);
+  const [importFillials, setImportFillials] = useState<number[]>([]);
   const [importMerchantSearch, setImportMerchantSearch] = useState("");
   const [importFilialSearch, setImportFilialSearch] = useState("");
   const [importPreview, setImportPreview] = useState<any[]>([]);
+  const [importCategory, setImportCategory] = useState<number | null>(null);
+
+  // Toggle import merchant and auto-select/deselect its fillials
+  const toggleImportMerchant = (merchantId: number) => {
+    const isSelected = importMerchants.includes(merchantId);
+    
+    if (isSelected) {
+      // Deselect merchant
+      setImportMerchants(importMerchants.filter(m => m !== merchantId));
+      // Deselect all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      setImportFillials(importFillials.filter(f => !merchantFillials.includes(f)));
+    } else {
+      // Select merchant
+      setImportMerchants([...importMerchants, merchantId]);
+      // Auto-select all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      const newFillials = [...new Set([...importFillials, ...merchantFillials])];
+      setImportFillials(newFillials);
+    }
+  };
   const [showProductsListModal, setShowProductsListModal] = useState(false);
   const [toast, setToast] = useState({ isOpen: false, message: "", type: "success" as "main" | "success" | "error" });
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; type: "product" | "category" | null; id: number | null; name: string }>({ 
@@ -536,10 +575,30 @@ export default function Products() {
     image: "",
     description: "",
   });
-  const [selectedMerchants, setSelectedMerchants] = useState<string[]>([]);
-  const [selectedFillials, setSelectedFillials] = useState<string[]>([]);
+  const [selectedMerchants, setSelectedMerchants] = useState<number[]>([]);
+  const [selectedFillials, setSelectedFillials] = useState<number[]>([]);
   const [merchantSearch, setMerchantSearch] = useState("");
   const [filialSearch, setFilialSearch] = useState("");
+
+  // Toggle merchant and auto-select/deselect its fillials
+  const toggleMerchant = (merchantId: number) => {
+    const isSelected = selectedMerchants.includes(merchantId);
+    
+    if (isSelected) {
+      // Deselect merchant
+      setSelectedMerchants(selectedMerchants.filter(m => m !== merchantId));
+      // Deselect all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      setSelectedFillials(selectedFillials.filter(f => !merchantFillials.includes(f)));
+    } else {
+      // Select merchant
+      setSelectedMerchants([...selectedMerchants, merchantId]);
+      // Auto-select all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      const newFillials = [...new Set([...selectedFillials, ...merchantFillials])];
+      setSelectedFillials(newFillials);
+    }
+  };
 
   // Category form
   const [categoryForm, setCategoryForm] = useState({
@@ -547,10 +606,30 @@ export default function Products() {
     description: "",
     image: "",
   });
-  const [selectedCategoryMerchants, setSelectedCategoryMerchants] = useState<string[]>([]);
-  const [selectedCategoryFillials, setSelectedCategoryFillials] = useState<string[]>([]);
+  const [selectedCategoryMerchants, setSelectedCategoryMerchants] = useState<number[]>([]);
+  const [selectedCategoryFillials, setSelectedCategoryFillials] = useState<number[]>([]);
   const [categoryMerchantSearch, setCategoryMerchantSearch] = useState("");
   const [categoryFilialSearch, setCategoryFilialSearch] = useState("");
+
+  // Toggle category merchant and auto-select/deselect its fillials
+  const toggleCategoryMerchant = (merchantId: number) => {
+    const isSelected = selectedCategoryMerchants.includes(merchantId);
+    
+    if (isSelected) {
+      // Deselect merchant
+      setSelectedCategoryMerchants(selectedCategoryMerchants.filter(m => m !== merchantId));
+      // Deselect all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      setSelectedCategoryFillials(selectedCategoryFillials.filter(f => !merchantFillials.includes(f)));
+    } else {
+      // Select merchant
+      setSelectedCategoryMerchants([...selectedCategoryMerchants, merchantId]);
+      // Auto-select all fillials belonging to this merchant
+      const merchantFillials = fillials.filter(f => f.merchant_id === merchantId).map(f => f.id);
+      const newFillials = [...new Set([...selectedCategoryFillials, ...merchantFillials])];
+      setSelectedCategoryFillials(newFillials);
+    }
+  };
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -585,118 +664,132 @@ export default function Products() {
     return filtered;
   }, [products, selectedCategory, priceRange, searchQuery]);
 
+  // Filter categories
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery) return categories;
+    const query = searchQuery.toLowerCase();
+    return categories.filter((c) =>
+      c.name.toLowerCase().includes(query) ||
+      (c as any).description?.toLowerCase().includes(query)
+    );
+  }, [categories, searchQuery]);
+
   // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("uz-UZ").format(amount) + " so'm";
   };
 
   // Handle product form submit
-  const handleProductSubmit = () => {
+  const handleProductSubmit = async () => {
     if (!productForm.name || !productForm.barcode || !productForm.category || !productForm.price) {
       setToast({ isOpen: true, message: "Iltimos barcha majburiy maydonlarni to'ldiring", type: "error" });
       return;
     }
 
-    if (editingProduct) {
-      // Update existing product
-      setProducts(
-        products.map((p) =>
-          p.id === editingProduct.id
-            ? {
-                ...p,
-                name: productForm.name,
-                barcode: productForm.barcode,
-                category: productForm.category,
-                price: parseFloat(productForm.price),
-                image: productForm.image,
-                description: productForm.description,
-                availableFor: {
-                  merchants: selectedMerchants,
-                  fillials: selectedFillials,
-                },
-              } as any
-            : p
-        )
-      );
-    } else {
-      // Add new product
-      const newProduct = {
-        id: Math.max(...products.map((p) => p.id)) + 1,
+    try {
+      setLoading(true);
+      
+      // Category ID is already in productForm.category (it's the select value)
+      const categoryId = parseInt(productForm.category);
+      if (!categoryId || isNaN(categoryId)) {
+        setToast({ isOpen: true, message: "Kategoriyani tanlang", type: "error" });
+        return;
+      }
+
+      const productData = {
         name: productForm.name,
         barcode: productForm.barcode,
-        category: productForm.category,
+        category_id: categoryId,
         price: parseFloat(productForm.price),
-        image: productForm.image,
-        description: productForm.description,
-        createdAt: new Date().toISOString().split("T")[0],
-        availableFor: {
-          merchants: selectedMerchants,
-          fillials: selectedFillials,
-        },
-      } as any;
-      setProducts([...products, newProduct] as any);
-    }
+        image_url: productForm.image || undefined,
+        description: productForm.description || undefined,
+        merchant_ids: selectedMerchants,
+        fillial_ids: selectedFillials,
+      };
 
-    setShowProductModal(false);
-    setEditingProduct(null);
-    setProductForm({
-      name: "",
-      barcode: "",
-      category: "",
-      price: "",
-      image: "",
-      description: "",
-    });
-    setSelectedMerchants([]);
-    setSelectedFillials([]);
+      if (editingProduct) {
+        // Update existing product
+        await productApi.updateProduct(editingProduct.id, productData);
+        setToast({ isOpen: true, message: "Mahsulot muvaffaqiyatli yangilandi", type: "success" });
+      } else {
+        // Create new product
+        await productApi.createProduct(productData);
+        setToast({ isOpen: true, message: "Mahsulot muvaffaqiyatli qo'shildi", type: "success" });
+      }
+
+      // Reload products from API
+      await loadProducts();
+      
+      setShowProductModal(false);
+      setEditingProduct(null);
+      setProductForm({
+        name: "",
+        barcode: "",
+        category: "",
+        price: "",
+        image: "",
+        description: "",
+      });
+      setSelectedMerchants([]);
+      setSelectedFillials([]);
+    } catch (error: any) {
+      console.error('Error saving product:', error);
+      setToast({ 
+        isOpen: true, 
+        message: error.response?.data?.message || "Mahsulotni saqlashda xatolik", 
+        type: "error" 
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Handle category form submit
-  const handleCategorySubmit = () => {
+  const handleCategorySubmit = async () => {
     if (!categoryForm.name) {
       setToast({ isOpen: true, message: "Kategoriya nomini kiriting", type: "error" });
       return;
     }
 
-    if (editingCategory) {
-      // Update existing category
-      setCategories(
-        categories.map((c) =>
-          c.id === editingCategory.id
-            ? {
-                ...c,
-                name: categoryForm.name,
-                description: categoryForm.description,
-                image: categoryForm.image,
-                availableFor: {
-                  merchants: selectedCategoryMerchants,
-                  fillials: selectedCategoryFillials,
-                },
-              }
-            : c
-        )
-      );
-    } else {
-      // Add new category
-      const newCategory = {
-        id: Math.max(...categories.map((c) => c.id)) + 1,
+    try {
+      setLoading(true);
+      
+      const categoryData = {
         name: categoryForm.name,
-        description: categoryForm.description,
-        productCount: 0,
-        image: categoryForm.image,
-        availableFor: {
-          merchants: selectedCategoryMerchants,
-          fillials: selectedCategoryFillials,
-        },
-      } as any;
-      setCategories([...categories, newCategory] as any);
-    }
+        description: categoryForm.description || undefined,
+        image: categoryForm.image || undefined,
+        merchant_ids: selectedCategoryMerchants.length > 0 ? selectedCategoryMerchants : undefined,
+        fillial_ids: selectedCategoryFillials.length > 0 ? selectedCategoryFillials : undefined,
+      };
 
-    setShowCategoryModal(false);
-    setEditingCategory(null);
-    setCategoryForm({ name: "", description: "", image: "" });
-    setSelectedCategoryMerchants([]);
-    setSelectedCategoryFillials([]);
+      if (editingCategory) {
+        // Update existing category via API
+        await productApi.updateCategory(editingCategory.id, categoryData);
+        setToast({ isOpen: true, message: "Kategoriya muvaffaqiyatli yangilandi", type: "success" });
+      } else {
+        // Create new category via API
+        await productApi.createCategory(categoryData);
+        setToast({ isOpen: true, message: "Kategoriya muvaffaqiyatli qo'shildi", type: "success" });
+      }
+      
+      // Reload categories from API
+      await loadCategories();
+      
+      setShowCategoryModal(false);
+      setEditingCategory(null);
+      setCategoryForm({ name: "", description: "", image: "" });
+      setSelectedCategoryMerchants([]);
+      setSelectedCategoryFillials([]);
+    } catch (error: any) {
+      console.error('Error saving category:', error);
+      setToast({ 
+        isOpen: true, 
+        message: error.response?.data?.message || "Kategoriyani saqlashda xatolik", 
+        type: "error" 
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Delete product
@@ -708,25 +801,45 @@ export default function Products() {
   };
 
   // Confirm delete
-  const confirmDelete = () => {
-    if (deleteConfirm.type === "product" && deleteConfirm.id) {
-      setProducts(products.filter((p) => p.id !== deleteConfirm.id));
-      setToast({ isOpen: true, message: "Mahsulot muvaffaqiyatli o'chirildi", type: "success" });
-    } else if (deleteConfirm.type === "category" && deleteConfirm.id) {
-      setCategories(categories.filter((c) => c.id !== deleteConfirm.id));
-      setToast({ isOpen: true, message: "Kategoriya muvaffaqiyatli o'chirildi", type: "success" });
+  const confirmDelete = async () => {
+    try {
+      setLoading(true);
+      
+      if (deleteConfirm.type === "product" && deleteConfirm.id) {
+        await productApi.deleteProduct(deleteConfirm.id);
+        await loadProducts(); // Reload from API
+        setToast({ isOpen: true, message: "Mahsulot muvaffaqiyatli o'chirildi", type: "success" });
+      } else if (deleteConfirm.type === "category" && deleteConfirm.id) {
+        await productApi.deleteCategory(deleteConfirm.id);
+        await loadCategories(); // Reload from API
+        setToast({ isOpen: true, message: "Kategoriya muvaffaqiyatli o'chirildi", type: "success" });
+      }
+      
+      setDeleteConfirm({ isOpen: false, type: null, id: null, name: "" });
+    } catch (error: any) {
+      console.error('Error deleting:', error);
+      const errorMsg = error.response?.data?.message || "O'chirishda xatolik";
+      setToast({ isOpen: true, message: errorMsg, type: "error" });
+      setDeleteConfirm({ isOpen: false, type: null, id: null, name: "" });
+    } finally {
+      setLoading(false);
     }
-    setDeleteConfirm({ isOpen: false, type: null, id: null, name: "" });
   };
 
   // Delete category
-  const handleDeleteCategory = (id: number) => {
+  const handleDeleteCategory = async (id: number) => {
     const category = categories.find((c) => c.id === id);
-    if (category && (category as any).productCount > 0) {
-      setToast({ isOpen: true, message: "Bu kategoriyada mahsulotlar mavjud. Avval mahsulotlarni o'chiring.", type: "error" });
-      return;
-    }
     if (category) {
+      // Check product count from _count field
+      const productCount = (category as any)._count?.products || (category as any).productCount || 0;
+      if (productCount > 0) {
+        setToast({ 
+          isOpen: true, 
+          message: `Bu kategoriyada ${productCount} ta mahsulot mavjud. Avval mahsulotlarni o'chiring yoki boshqa kategoriyaga o'tkazing.`, 
+          type: "error" 
+        });
+        return;
+      }
       setDeleteConfirm({ isOpen: true, type: "category", id, name: category.name });
     }
   };
@@ -737,13 +850,16 @@ export default function Products() {
     setProductForm({
       name: product.name,
       barcode: (product as any).barcode,
-      category: product.category,
+      category: String((product as any).category_id || ""),
       price: product.price.toString(),
-      image: (product as any).image || "",
+      image: (product as any).image_url || (product as any).image || "",
       description: (product as any).description || "",
     });
-    setSelectedMerchants((product as any).availableFor?.merchants || []);
-    setSelectedFillials((product as any).availableFor?.fillials || []);
+    // Extract merchant and fillial IDs from the relation arrays
+    const merchantIds = (product as any).merchants?.map((m: any) => m.merchant_id) || [];
+    const fillialIds = (product as any).fillials?.map((f: any) => f.fillial_id) || [];
+    setSelectedMerchants(merchantIds);
+    setSelectedFillials(fillialIds);
     setShowProductModal(true);
   };
 
@@ -755,9 +871,35 @@ export default function Products() {
       description: (category as any).description,
       image: (category as any).image || "",
     });
-    setSelectedCategoryMerchants((category as any).availableFor?.merchants || []);
-    setSelectedCategoryFillials((category as any).availableFor?.fillials || []);
+    // Extract merchant and fillial IDs from the relation arrays
+    const merchantIds = (category as any).merchants?.map((m: any) => m.merchant_id) || [];
+    const fillialIds = (category as any).fillials?.map((f: any) => f.fillial_id) || [];
+    setSelectedCategoryMerchants(merchantIds);
+    setSelectedCategoryFillials(fillialIds);
     setShowCategoryModal(true);
+  };
+
+  // Download Excel template
+  const handleDownloadTemplate = () => {
+    // Create CSV template
+    const template = `Nomi,Shtrix kod,Kategoriya,Narx,Tavsif
+Samsung Galaxy A54,8801643112233,Elektronika,4500000,5G 128GB 6GB RAM
+Apple iPhone 15,0194253234567,Elektronika,15000000,256GB Titanium
+LG Muzlatgich,8806098345678,Uy texnikasi,7500000,Side-by-side 600L
+MacBook Pro 14,0195949456789,Kompyuter texnikasi,25000000,M3 Pro 18GB RAM
+Rolex Submariner,7610270123456,Soatlar,95000000,Avtomatik suv o'tkazmaydigan`;
+    
+    const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'mahsulotlar_template.csv';
+    link.click();
+    
+    setToast({ 
+      isOpen: true, 
+      message: "Template muvaffaqiyatli yuklandi! Format: Nomi, Shtrix kod, Kategoriya, Narx, Tavsif", 
+      type: "success" 
+    });
   };
 
   // Import from Excel - Step 1: Select file and preview
@@ -765,13 +907,36 @@ export default function Products() {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xlsx,.xls,.csv";
-    input.onchange = (e: any) => {
+    input.onchange = async (e: any) => {
       const file = e.target?.files?.[0];
       if (file) {
         setImportFile(file);
         
-        // For demo: automatically load demo data
-        const demoImportData = [
+        try {
+          // Read Excel file
+          const data = await file.arrayBuffer();
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet);
+          
+          setImportPreview(jsonData);
+          setShowImportModal(true);
+        } catch (error) {
+          console.error('Excel file reading error:', error);
+          setToast({ 
+            isOpen: true, 
+            message: "Excel faylni o'qishda xatolik yuz berdi", 
+            type: "error" 
+          });
+        }
+      }
+    };
+    input.click();
+  };
+
+  // Old demo data (for reference, can be removed)
+  const OLD_DEMO_DATA = [
           { "Nomi": "Samsung Galaxy A54", "Shtrix kod": "8801643112233", "Kategoriya": "Elektronika", "Narx": "4500000", "Tavsif": "5G, 128GB, 6GB RAM" },
           { "Nomi": "Artel TV 43\"", "Shtrix kod": "4820285123456", "Kategoriya": "Elektronika", "Narx": "3200000", "Tavsif": "Smart TV, Full HD" },
           { "Nomi": "LG Konditsioner", "Shtrix kod": "8806098123456", "Kategoriya": "Uy texnikasi", "Narx": "5500000", "Tavsif": "Inverter, 12000 BTU" },
@@ -830,47 +995,71 @@ export default function Products() {
           { "Nomi": "Dell Wireless Mouse", "Shtrix kod": "8843854456791", "Kategoriya": "Kompyuter texnikasi", "Narx": "320000", "Tavsif": "Compact, 3 buttons" },
           { "Nomi": "Citizen Eco-Drive Watch", "Shtrix kod": "4974375567802", "Kategoriya": "Soatlar", "Narx": "3500000", "Tavsif": "Solar powered, sapphire" },
         ];
-        
-        setImportPreview(demoImportData);
-        setShowImportModal(true);
-      }
-    };
-    input.click();
-  };
 
   // Import from Excel - Step 2: Process with selected merchants/fillials
-  const handleImportSubmit = () => {
-    if (!importPreview || importPreview.length === 0) return;
+  const handleImportSubmit = async () => {
+    if (!importPreview || importPreview.length === 0) {
+      setToast({ isOpen: true, message: "Import qilinadigan mahsulotlar yo'q", type: "error" });
+      return;
+    }
+
+    if (!importCategory) {
+      setToast({ isOpen: true, message: "Kategoriyani tanlang", type: "error" });
+      return;
+    }
 
     try {
-      // For demo: use preview data directly
-      const importedProducts: Product[] = importPreview.map((row, index) => ({
-        id: Math.max(...products.map((p) => p.id), 0) + index + 1,
-        name: row["Nomi"] || row["name"] || "",
-        barcode: row["Shtrix kod"] || row["barcode"] || "",
-        category: row["Kategoriya"] || row["category"] || "",
-        price: parseFloat(row["Narx"] || row["price"] || "0"),
-        description: row["Tavsif"] || row["description"] || "",
-        stock: 10, // Default stock for demo
-        image: "", // Demo mode: no images
-        createdAt: new Date().toISOString().split("T")[0],
-        availableFor: {
-          merchants: importMerchants.length > 0 ? importMerchants : ["Texnomart"],
-          fillials: importFillials.length > 0 ? importFillials : ["Chilonzor filiali"],
-        },
-      }));
+      setLoading(true);
+      
+      // Map preview data to CreateProductDto format
+      const productsToImport = importPreview.map((row) => {
+        return {
+          name: row["Nomi"] || row["name"] || "",
+          barcode: String(row["Shtrix kod"] || row["barcode"] || ""),
+          category_id: importCategory, // Use selected category
+          price: parseFloat(row["Narx"] || row["price"] || "0"),
+          description: row["Tavsif"] || row["description"] || undefined,
+          image_url: undefined,
+          // For now, mock merchant/fillial IDs
+          // In real app, map importMerchants and importFillials to IDs
+        };
+      });
 
-      setProducts([...products, ...importedProducts] as any);
-      setToast({ isOpen: true, message: `Demo: ${importedProducts.length} ta mahsulot muvaffaqiyatli qo'shildi!`, type: "success" });
+      // Call bulk import API
+      const response = await productApi.bulkImportProducts({
+        products: productsToImport,
+        default_merchant_ids: importMerchants,
+        default_fillial_ids: importFillials,
+      });
+
+      console.log('Bulk import response:', response.data);
+      
+      // Reload products from API
+      await loadProducts();
+      
+      const successCount = (response.data as any).success || productsToImport.length;
+      setToast({ 
+        isOpen: true, 
+        message: `${successCount} ta mahsulot muvaffaqiyatli import qilindi!`, 
+        type: "success" 
+      });
+      
       setShowImportModal(false);
       setImportFile(null);
       setImportMerchants([]);
       setImportFillials([]);
+      setImportCategory(null);
       setImportPreview([]);
       setShowProductsListModal(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Import error:", error);
-      setToast({ isOpen: true, message: "Import qilishda xatolik yuz berdi", type: "error" });
+      setToast({ 
+        isOpen: true, 
+        message: error.response?.data?.message || "Import qilishda xatolik yuz berdi", 
+        type: "error" 
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -885,6 +1074,13 @@ export default function Products() {
           </p>
         </div>
         <div className="flex gap-3">
+          <button
+            onClick={handleDownloadTemplate}
+            className="flex cursor-pointer items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 dark:border-green-600 dark:bg-navy-800 dark:text-green-400 dark:hover:bg-green-900/20"
+          >
+            <Download size={18} />
+            Template yuklash
+          </button>
           <button
             onClick={handleImportExcelClick}
             className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-navy-800 dark:text-white dark:hover:bg-navy-700"
@@ -1058,7 +1254,17 @@ export default function Products() {
         ) : (
           <>
             {/* Categories */}
-            <div className="mb-5 flex justify-end">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Kategoriya qidirish..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-4 outline-none focus:border-brand-500 dark:border-gray-600 dark:bg-navy-700 dark:text-white"
+                />
+              </div>
               <button
                 onClick={() => {
                   setEditingCategory(null);
@@ -1073,7 +1279,7 @@ export default function Products() {
             </div>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {categories.map((category) => (
+              {filteredCategories.map((category) => (
                 <Card key={category.id} extra="!p-5 hover:shadow-lg transition-shadow">
                   {/* Category Image */}
                   {(category as any).image && (
@@ -1182,7 +1388,7 @@ export default function Products() {
                 >
                   <option value="">Tanlang</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={c.name}>
+                    <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
                   ))}
@@ -1218,20 +1424,20 @@ export default function Products() {
               <div className="md:col-span-2">
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Merchantlar ({selectedMerchants.length}/{MOCK_MERCHANTS.length})
+                    Merchantlar ({selectedMerchants.length}/{merchants.length})
                   </label>
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedMerchants.length === MOCK_MERCHANTS.length) {
+                      if (selectedMerchants.length === merchants.length) {
                         setSelectedMerchants([]);
                       } else {
-                        setSelectedMerchants(MOCK_MERCHANTS);
+                        setSelectedMerchants(merchants.map(m => m.id));
                       }
                     }}
                     className="text-xs font-medium text-brand-500 hover:text-brand-600"
                   >
-                    {selectedMerchants.length === MOCK_MERCHANTS.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
+                    {selectedMerchants.length === merchants.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
                   </button>
                 </div>
                 <input
@@ -1243,24 +1449,18 @@ export default function Products() {
                 />
                 <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-navy-700">
                   <div className="flex flex-wrap gap-1.5">
-                    {MOCK_MERCHANTS.filter(m => m.toLowerCase().includes(merchantSearch.toLowerCase())).map((merchant) => (
+                    {merchants.filter(m => m.name.toLowerCase().includes(merchantSearch.toLowerCase())).map((merchant) => (
                       <button
-                        key={merchant}
+                        key={merchant.id}
                         type="button"
-                        onClick={() => {
-                          if (selectedMerchants.includes(merchant)) {
-                            setSelectedMerchants(selectedMerchants.filter(m => m !== merchant));
-                          } else {
-                            setSelectedMerchants([...selectedMerchants, merchant]);
-                          }
-                        }}
+                        onClick={() => toggleMerchant(merchant.id)}
                         className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          selectedMerchants.includes(merchant)
+                          selectedMerchants.includes(merchant.id)
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
-                        {merchant}
+                        {merchant.name}
                       </button>
                     ))}
                   </div>
@@ -1270,20 +1470,20 @@ export default function Products() {
               <div className="md:col-span-2">
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Filiallar ({selectedFillials.length}/{MOCK_FILLIALS.length})
+                    Filiallar ({selectedFillials.length}/{fillials.length})
                   </label>
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedFillials.length === MOCK_FILLIALS.length) {
+                      if (selectedFillials.length === fillials.length) {
                         setSelectedFillials([]);
                       } else {
-                        setSelectedFillials(MOCK_FILLIALS);
+                        setSelectedFillials(fillials.map(f => f.id));
                       }
                     }}
                     className="text-xs font-medium text-brand-500 hover:text-brand-600"
                   >
-                    {selectedFillials.length === MOCK_FILLIALS.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
+                    {selectedFillials.length === fillials.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
                   </button>
                 </div>
                 <input
@@ -1295,24 +1495,24 @@ export default function Products() {
                 />
                 <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-navy-700">
                   <div className="flex flex-wrap gap-1.5">
-                    {MOCK_FILLIALS.filter(f => f.toLowerCase().includes(filialSearch.toLowerCase())).map((filial) => (
+                    {fillials.filter(f => f.name.toLowerCase().includes(filialSearch.toLowerCase())).map((filial) => (
                       <button
-                        key={filial}
+                        key={filial.id}
                         type="button"
                         onClick={() => {
-                          if (selectedFillials.includes(filial)) {
-                            setSelectedFillials(selectedFillials.filter(f => f !== filial));
+                          if (selectedFillials.includes(filial.id)) {
+                            setSelectedFillials(selectedFillials.filter(f => f !== filial.id));
                           } else {
-                            setSelectedFillials([...selectedFillials, filial]);
+                            setSelectedFillials([...selectedFillials, filial.id]);
                           }
                         }}
                         className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          selectedFillials.includes(filial)
+                          selectedFillials.includes(filial.id)
                             ? "bg-green-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
-                        {filial}
+                        {filial.name}
                       </button>
                     ))}
                   </div>
@@ -1416,20 +1616,20 @@ export default function Products() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Merchantlar ({selectedCategoryMerchants.length}/{MOCK_MERCHANTS.length})
+                    Merchantlar ({selectedCategoryMerchants.length}/{merchants.length})
                   </label>
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedCategoryMerchants.length === MOCK_MERCHANTS.length) {
+                      if (selectedCategoryMerchants.length === merchants.length) {
                         setSelectedCategoryMerchants([]);
                       } else {
-                        setSelectedCategoryMerchants(MOCK_MERCHANTS);
+                        setSelectedCategoryMerchants(merchants.map(m => m.id));
                       }
                     }}
                     className="text-xs font-medium text-brand-500 hover:text-brand-600"
                   >
-                    {selectedCategoryMerchants.length === MOCK_MERCHANTS.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
+                    {selectedCategoryMerchants.length === merchants.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
                   </button>
                 </div>
                 <input
@@ -1441,24 +1641,18 @@ export default function Products() {
                 />
                 <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-navy-700">
                   <div className="flex flex-wrap gap-1.5">
-                    {MOCK_MERCHANTS.filter(m => m.toLowerCase().includes(categoryMerchantSearch.toLowerCase())).map((merchant) => (
+                    {merchants.filter(m => m.name.toLowerCase().includes(categoryMerchantSearch.toLowerCase())).map((merchant) => (
                       <button
-                        key={merchant}
+                        key={merchant.id}
                         type="button"
-                        onClick={() => {
-                          if (selectedCategoryMerchants.includes(merchant)) {
-                            setSelectedCategoryMerchants(selectedCategoryMerchants.filter(m => m !== merchant));
-                          } else {
-                            setSelectedCategoryMerchants([...selectedCategoryMerchants, merchant]);
-                          }
-                        }}
+                        onClick={() => toggleCategoryMerchant(merchant.id)}
                         className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          selectedCategoryMerchants.includes(merchant)
+                          selectedCategoryMerchants.includes(merchant.id)
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
-                        {merchant}
+                        {merchant.name}
                       </button>
                     ))}
                   </div>
@@ -1468,20 +1662,20 @@ export default function Products() {
               <div>
                 <div className="mb-2 flex items-center justify-between">
                   <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Filiallar ({selectedCategoryFillials.length}/{MOCK_FILLIALS.length})
+                    Filiallar ({selectedCategoryFillials.length}/{fillials.length})
                   </label>
                   <button
                     type="button"
                     onClick={() => {
-                      if (selectedCategoryFillials.length === MOCK_FILLIALS.length) {
+                      if (selectedCategoryFillials.length === fillials.length) {
                         setSelectedCategoryFillials([]);
                       } else {
-                        setSelectedCategoryFillials(MOCK_FILLIALS);
+                        setSelectedCategoryFillials(fillials.map(f => f.id));
                       }
                     }}
                     className="text-xs font-medium text-brand-500 hover:text-brand-600"
                   >
-                    {selectedCategoryFillials.length === MOCK_FILLIALS.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
+                    {selectedCategoryFillials.length === fillials.length ? "Hammasini olib tashlash" : "Hammasini tanlash"}
                   </button>
                 </div>
                 <input
@@ -1493,24 +1687,24 @@ export default function Products() {
                 />
                 <div className="max-h-32 overflow-y-auto rounded-lg border border-gray-300 bg-white p-2 dark:border-gray-600 dark:bg-navy-700">
                   <div className="flex flex-wrap gap-1.5">
-                    {MOCK_FILLIALS.filter(f => f.toLowerCase().includes(categoryFilialSearch.toLowerCase())).map((filial) => (
+                    {fillials.filter(f => f.name.toLowerCase().includes(categoryFilialSearch.toLowerCase())).map((filial) => (
                       <button
-                        key={filial}
+                        key={filial.id}
                         type="button"
                         onClick={() => {
-                          if (selectedCategoryFillials.includes(filial)) {
-                            setSelectedCategoryFillials(selectedCategoryFillials.filter(f => f !== filial));
+                          if (selectedCategoryFillials.includes(filial.id)) {
+                            setSelectedCategoryFillials(selectedCategoryFillials.filter(f => f !== filial.id));
                           } else {
-                            setSelectedCategoryFillials([...selectedCategoryFillials, filial]);
+                            setSelectedCategoryFillials([...selectedCategoryFillials, filial.id]);
                           }
                         }}
                         className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          selectedCategoryFillials.includes(filial)
+                          selectedCategoryFillials.includes(filial.id)
                             ? "bg-green-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
-                        {filial}
+                        {filial.name}
                       </button>
                     ))}
                   </div>
@@ -1561,6 +1755,7 @@ export default function Products() {
                     setImportFillials([]);
                     setImportMerchantSearch("");
                     setImportFilialSearch("");
+                    setImportCategory(null);
                     setImportPreview([]);
                     setShowProductsListModal(false);
                   }}
@@ -1612,6 +1807,50 @@ export default function Products() {
                 </div>
               )}
 
+              {/* Category Selection - Required */}
+              <div className="mb-6 rounded-lg border-2 border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-900/20">
+                <div className="mb-3">
+                  <h3 className="font-semibold text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                    <Tag size={18} />
+                    Kategoriya tanlash <span className="text-red-500">*</span>
+                  </h3>
+                  <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                    Barcha mahsulotlar uchun bitta kategoriya tanlanadi
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setImportCategory(cat.id)}
+                      className={`rounded-lg border-2 p-3 text-left transition-all ${
+                        importCategory === cat.id
+                          ? "border-orange-500 bg-orange-500 text-white shadow-lg scale-105"
+                          : "border-gray-300 bg-white hover:border-orange-300 hover:bg-orange-50 dark:border-gray-600 dark:bg-navy-700 dark:hover:border-orange-600"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <Tag size={14} className={importCategory === cat.id ? "text-white" : "text-orange-500"} />
+                        <span className={`text-sm font-semibold ${importCategory === cat.id ? "text-white" : "text-gray-900 dark:text-white"}`}>
+                          {cat.name}
+                        </span>
+                      </div>
+                      {cat.description && (
+                        <p className={`text-xs line-clamp-1 ${importCategory === cat.id ? "text-orange-100" : "text-gray-500 dark:text-gray-400"}`}>
+                          {cat.description}
+                        </p>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {!importCategory && (
+                  <p className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">
+                    ⚠️ Davom etish uchun kategoriya tanlang
+                  </p>
+                )}
+              </div>
+
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Merchants Section */}
                 <div className="rounded-lg border-2 border-gray-200 p-4 dark:border-gray-700">
@@ -1619,21 +1858,21 @@ export default function Products() {
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">Merchantlar</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium text-brand-500">{importMerchants.length}</span> / {MOCK_MERCHANTS.length} tanlangan
+                        <span className="font-medium text-brand-500">{importMerchants.length}</span> / {merchants.length} tanlangan
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        if (importMerchants.length === MOCK_MERCHANTS.length) {
+                        if (importMerchants.length === merchants.length) {
                           setImportMerchants([]);
                         } else {
-                          setImportMerchants(MOCK_MERCHANTS);
+                          setImportMerchants(merchants.map(m => Number(m.id)));
                         }
                       }}
                       className="rounded-lg bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-600 hover:bg-brand-100 dark:bg-brand-900/30 dark:text-brand-400"
                     >
-                      {importMerchants.length === MOCK_MERCHANTS.length ? "Tozalash" : "Hammasini tanlash"}
+                      {importMerchants.length === merchants.length ? "Tozalash" : "Hammasini tanlash"}
                     </button>
                   </div>
                   <div className="relative mb-3">
@@ -1648,24 +1887,18 @@ export default function Products() {
                   </div>
                   <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-navy-900">
                     <div className="flex flex-wrap gap-1.5">
-                      {MOCK_MERCHANTS.filter(m => m.toLowerCase().includes(importMerchantSearch.toLowerCase())).map((merchant) => (
+                      {merchants.filter(m => m.name.toLowerCase().includes(importMerchantSearch.toLowerCase())).map((merchant) => (
                       <button
-                        key={merchant}
+                        key={merchant.id}
                         type="button"
-                        onClick={() => {
-                          if (importMerchants.includes(merchant)) {
-                            setImportMerchants(importMerchants.filter(m => m !== merchant));
-                          } else {
-                            setImportMerchants([...importMerchants, merchant]);
-                          }
-                        }}
+                        onClick={() => toggleImportMerchant(merchant.id)}
                         className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                          importMerchants.includes(merchant)
+                          importMerchants.includes(merchant.id)
                             ? "bg-blue-500 text-white"
                             : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                         }`}
                       >
-                        {merchant}
+                        {merchant.name}
                       </button>
                     ))}
                     </div>
@@ -1678,21 +1911,21 @@ export default function Products() {
                     <div>
                       <h3 className="font-semibold text-gray-900 dark:text-white">Filiallar</h3>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        <span className="font-medium text-green-500">{importFillials.length}</span> / {MOCK_FILLIALS.length} tanlangan
+                        <span className="font-medium text-green-500">{importFillials.length}</span> / {fillials.length} tanlangan
                       </p>
                     </div>
                     <button
                       type="button"
                       onClick={() => {
-                        if (importFillials.length === MOCK_FILLIALS.length) {
+                        if (importFillials.length === fillials.length) {
                           setImportFillials([]);
                         } else {
-                          setImportFillials(MOCK_FILLIALS);
+                          setImportFillials(fillials.map(f => f.id));
                         }
                       }}
                       className="rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-600 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400"
                     >
-                      {importFillials.length === MOCK_FILLIALS.length ? "Tozalash" : "Hammasini tanlash"}
+                      {importFillials.length === fillials.length ? "Tozalash" : "Hammasini tanlash"}
                     </button>
                   </div>
                   <div className="relative mb-3">
@@ -1707,24 +1940,24 @@ export default function Products() {
                   </div>
                   <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-navy-900">
                     <div className="flex flex-wrap gap-1.5">
-                      {MOCK_FILLIALS.filter(f => f.toLowerCase().includes(importFilialSearch.toLowerCase())).map((filial) => (
+                      {fillials.filter(f => f.name.toLowerCase().includes(importFilialSearch.toLowerCase())).map((filial) => (
                         <button
-                          key={filial}
+                          key={filial.id}
                           type="button"
                           onClick={() => {
-                            if (importFillials.includes(filial)) {
-                              setImportFillials(importFillials.filter(f => f !== filial));
+                            if (importFillials.includes(filial.id)) {
+                              setImportFillials(importFillials.filter(f => f !== filial.id));
                             } else {
-                              setImportFillials([...importFillials, filial]);
+                              setImportFillials([...importFillials, filial.id]);
                             }
                           }}
                           className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
-                            importFillials.includes(filial)
+                            importFillials.includes(filial.id)
                               ? "bg-green-500 text-white"
                               : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                           }`}
                         >
-                          {filial}
+                          {filial.name}
                         </button>
                       ))}
                     </div>
@@ -1742,6 +1975,7 @@ export default function Products() {
                     setImportFillials([]);
                     setImportMerchantSearch("");
                     setImportFilialSearch("");
+                    setImportCategory(null);
                     setImportPreview([]);
                     setShowProductsListModal(false);
                   }}
@@ -1751,7 +1985,7 @@ export default function Products() {
                 </button>
                 <button
                   onClick={handleImportSubmit}
-                  disabled={importMerchants.length === 0 && importFillials.length === 0}
+                  disabled={!importCategory || loading}
                   className="rounded-lg bg-brand-500 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Import qilish

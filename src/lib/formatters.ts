@@ -131,26 +131,36 @@ export function appStatusBadge(status?: string | null, fullWidth: boolean = fals
   
   // Tasdiqlangan - CONFIRMED status
   if (s === "CONFIRMED") {
-    return { label: "TASDIQLANGAN", className: `${flexClass} rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300 ${widthClass}` };
+    return { label: "Tasdiqlangan", className: `${flexClass} rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300 ${widthClass}` };
   }
   
   // Tugatilgan - FINISHED/Completed statuses
   if (s === "FINISHED" || s === "COMPLETED" || s === "ACTIVE") {
-    return { label: "TUGATILGAN", className: `${flexClass} rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300 ${widthClass}` };
+    return { label: "Tugatilgan", className: `${flexClass} rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300 ${widthClass}` };
   }
   
   // Rad qilingan - Rejected/Cancelled statuses
   if (s.includes("CANCELED") || s === "SCORING RAD ETDI" || s === "DAILY RAD ETDI" || s.includes("RAD") || s === "REJECTED" || s.includes("SCORING")) {
-    return { label: "RAD QILINGAN", className: `${flexClass} rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300 ${widthClass}` };
+    return { label: "Rad etilgan", className: `${flexClass} rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-medium text-red-800 dark:text-red-300 ${widthClass}` };
+  }
+  
+  // Skoring rad etdi - Cancelled by scoring
+  if (s === "CANCELLED_BY_SCORING") {
+    return { label: "Skoring rad etdi", className: `${flexClass} rounded-full bg-orange-100 dark:bg-orange-900/30 px-2 py-1 text-xs font-medium text-orange-800 dark:text-orange-300 ${widthClass}` };
   }
   
   // Limit - Limit statuses
   if (s === "LIMIT" || s.includes("LIMIT")) {
-    return { label: "LIMIT", className: `${flexClass} rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-1 text-xs font-medium text-green-800 dark:text-green-300 ${widthClass}` };
+    return { label: "Limit", className: `${flexClass} rounded-full bg-purple-100 dark:bg-purple-900/30 px-2 py-1 text-xs font-medium text-purple-800 dark:text-purple-300 ${widthClass}` };
+  }
+  
+  // Yaratilgan - CREATED status
+  if (s === "CREATED") {
+    return { label: "Yaratilgan", className: `${flexClass} rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-1 text-xs font-medium text-blue-800 dark:text-blue-300 ${widthClass}` };
   }
   
   // Kutilmoqda - All other statuses (pending, waiting, etc)
-  return { label: "KUTILMOQDA", className: `${flexClass} rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300 ${widthClass}` };
+  return { label: "Kutilmoqda", className: `${flexClass} rounded-full bg-yellow-100 dark:bg-yellow-900/30 px-2 py-1 text-xs font-medium text-yellow-800 dark:text-yellow-300 ${widthClass}` };
 }
 
 export function formatDateNoSeconds(iso?: string | null) {

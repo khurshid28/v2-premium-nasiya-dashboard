@@ -1,425 +1,153 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Card from "components/card";
-import { Search, ChartBar, Calendar, User, DeviceMobile, Phone, Filter } from "tabler-icons-react";
+import { Clock, Search, CircleCheck, CircleX, Activity, User, TrendingUp, Calendar, Bolt, Award } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
-import DateRangePicker from "components/DateRangePicker";
-
-// Types
-type ScoringResult = "approved" | "rejected";
-type ApplicationSource = "client_mobile" | "operator";
-
-type ScoringRecord = {
-  id: string;
-  customerId: number;
-  customerName: string;
-  customerPhone: string;
-  passport: string;
-  scoringDate: string;
-  result: ScoringResult;
-  scoringScore: number;
-  scoringModel: string;
-  limitAmount?: number;
-  rejectionReason?: string;
-  source: ApplicationSource;
-  operatorName?: string;
-  fillialName?: string;
-  region: string;
-  waitingTime: number; // in minutes
-};
-
-// Mock Data - Combined from all customers
-const MOCK_SCORING_RECORDS: ScoringRecord[] = [
-  {
-    id: "SCR001",
-    customerId: 1,
-    customerName: "Abdullayev Jasur",
-    customerPhone: "+998901234567",
-    passport: "AA1234567",
-    scoringDate: "2024-11-01",
-    result: "approved",
-    scoringScore: 420,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 15000000,
-    source: "client_mobile",
-    region: "Toshkent",
-    waitingTime: 2,
-  },
-  {
-    id: "SCR002",
-    customerId: 1,
-    customerName: "Abdullayev Jasur",
-    customerPhone: "+998901234567",
-    passport: "AA1234567",
-    scoringDate: "2024-10-15",
-    result: "approved",
-    scoringScore: 350,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 10000000,
-    source: "operator",
-    operatorName: "Karimov Shavkat",
-    fillialName: "Chilonzor filiali",
-    region: "Toshkent",
-    waitingTime: 1.5,
-  },
-  {
-    id: "SCR003",
-    customerId: 1,
-    customerName: "Abdullayev Jasur",
-    customerPhone: "+998901234567",
-    passport: "AA1234567",
-    scoringDate: "2024-08-20",
-    result: "rejected",
-    scoringScore: 180,
-    scoringModel: "Premium Model v1.5",
-    rejectionReason: "Yomon kredit tarixi",
-    source: "client_mobile",
-    region: "Toshkent",
-    waitingTime: 18,
-  },
-  {
-    id: "SCR004",
-    customerId: 2,
-    customerName: "Karimova Nilufar",
-    customerPhone: "+998902345678",
-    passport: "AB2345678",
-    scoringDate: "2024-11-10",
-    result: "approved",
-    scoringScore: 385,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 12000000,
-    source: "operator",
-    operatorName: "Aliyeva Malika",
-    fillialName: "Yunusobod filiali",
-    region: "Toshkent",
-    waitingTime: 2.5,
-  },
-  {
-    id: "SCR005",
-    customerId: 2,
-    customerName: "Karimova Nilufar",
-    customerPhone: "+998902345678",
-    passport: "AB2345678",
-    scoringDate: "2024-05-05",
-    result: "approved",
-    scoringScore: 410,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 20000000,
-    source: "client_mobile",
-    region: "Toshkent",
-    waitingTime: 1,
-  },
-  {
-    id: "SCR006",
-    customerId: 3,
-    customerName: "Rahimov Bekzod",
-    customerPhone: "+998903456789",
-    passport: "AC3456789",
-    scoringDate: "2024-09-15",
-    result: "approved",
-    scoringScore: 395,
-    scoringModel: "Premium Model v1.5",
-    limitAmount: 18000000,
-    source: "client_mobile",
-    region: "Samarqand",
-    waitingTime: 3,
-  },
-  {
-    id: "SCR007",
-    customerId: 4,
-    customerName: "Yusupova Madina",
-    customerPhone: "+998904567890",
-    passport: "AD4567890",
-    scoringDate: "2024-11-20",
-    result: "approved",
-    scoringScore: 420,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 25000000,
-    source: "operator",
-    operatorName: "Tursunov Bekzod",
-    fillialName: "Yashnobod filiali",
-    region: "Toshkent",
-    waitingTime: 1.5,
-  },
-  {
-    id: "SCR008",
-    customerId: 5,
-    customerName: "Toshmatov Ulugbek",
-    customerPhone: "+998907778899",
-    passport: "AE5678901",
-    scoringDate: "2024-10-05",
-    result: "approved",
-    scoringScore: 360,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 8000000,
-    source: "client_mobile",
-    region: "Buxoro",
-    waitingTime: 7,
-  },
-  {
-    id: "SCR009",
-    customerId: 6,
-    customerName: "Saidova Shoira",
-    customerPhone: "+998908889900",
-    passport: "AF6789012",
-    scoringDate: "2024-11-01",
-    result: "approved",
-    scoringScore: 418,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 30000000,
-    source: "operator",
-    operatorName: "Xolmatova Dilnoza",
-    fillialName: "Mirzo Ulug'bek filiali",
-    region: "Toshkent",
-    waitingTime: 2,
-  },
-  {
-    id: "SCR010",
-    customerId: 7,
-    customerName: "Aliyev Rustam",
-    customerPhone: "+998909990011",
-    passport: "AG7890123",
-    scoringDate: "2024-10-20",
-    result: "approved",
-    scoringScore: 375,
-    scoringModel: "Premium Model v1.5",
-    limitAmount: 12000000,
-    source: "client_mobile",
-    region: "Farg'ona",
-    waitingTime: 2.5,
-  },
-  {
-    id: "SCR011",
-    customerId: 8,
-    customerName: "Nazarova Gulnoza",
-    customerPhone: "+998901112233",
-    passport: "AH8901234",
-    scoringDate: "2024-09-25",
-    result: "approved",
-    scoringScore: 388,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 15000000,
-    source: "operator",
-    operatorName: "Rahimov Jasur",
-    fillialName: "Sergeli filiali",
-    region: "Toshkent",
-    waitingTime: 3,
-  },
-  {
-    id: "SCR012",
-    customerId: 9,
-    customerName: "Qodirov Javohir",
-    customerPhone: "+998902223344",
-    passport: "AI9012345",
-    scoringDate: "2024-11-05",
-    result: "approved",
-    scoringScore: 370,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 10000000,
-    source: "client_mobile",
-    region: "Andijon",
-    waitingTime: 1.5,
-  },
-  {
-    id: "SCR013",
-    customerId: 10,
-    customerName: "Ismailov Aziz",
-    customerPhone: "+998905556677",
-    passport: "AJ0123456",
-    scoringDate: "2024-10-10",
-    result: "approved",
-    scoringScore: 405,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 20000000,
-    source: "operator",
-    operatorName: "Saidov Otabek",
-    fillialName: "Uchtepa filiali",
-    region: "Toshkent",
-    waitingTime: 20,
-  },
-  {
-    id: "SCR014",
-    customerId: 11,
-    customerName: "Mirzayev Bobur",
-    customerPhone: "+998906667788",
-    passport: "AK1234567",
-    scoringDate: "2024-11-12",
-    result: "approved",
-    scoringScore: 355,
-    scoringModel: "Premium Model v1.5",
-    limitAmount: 5000000,
-    source: "client_mobile",
-    region: "Namangan",
-    waitingTime: 10,
-  },
-  {
-    id: "SCR015",
-    customerId: 12,
-    customerName: "Xudoyberganova Dilbar",
-    customerPhone: "+998904445566",
-    passport: "AL2345678",
-    scoringDate: "2024-10-28",
-    result: "approved",
-    scoringScore: 412,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 22000000,
-    source: "operator",
-    operatorName: "Normatova Saida",
-    fillialName: "Bektemir filiali",
-    region: "Toshkent",
-    waitingTime: 1,
-  },
-  {
-    id: "SCR016",
-    customerId: 13,
-    customerName: "Sharipov Otabek",
-    customerPhone: "+998909998877",
-    passport: "AM3456789",
-    scoringDate: "2024-11-15",
-    result: "approved",
-    scoringScore: 390,
-    scoringModel: "Premium Model v2.0",
-    limitAmount: 16000000,
-    source: "client_mobile",
-    region: "Qashqadaryo",
-    waitingTime: 2,
-  },
-  {
-    id: "SCR017",
-    customerId: 14,
-    customerName: "Juraev Sardor",
-    customerPhone: "+998908887766",
-    passport: "AN4567890",
-    scoringDate: "2024-10-18",
-    result: "approved",
-    scoringScore: 380,
-    scoringModel: "Premium Model v1.5",
-    limitAmount: 14000000,
-    source: "operator",
-    operatorName: "Ergashev Sanjar",
-    fillialName: "Shayxontohur filiali",
-    region: "Toshkent",
-    waitingTime: 5,
-  },
-  {
-    id: "SCR018",
-    customerId: 15,
-    customerName: "Axmedova Sevara",
-    customerPhone: "+998907776655",
-    passport: "AO5678901",
-    scoringDate: "2024-11-08",
-    result: "approved",
-    scoringScore: 365,
-    scoringModel: "Premium Model v2.1",
-    limitAmount: 9000000,
-    source: "client_mobile",
-    region: "Surxondaryo",
-    waitingTime: 1.5,
-  },
-];
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("uz-UZ").format(amount) + " so'm";
-};
+import { scoringHistoryApi, ScoringHistoryItem } from "lib/api/scoringHistory";
+import Toast from "components/toast/ToastNew";
 
 const formatDate = (dateString: string) => {
   const d = new Date(dateString);
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
   const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
 };
 
-const formatWaitingTime = (minutes: number) => {
-  const wholeMinutes = Math.floor(minutes);
-  const seconds = Math.round((minutes - wholeMinutes) * 60);
-  
-  if (wholeMinutes === 0) {
-    return `${seconds} s`;
-  } else if (seconds === 0) {
-    return `${wholeMinutes} min`;
-  } else {
-    return `${wholeMinutes} min ${seconds} s`;
-  }
+const formatDuration = (seconds: number) => {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}m ${secs}s`;
+};
+
+const formatName = (name: string) => {
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => {
+      // Handle words with apostrophes like O'tkir
+      if (word.includes("'")) {
+        return word.split("'").map(part => part.charAt(0).toUpperCase() + part.slice(1)).join("'");
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(' ');
+};
+
+const getCategoryName = (category: string) => {
+  const categories: { [key: string]: string } = {
+    OFFICIAL: "Rasmiy ish joyi",
+    INDIVIDUAL: "Yakka tartibdagi tadbirkor",
+    UNEMPLOYED: "Ishsiz",
+    SELF_EMPLOYED: "Mustaqil faoliyat",
+    RETIRED: "Pensioner",
+  };
+  return categories[category] || category;
 };
 
 export default function ScoringHistory() {
+  const [loading, setLoading] = useState(false);
+  const [history, setHistory] = useState<ScoringHistoryItem[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterSource, setFilterSource] = useState("all");
+  const [filterPassed, setFilterPassed] = useState("all");
+  const [filterModel, setFilterModel] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [filterModel, setFilterModel] = useState<string>("all");
-  const [filterResult, setFilterResult] = useState<string>("all");
-  const [filterSource, setFilterSource] = useState<string>("all");
-  const [filterRegion, setFilterRegion] = useState<string>("all");
-  const [filterFillial, setFilterFillial] = useState<string>("all");
-  const [startDate, setStartDate] = useState<string>("");
-  const [endDate, setEndDate] = useState<string>("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
+  const [pageSize, setPageSize] = useState(5);
+  const [selectedItem, setSelectedItem] = useState<ScoringHistoryItem | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>({ show: false, message: '', type: 'info' });
 
-  const filteredRecords = useMemo(() => {
-    return MOCK_SCORING_RECORDS.filter((record) => {
-      const matchesSearch = 
-        record.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        record.customerPhone.includes(searchQuery) ||
-        record.passport.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesModel = filterModel === "all" || record.scoringModel === filterModel;
-      const matchesResult = filterResult === "all" || record.result === filterResult;
-      const matchesSource = filterSource === "all" || record.source === filterSource;
-      const matchesRegion = filterRegion === "all" || record.region === filterRegion;
-      const matchesFillial = filterFillial === "all" || record.fillialName === filterFillial;
-      
-      // Date range filter
-      let matchesDate = true;
-      if (startDate || endDate) {
-        const recordDate = new Date(record.scoringDate);
-        if (startDate) {
-          const start = new Date(startDate);
-          start.setHours(0, 0, 0, 0);
-          matchesDate = matchesDate && recordDate >= start;
-        }
-        if (endDate) {
-          const end = new Date(endDate);
-          end.setHours(23, 59, 59, 999);
-          matchesDate = matchesDate && recordDate <= end;
-        }
-      }
-      
-      return matchesSearch && matchesModel && matchesResult && matchesSource && matchesRegion && matchesFillial && matchesDate;
-    });
-  }, [searchQuery, filterModel, filterResult, filterSource, filterRegion, filterFillial, startDate, endDate]);
+  useEffect(() => {
+    loadHistory();
+    loadStats();
+  }, []);
 
-  const totalPages = Math.ceil(filteredRecords.length / pageSize);
+  const loadHistory = async () => {
+    try {
+      setLoading(true);
+      const response = await scoringHistoryApi.getScoringHistory();
+      setHistory(response.data.data || []);
+    } catch (error: any) {
+      console.error('Error loading scoring history:', error);
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Ma'lumotlarni yuklashda xatolik",
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await scoringHistoryApi.getScoringHistoryStats();
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
+
+  // Get unique models for filter from all history
+  const uniqueModels = Array.from(new Set(history.map(item => item.scoringModel.name)));
+
+  // Filter data
+  const filteredHistory = history.filter((item) => {
+    const matchesSearch = 
+      item.zayavka.fullname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.zayavka.phone?.includes(searchQuery) ||
+      item.id.toString().includes(searchQuery);
+
+    const matchesSource = filterSource === "all" || item.source === filterSource;
+    const matchesPassed = 
+      filterPassed === "all" || 
+      (filterPassed === "passed" && item.passed) ||
+      (filterPassed === "failed" && !item.passed);
+    const matchesModel = filterModel === "all" || item.scoringModel.name === filterModel;
+
+    return matchesSearch && matchesSource && matchesPassed && matchesModel;
+  });
+
+  // Calculate statistics from filtered data
+  const filteredStats = {
+    total: filteredHistory.length,
+    passed: filteredHistory.filter(item => item.passed).length,
+    failed: filteredHistory.filter(item => !item.passed).length,
+    avgScore: filteredHistory.length > 0 
+      ? filteredHistory.reduce((sum, item) => sum + item.total_score, 0) / filteredHistory.length 
+      : 0,
+    avgProcessingTime: filteredHistory.length > 0
+      ? filteredHistory.reduce((sum, item) => sum + item.processing_time_seconds, 0) / filteredHistory.length
+      : 0,
+  };
+
+  // Pagination
+  const totalPages = Math.ceil(filteredHistory.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentRecords = filteredRecords.slice(startIndex, endIndex);
+  const currentItems = filteredHistory.slice(startIndex, startIndex + pageSize);
 
-  // Get unique models
-  const uniqueModels = Array.from(new Set(MOCK_SCORING_RECORDS.map(r => r.scoringModel)));
-  
-  // Get unique regions
-  const uniqueRegions = Array.from(new Set(MOCK_SCORING_RECORDS.map(r => r.region))).sort();
-  
-  // Get unique fillials (only from operator records)
-  const uniqueFillials = Array.from(
-    new Set(MOCK_SCORING_RECORDS.filter(r => r.fillialName).map(r => r.fillialName!))
-  ).sort();
+  const getStatusBadge = (passed: boolean) => {
+    return passed
+      ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+  };
 
-  // Statistics
-  const stats = useMemo(() => {
-    const total = filteredRecords.length;
-    const approved = filteredRecords.filter(r => r.result === "approved").length;
-    const rejected = filteredRecords.filter(r => r.result === "rejected").length;
-    const avgScore = filteredRecords.length > 0 
-      ? Math.round(filteredRecords.reduce((sum, r) => sum + r.scoringScore, 0) / filteredRecords.length)
-      : 0;
-    const avgWaitTime = filteredRecords.length > 0
-      ? (filteredRecords.reduce((sum, r) => sum + r.waitingTime, 0) / filteredRecords.length).toFixed(1)
-      : 0;
-    
-    return { total, approved, rejected, avgScore, avgWaitTime };
-  }, [filteredRecords]);
+  const getSourceBadge = (source: string) => {
+    const badges: { [key: string]: string } = {
+      mobile: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+      web: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+      api: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
+    };
+    return badges[source] || "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400";
+  };
 
   return (
     <div className="mt-5 h-full w-full">
@@ -427,290 +155,271 @@ export default function ScoringHistory() {
         {/* Header */}
         <header className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-600 shadow-lg shadow-brand-500/50">
-              <ChartBar className="h-6 w-6 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-500/50">
+              <Clock className="h-6 w-6 text-white" />
             </div>
             <div>
               <h4 className="text-xl font-bold text-navy-700 dark:text-white">
                 Skoring tarixi
               </h4>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Barcha mijozlarning skoring natijalari
+                Barcha skoring baholash natijalari
               </p>
             </div>
           </div>
         </header>
 
         {/* Statistics */}
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Jami skoringlar</p>
-            <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">{stats.total}</p>
+        {history.length > 0 && (
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-500 to-gray-600 p-5 shadow-lg transition-all hover:shadow-xl">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-white/10"></div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">Jami</p>
+              <p className="mt-2 text-3xl font-bold text-white">{filteredStats.total}</p>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-green-500 to-green-600 p-5 shadow-lg shadow-green-500/30 transition-all hover:shadow-xl">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-white/10"></div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">Muvaffaqiyatli</p>
+              <p className="mt-2 text-3xl font-bold text-white">{filteredStats.passed}</p>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-red-600 p-5 shadow-lg shadow-red-500/30 transition-all hover:shadow-xl">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-white/10"></div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">Rad etilgan</p>
+              <p className="mt-2 text-3xl font-bold text-white">{filteredStats.failed}</p>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 p-5 shadow-lg shadow-blue-500/30 transition-all hover:shadow-xl">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-white/10"></div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">O'rtacha ball</p>
+              <p className="mt-2 text-3xl font-bold text-white">{Math.round(filteredStats.avgScore)}</p>
+            </div>
+            <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 p-5 shadow-lg shadow-purple-500/30 transition-all hover:shadow-xl">
+              <div className="absolute right-0 top-0 h-20 w-20 translate-x-6 -translate-y-6 rounded-full bg-white/10"></div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/80">O'rtacha vaqt</p>
+              <p className="mt-2 text-3xl font-bold text-white">{formatDuration(Math.round(filteredStats.avgProcessingTime))}</p>
+            </div>
           </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Tasdiqlangan</p>
-            <p className="mt-1 text-2xl font-bold text-green-600 dark:text-green-400">{stats.approved}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Rad etilgan</p>
-            <p className="mt-1 text-2xl font-bold text-red-600 dark:text-red-400">{stats.rejected}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">O'rtacha ball</p>
-            <p className="mt-1 text-2xl font-bold text-indigo-600 dark:text-indigo-400">{stats.avgScore}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-800">
-            <p className="text-xs text-gray-600 dark:text-gray-400">O'rtacha kutish</p>
-            <p className="mt-1 text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.avgWaitTime} min</p>
-          </div>
-        </div>
+        )}
 
-        {/* Search and Filters */}
-        <div className="mt-6 flex flex-col gap-3">
+        {/* Filters */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Mijoz ismi, telefon yoki passport bo'yicha qidirish..."
+              placeholder="ID, Mijoz yoki telefon bo'yicha qidirish..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-navy-700 outline-none transition-colors placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
-          
-          {/* Date Range Picker */}
-          <DateRangePicker 
-            startDate={startDate} 
-            endDate={endDate} 
-            onStartChange={setStartDate} 
-            onEndChange={setEndDate}
+
+          <CustomSelect
+            value={filterSource}
+            onChange={(value) => {
+              setFilterSource(value);
+              setCurrentPage(1);
+            }}
+            options={[
+              { value: "all", label: "Barcha manbalar" },
+              { value: "mobile", label: "Mobile" },
+              { value: "web", label: "Web" },
+              { value: "api", label: "API" },
+            ]}
+            className="min-w-[180px]"
           />
-          
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filtrlar:</span>
-            </div>
-            
-            <CustomSelect
-              value={filterRegion}
-              onChange={(value) => {
-                setFilterRegion(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "all", label: "Barcha hududlar" },
-                ...uniqueRegions.map(region => ({ value: region, label: region }))
-              ]}
-              className="min-w-[150px]"
-            />
-            
-            <CustomSelect
-              value={filterFillial}
-              onChange={(value) => {
-                setFilterFillial(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "all", label: "Barcha filiallar" },
-                ...uniqueFillials.map(fillial => ({ value: fillial, label: fillial }))
-              ]}
-              className="min-w-[180px]"
-            />
-            
-            <CustomSelect
-              value={filterModel}
-              onChange={(value) => {
-                setFilterModel(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "all", label: "Barcha modellar" },
-                ...uniqueModels.map(model => ({ value: model, label: model }))
-              ]}
-              className="min-w-[180px]"
-            />
-            
-            <CustomSelect
-              value={filterResult}
-              onChange={(value) => {
-                setFilterResult(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "all", label: "Barcha natijalar" },
-                { value: "approved", label: "Tasdiqlangan" },
-                { value: "rejected", label: "Rad etilgan" }
-              ]}
-              className="min-w-[150px]"
-            />
-            
-            <CustomSelect
-              value={filterSource}
-              onChange={(value) => {
-                setFilterSource(value);
-                setCurrentPage(1);
-              }}
-              options={[
-                { value: "all", label: "Barcha manbalar" },
-                { value: "client_mobile", label: "Client Mobile" },
-                { value: "operator", label: "Operator" }
-              ]}
-              className="min-w-[150px]"
-            />
-          </div>
+
+          <CustomSelect
+            value={filterPassed}
+            onChange={(value) => {
+              setFilterPassed(value);
+              setCurrentPage(1);
+            }}
+            options={[
+              { value: "all", label: "Barcha natijalar" },
+              { value: "passed", label: "Muvaffaqiyatli" },
+              { value: "failed", label: "Rad etilgan" },
+            ]}
+            className="min-w-[180px]"
+          />
+
+          <CustomSelect
+            value={filterModel}
+            onChange={(value) => {
+              setFilterModel(value);
+              setCurrentPage(1);
+            }}
+            options={[
+              { value: "all", label: "Barcha modellar" },
+              ...uniqueModels.map(model => ({ value: model, label: model }))
+            ]}
+            className="min-w-[180px]"
+          />
         </div>
 
         {/* Table */}
-        <div className="mt-6 overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  #
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Mijoz
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Sana
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Ball
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Model
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Manba
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Limit
-                </th>
-                <th className="pb-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Natija
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Kutish vaqti
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Sabab
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentRecords.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-10 text-center text-sm text-gray-500">
-                    Ma'lumot topilmadi
-                  </td>
+        <div className="mt-6 overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-navy-800">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+            </div>
+          ) : currentItems.length === 0 ? (
+            <div className="py-20 text-center text-sm text-gray-500">Ma'lumot topilmadi</div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-navy-700">
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <User className="h-3.5 w-3.5" />
+                      Mijoz
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <Award className="h-3.5 w-3.5" />
+                      Model
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center justify-center gap-1">
+                      <TrendingUp className="h-3.5 w-3.5" />
+                      Ball
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center justify-center gap-1">
+                      <CircleCheck className="h-3.5 w-3.5" />
+                      Natija
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">Limit / Sabab</th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center justify-center gap-1">
+                      <Bolt className="h-3.5 w-3.5" />
+                      Manba
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center justify-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      Vaqt
+                    </div>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3.5 w-3.5" />
+                      Sana
+                    </div>
+                  </th>
                 </tr>
-              ) : (
-                currentRecords.map((record, index) => (
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {currentItems.map((item) => (
                   <tr
-                    key={record.id}
-                    className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900 cursor-pointer"
+                    key={item.id}
                     onClick={() => {
-                      setSelectedCustomerId(record.customerId);
+                      setSelectedItem(item);
                       setShowDetailModal(true);
                     }}
+                    className="cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-navy-700"
                   >
-                    <td className="py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {startIndex + index + 1}
+                    <td className="px-4 py-3 text-center">
+                      <span className="text-sm font-bold text-gray-700 dark:text-gray-300">#{item.id}</span>
                     </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <div className="text-sm font-medium text-navy-700 dark:text-white">
-                            {record.customerName}
-                          </div>
-                          <div className="text-xs text-gray-500">{record.customerPhone}</div>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-brand-500 to-indigo-600 text-xs font-bold text-white shadow-sm">
+                          <User className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-navy-700 dark:text-white">{formatName(item.zayavka.fullname)}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">{item.zayavka.phone}</span>
                         </div>
                       </div>
                     </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {formatDate(record.scoringDate)}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-navy-700 dark:text-white">{item.scoringModel.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{item.scoringModel.version}</span>
                       </div>
                     </td>
-                    <td className="py-4">
-                      <div className={`inline-flex rounded-full px-3 py-1 text-sm font-bold ${
-                        record.scoringScore >= 350
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : record.scoringScore >= 250
-                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      }`}>
-                        {record.scoringScore}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-lg font-bold text-navy-700 dark:text-white">{item.total_score}</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">ball</span>
+                        </div>
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                          <div 
+                            className={`h-full rounded-full transition-all ${
+                              item.passed 
+                                ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                                : 'bg-gradient-to-r from-red-500 to-red-600'
+                            }`}
+                            style={{ width: `${Math.min((item.total_score / 500) * 100, 100)}%` }}
+                          ></div>
+                        </div>
                       </div>
                     </td>
-                    <td className="py-4 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-                      {record.scoringModel}
-                    </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-1.5">
-                        {record.source === "client_mobile" ? (
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${getStatusBadge(item.passed)}`}>
+                        {item.passed ? (
                           <>
-                            <DeviceMobile className="h-4 w-4 text-blue-600" />
-                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                              Client Mobile
-                            </span>
+                            <CircleCheck className="h-3 w-3" />
+                            O'tdi
                           </>
                         ) : (
                           <>
-                            <Phone className="h-4 w-4 text-purple-600" />
-                            <div className="text-xs">
-                              <div className="font-medium text-purple-600 dark:text-purple-400">
-                                {record.operatorName}
-                              </div>
-                              <div className="text-gray-500">{record.fillialName}</div>
-                            </div>
+                            <CircleX className="h-3 w-3" />
+                            Rad
                           </>
                         )}
-                      </div>
-                    </td>
-                    <td className="py-4 text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {record.limitAmount ? formatCurrency(record.limitAmount) : "-"}
-                    </td>
-                    <td className="py-4 text-center">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-                        record.result === "approved"
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      }`}>
-                        {record.result === "approved" ? "✓ Tasdiqlandi" : "✗ Rad etildi"}
                       </span>
                     </td>
-                    <td className="py-4">
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm font-medium ${
-                        record.waitingTime <= 3
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : record.waitingTime <= 10
-                          ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                          : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      }`}>
-                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatWaitingTime(record.waitingTime)}
-                      </div>
+                    <td className="px-4 py-3">
+                      {item.passed ? (
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                            {item.zayavka.limit?.toLocaleString() || 0} so'm
+                          </span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Berilgan limit</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">Rad qilindi</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400">Ball yetarli emas</span>
+                        </div>
+                      )}
                     </td>
-                    <td className="py-4 text-sm text-red-600 dark:text-red-400">
-                      {record.rejectionReason || "-"}
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${getSourceBadge(item.source)}`}>
+                        <Bolt className="h-3 w-3" />
+                        {item.source}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                      {formatDuration(item.processing_time_seconds)}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                      {formatDate(item.evaluated_at)}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
 
         {/* Pagination */}
         <div className="mt-6 flex items-center justify-between gap-4">
-          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-            {`${filteredRecords.length} dan ${currentRecords.length} ta ko'rsatilmoqda`}
+          <div className="whitespace-nowrap text-xs text-gray-600 dark:text-gray-400 sm:text-sm">
+            {`${filteredHistory.length} dan ${currentItems.length} ta ko'rsatilmoqda`}
           </div>
           <div className="flex items-center gap-3">
             <CustomSelect
@@ -720,10 +429,10 @@ export default function ScoringHistory() {
                 setCurrentPage(1);
               }}
               options={[
-                { value: "5", label: "5 ta" },
                 { value: "10", label: "10 ta" },
-                { value: "25", label: "25 ta" },
-                { value: "50", label: "50 ta" }
+                { value: "20", label: "20 ta" },
+                { value: "50", label: "50 ta" },
+                { value: "100", label: "100 ta" },
               ]}
               className="min-w-[100px] sm:min-w-[120px]"
             />
@@ -737,142 +446,146 @@ export default function ScoringHistory() {
       </Card>
 
       {/* Detail Modal */}
-      {showDetailModal && selectedCustomerId && (() => {
-        const customerRecords = MOCK_SCORING_RECORDS.filter(r => r.customerId === selectedCustomerId);
-        const customerInfo = customerRecords[0];
-        
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-navy-800">
-              <div className="mb-4 flex items-center justify-between">
-                <div>
-                  <h3 className="text-xl font-bold text-navy-700 dark:text-white">
-                    {customerInfo.customerName}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {customerInfo.customerPhone} • {customerInfo.passport}
-                  </p>
+      {showDetailModal && selectedItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-navy-800">
+            {/* Header */}
+            <div className="sticky top-0 border-b border-gray-200 bg-gradient-to-r from-indigo-500 to-indigo-600 px-6 py-4 dark:border-gray-700">
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="absolute right-6 top-6 rounded-lg bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
+              >
+                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                  <Activity className="h-7 w-7 text-white" />
                 </div>
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">Skoring tafsilotlari</h3>
+                  <p className="mt-1 text-sm text-white/80">ID: #{selectedItem.id}</p>
+                </div>
               </div>
+            </div>
 
-              <div className="mb-4 rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-                <p className="text-sm font-bold text-navy-700 dark:text-white">
-                  Jami skoringlar: {customerRecords.length}
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {customerRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className={`rounded-lg border p-4 ${
-                      record.result === "approved"
-                        ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
-                        : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm text-gray-600 dark:text-gray-400">
-                            {formatDate(record.scoringDate)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {record.source === "client_mobile" ? (
-                            <>
-                              <DeviceMobile className="h-4 w-4 text-blue-600" />
-                              <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                                Client Mobile
-                              </span>
-                            </>
-                          ) : (
-                            <>
-                              <Phone className="h-4 w-4 text-purple-600" />
-                              <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
-                                Operator: {record.operatorName} ({record.fillialName})
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`rounded-full px-3 py-1.5 text-sm font-bold ${
-                          record.scoringScore >= 350
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : record.scoringScore >= 250
-                            ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        }`}>
-                          Ball: {record.scoringScore}
-                        </div>
-                        <div className={`rounded-full px-3 py-1 text-sm font-bold ${
-                          record.result === "approved"
-                            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                            : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        }`}>
-                          {record.result === "approved" ? "Tasdiqlandi" : "Rad etildi"}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-3">
-                      <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Model: </span>
-                        <span className="font-medium text-indigo-600 dark:text-indigo-400">
-                          {record.scoringModel}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-gray-600 dark:text-gray-400">Kutish vaqti: </span>
-                        <span className={`font-medium ${
-                          record.waitingTime <= 3
-                            ? "text-green-600 dark:text-green-400"
-                            : record.waitingTime <= 10
-                            ? "text-yellow-600 dark:text-yellow-400"
-                            : "text-red-600 dark:text-red-400"
-                        }`}>
-                          {formatWaitingTime(record.waitingTime)}
-                        </span>
-                      </div>
-                      {record.result === "approved" && record.limitAmount && (
-                        <div className="text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Limit: </span>
-                          <span className="font-bold text-green-600 dark:text-green-400">
-                            {formatCurrency(record.limitAmount)}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {record.result === "rejected" && record.rejectionReason && (
-                      <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                        <span className="font-medium">Sabab: </span>{record.rejectionReason}
-                      </div>
-                    )}
+            {/* Content */}
+            <div className="p-6 space-y-6">
+              {/* Mijoz ma'lumotlari */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                <h4 className="mb-3 text-sm font-bold text-navy-700 dark:text-white">Mijoz ma'lumotlari</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">F.I.O</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selectedItem.zayavka.fullname}</p>
                   </div>
-                ))}
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Telefon</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selectedItem.zayavka.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Ariza summasi</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">
+                      {selectedItem.zayavka.amount?.toLocaleString()} so'm
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Berilgan limit</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">
+                      {selectedItem.zayavka.limit?.toLocaleString() || 0} so'm
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setShowDetailModal(false)}
-                  className="rounded-lg bg-brand-500 px-6 py-2 font-medium text-white transition-colors hover:bg-brand-600"
-                >
-                  Yopish
-                </button>
+              {/* Skoring natijalari */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                <h4 className="mb-3 text-sm font-bold text-navy-700 dark:text-white">Skoring natijalari</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Model</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">
+                      {selectedItem.scoringModel.name} ({selectedItem.scoringModel.version})
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Kategoriya</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{getCategoryName(selectedItem.scoringCategory.category)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Jami ball</p>
+                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                      {selectedItem.total_score} ball
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Minimal ball</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{selectedItem.scoringModel.minPassScore}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Natija</p>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${getStatusBadge(selectedItem.passed)}`}>
+                      {selectedItem.passed ? (
+                        <>
+                          <CircleCheck className="h-3 w-3" />
+                          Muvaffaqiyatli
+                        </>
+                      ) : (
+                        <>
+                          <CircleX className="h-3 w-3" />
+                          Rad etilgan
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Manba</p>
+                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-bold ${getSourceBadge(selectedItem.source)}`}>
+                      {selectedItem.source}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Vaqt ma'lumotlari */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                <h4 className="mb-3 text-sm font-bold text-navy-700 dark:text-white">Vaqt ma'lumotlari</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Boshlangan</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{formatDate(selectedItem.scoring_start)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Tugagan</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{formatDate(selectedItem.scoring_end)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Davomiyligi</p>
+                    <p className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                      {formatDuration(selectedItem.processing_time_seconds)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Baholangan</p>
+                    <p className="text-sm font-medium text-navy-700 dark:text-white">{formatDate(selectedItem.evaluated_at)}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ ...toast, show: false })}
+        duration={3000}
+      />
     </div>
   );
 }

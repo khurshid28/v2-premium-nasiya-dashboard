@@ -242,14 +242,8 @@ const Agents = (): JSX.Element => {
         
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { 
-            if (location.pathname.startsWith('/demo')) {
-              setEditInitial(null);
-              setEditOpen(true);
-            } else {
-              setToastType("info");
-              setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-              setToastOpen(true);
-            }
+            setEditInitial(null);
+            setEditOpen(true);
           }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
             <span className="hidden sm:inline">Agent qo'shish</span>
             <span className="sm:hidden">+ Agent</span>
@@ -559,25 +553,13 @@ const Agents = (): JSX.Element => {
                 Barcha ma'lumotlarni ko'chirish
               </button>
               <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { 
-                if (location.pathname.startsWith('/demo')) {
-                  setEditInitial(selected);
-                  setEditOpen(true);
-                  setOpen(false);
-                } else {
-                  setToastType("info");
-                  setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                  setToastOpen(true);
-                }
+                setEditInitial(selected);
+                setEditOpen(true);
+                setOpen(false);
               }}>Tahrirlash</button>
               <button className="rounded bg-orange-600 hover:bg-orange-700 px-3 py-1 text-white" onClick={() => { 
-                if (location.pathname.startsWith('/demo')) {
-                  setPasswordOpen(true);
-                  setOpen(false);
-                } else {
-                  setToastType("info");
-                  setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                  setToastOpen(true);
-                }
+                setPasswordOpen(true);
+                setOpen(false);
               }}>Parolni o'zgartirish</button>
             </div>
           </div>
@@ -602,6 +584,9 @@ const Agents = (): JSX.Element => {
           }
           if (selected && selected.id) {
             await api.updateAgentPassword(selected.id, { password: payload });
+            setToastType('success');
+            setToastMessage('Parol muvaffaqiyatli o\'zgartirildi');
+            setToastOpen(true);
           }
           setPasswordOpen(false);
           setSelected(null);
@@ -623,13 +608,24 @@ const Agents = (): JSX.Element => {
             setToastOpen(true);
             return;
           }
-          if (editInitial && editInitial.id) {
-            await api.updateAgent(editInitial.id, payload);
-          } else {
-            await api.createAgent(payload);
+          try {
+            if (editInitial && editInitial.id) {
+              await api.updateAgent(editInitial.id, payload);
+              setToastType('success');
+              setToastMessage('Agent muvaffaqiyatli tahrirlandi');
+            } else {
+              await api.createAgent(payload);
+              setToastType('success');
+              setToastMessage('Agent muvaffaqiyatli qo\'shildi');
+            }
+            const res = await api.listAgents({});
+            setData(res?.items || []);
+            setToastOpen(true);
+          } catch (error) {
+            setToastType('error');
+            setToastMessage(error.message || 'Xatolik yuz berdi');
+            setToastOpen(true);
           }
-          const res = await api.listAgents({});
-          setData(res?.items || []);
           setEditOpen(false);
           setEditInitial(null);
         }}

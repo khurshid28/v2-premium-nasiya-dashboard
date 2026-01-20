@@ -1,40 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
-import { Search, User, FileText, BuildingStore, Calendar, ShieldCheck, Phone, DeviceMobile, CircleCheck } from "tabler-icons-react";
+import { Search, User, FileText, BuildingStore, Calendar, ShieldCheck, Phone, DeviceMobile, CircleCheck, Eye, CurrencyDollar } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
+import * as api from "lib/api";
 
 // Types
-type ScoringResult = "approved" | "rejected";
-type ApplicationSource = "client_mobile" | "operator";
-
-type ApplicationDetail = {
-  id: string;
-  productName: string;
-  productPrice: number;
-  totalAmount: number;
-  fillialName: string;
-  merchantName: string;
-  region: string;
-  applicationDate: string;
-  contractMonths: number;
-  monthlyPayment: number;
-  status: "active" | "completed" | "rejected";
-};
-
-type ScoringDetail = {
-  id: string;
-  scoringDate: string;
-  result: ScoringResult;
-  limitAmount?: number;
-  rejectionReason?: string;
-  source: ApplicationSource;
-  operatorName?: string;
-  fillialName?: string;
-  scoringScore: number;
-  scoringModel: string;
-};
-
 type Customer = {
   id: number;
   fullName: string;
@@ -48,712 +19,10 @@ type Customer = {
   activeApplications: number;
   completedApplications: number;
   rejectedApplications: number;
-  debt: number; // Qarzdorlik
-  applications: ApplicationDetail[];
-  scorings: ScoringDetail[];
+  debt: number;
 };
 
 // Mock Data
-const MOCK_CUSTOMERS: Customer[] = [
-  {
-    id: 1,
-    fullName: "Abdullayev Jasur",
-    phone: "+998901234567",
-    passport: "AA1234567",
-    birthDate: "1990-05-15",
-    region: "Toshkent",
-    address: "Chilonzor tumani, 12-mavze",
-    registrationDate: "2023-01-15",
-    totalApplications: 5,
-    activeApplications: 2,
-    completedApplications: 2,
-    rejectedApplications: 1,
-    debt: 1700000, // Qarzdorlik bor
-    applications: [
-      {
-        id: "APP001",
-        productName: "Samsung Galaxy S23",
-        productPrice: 8500000,
-        totalAmount: 10200000,
-        fillialName: "Chilonzor filiali",
-        merchantName: "Texnomart",
-        region: "Toshkent",
-        applicationDate: "2024-11-01",
-        contractMonths: 12,
-        monthlyPayment: 850000,
-        status: "active",
-      },
-      {
-        id: "APP002",
-        productName: "LG Muzlatgich",
-        productPrice: 6000000,
-        totalAmount: 6600000,
-        fillialName: "Sergeli filiali",
-        merchantName: "Artel Plaza",
-        region: "Toshkent",
-        applicationDate: "2024-10-15",
-        contractMonths: 12,
-        monthlyPayment: 550000,
-        status: "active",
-      },
-      {
-        id: "APP003",
-        productName: "iPhone 14",
-        productPrice: 12000000,
-        totalAmount: 13200000,
-        fillialName: "Chilonzor filiali",
-        merchantName: "Texnomart",
-        region: "Toshkent",
-        applicationDate: "2024-06-10",
-        contractMonths: 12,
-        monthlyPayment: 1100000,
-        status: "completed",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR001",
-        scoringDate: "2024-11-01",
-        result: "approved",
-        limitAmount: 15000000,
-        source: "client_mobile",
-        scoringScore: 420,
-        scoringModel: "Premium Model v2.1",
-      },
-      {
-        id: "SCR002",
-        scoringDate: "2024-10-15",
-        result: "approved",
-        limitAmount: 10000000,
-        source: "operator",
-        operatorName: "Karimov Shavkat",
-        fillialName: "Chilonzor filiali",
-        scoringScore: 350,
-        scoringModel: "Premium Model v2.0",
-      },
-      {
-        id: "SCR003",
-        scoringDate: "2024-08-20",
-        result: "rejected",
-        rejectionReason: "Yomon kredit tarixi",
-        source: "client_mobile",
-        scoringScore: 180,
-        scoringModel: "Premium Model v1.5",
-      },
-    ],
-  },
-  {
-    id: 2,
-    fullName: "Karimova Nigora",
-    phone: "+998907654321",
-    passport: "AB7654321",
-    birthDate: "1995-08-22",
-    region: "Samarqand",
-    address: "Registon ko'chasi, 45",
-    registrationDate: "2023-03-20",
-    totalApplications: 3,
-    activeApplications: 1,
-    completedApplications: 2,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP004",
-        productName: "Artel Kir yuvish mashinasi",
-        productPrice: 4500000,
-        totalAmount: 4950000,
-        fillialName: "Samarqand markaz",
-        merchantName: "Artel Plaza",
-        region: "Samarqand",
-        applicationDate: "2024-11-10",
-        contractMonths: 10,
-        monthlyPayment: 495000,
-        status: "active",
-      },
-      {
-        id: "APP005",
-        productName: "MacBook Air",
-        productPrice: 15000000,
-        totalAmount: 16500000,
-        fillialName: "Samarqand markaz",
-        merchantName: "Texnomart",
-        region: "Samarqand",
-        applicationDate: "2024-05-05",
-        contractMonths: 12,
-        monthlyPayment: 1375000,
-        status: "completed",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR004",
-        scoringDate: "2024-11-10",
-        result: "approved",
-        limitAmount: 12000000,
-        source: "operator",
-        operatorName: "Aliyeva Malika",
-        fillialName: "Yunusobod filiali",
-        scoringScore: 385,
-        scoringModel: "Premium Model v2.1",
-      },
-      {
-        id: "SCR005",
-        scoringDate: "2024-05-05",
-        result: "approved",
-        limitAmount: 20000000,
-        source: "client_mobile",
-        scoringScore: 410,
-        scoringModel: "Premium Model v2.0",
-      },
-    ],
-  },
-  {
-    id: 3,
-    fullName: "Xolmatov Sardor",
-    phone: "+998901112233",
-    passport: "AC9876543",
-    birthDate: "1988-12-10",
-    region: "Buxoro",
-    address: "Buxoro shahri, 25-uy",
-    registrationDate: "2023-05-12",
-    totalApplications: 4,
-    activeApplications: 1,
-    completedApplications: 3,
-    rejectedApplications: 0,
-    debt: 850000,
-    applications: [
-      {
-        id: "APP006",
-        productName: "Samsung TV 55''",
-        productPrice: 7500000,
-        totalAmount: 8250000,
-        fillialName: "Buxoro filiali",
-        merchantName: "Texnomart",
-        region: "Buxoro",
-        applicationDate: "2024-09-15",
-        contractMonths: 12,
-        monthlyPayment: 687500,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR006",
-        scoringDate: "2024-09-15",
-        result: "approved",
-        limitAmount: 18000000,
-        source: "client_mobile",
-        scoringScore: 395,
-        scoringModel: "Premium Model v1.5",
-      },
-    ],
-  },
-  {
-    id: 4,
-    fullName: "Rahimova Dilnoza",
-    phone: "+998904445566",
-    passport: "AD1122334",
-    birthDate: "1992-03-25",
-    region: "Andijon",
-    address: "Andijon shahri, 10-ko'cha",
-    registrationDate: "2023-07-20",
-    totalApplications: 2,
-    activeApplications: 2,
-    completedApplications: 0,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP007",
-        productName: "iPhone 15 Pro",
-        productPrice: 18000000,
-        totalAmount: 19800000,
-        fillialName: "Andijon markaz",
-        merchantName: "Texnomart",
-        region: "Andijon",
-        applicationDate: "2024-11-20",
-        contractMonths: 12,
-        monthlyPayment: 1650000,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR007",
-        scoringDate: "2024-11-20",
-        result: "approved",
-        limitAmount: 25000000,
-        source: "operator",
-        operatorName: "Tursunov Bekzod",
-        fillialName: "Yashnobod filiali",
-        scoringScore: 420,
-        scoringModel: "Premium Model v2.1",
-      },
-    ],
-  },
-  {
-    id: 5,
-    fullName: "Toshmatov Ulugbek",
-    phone: "+998907778899",
-    passport: "AE5544332",
-    birthDate: "1985-06-18",
-    region: "Namangan",
-    address: "Namangan shahri, 5-mavze",
-    registrationDate: "2023-02-28",
-    totalApplications: 6,
-    activeApplications: 1,
-    completedApplications: 4,
-    rejectedApplications: 1,
-    debt: 2100000,
-    applications: [
-      {
-        id: "APP008",
-        productName: "Artel Konditsioner",
-        productPrice: 5000000,
-        totalAmount: 5500000,
-        fillialName: "Namangan filiali",
-        merchantName: "Artel Plaza",
-        region: "Namangan",
-        applicationDate: "2024-10-05",
-        contractMonths: 10,
-        monthlyPayment: 550000,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR008",
-        scoringDate: "2024-10-05",
-        result: "approved",
-        limitAmount: 8000000,
-        source: "client_mobile",
-        scoringScore: 360,
-        scoringModel: "Premium Model v2.0",
-      },
-    ],
-  },
-  {
-    id: 6,
-    fullName: "Yusupova Madina",
-    phone: "+998903334455",
-    passport: "AF6677889",
-    birthDate: "1998-09-12",
-    region: "Farg'ona",
-    address: "Farg'ona shahri, 30-uy",
-    registrationDate: "2023-08-15",
-    totalApplications: 3,
-    activeApplications: 1,
-    completedApplications: 2,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP009",
-        productName: "MacBook Pro 14''",
-        productPrice: 22000000,
-        totalAmount: 24200000,
-        fillialName: "Farg'ona markaz",
-        merchantName: "Texnomart",
-        region: "Farg'ona",
-        applicationDate: "2024-11-01",
-        contractMonths: 12,
-        monthlyPayment: 2016666,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR009",
-        scoringDate: "2024-11-01",
-        result: "approved",
-        limitAmount: 30000000,
-        source: "operator",
-        operatorName: "Xolmatova Dilnoza",
-        fillialName: "Mirzo Ulug'bek filiali",
-        scoringScore: 418,
-        scoringModel: "Premium Model v2.1",
-      },
-    ],
-  },
-  {
-    id: 7,
-    fullName: "Aliyev Rustam",
-    phone: "+998909990011",
-    passport: "AG3344556",
-    birthDate: "1993-04-22",
-    region: "Toshkent",
-    address: "Yakkasaroy tumani, 8-mavze",
-    registrationDate: "2023-04-10",
-    totalApplications: 5,
-    activeApplications: 2,
-    completedApplications: 2,
-    rejectedApplications: 1,
-    debt: 0,
-    applications: [
-      {
-        id: "APP010",
-        productName: "Sony PlayStation 5",
-        productPrice: 6500000,
-        totalAmount: 7150000,
-        fillialName: "Yakkasaroy filiali",
-        merchantName: "Texnomart",
-        region: "Toshkent",
-        applicationDate: "2024-10-20",
-        contractMonths: 12,
-        monthlyPayment: 595833,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR010",
-        scoringDate: "2024-10-20",
-        result: "approved",
-        limitAmount: 12000000,
-        source: "client_mobile",
-        scoringScore: 375,
-        scoringModel: "Premium Model v1.5",
-      },
-    ],
-  },
-  {
-    id: 8,
-    fullName: "Nazarova Shoira",
-    phone: "+998905556677",
-    passport: "AH7788990",
-    birthDate: "1991-11-30",
-    region: "Samarqand",
-    address: "Samarqand shahri, 15-ko'cha",
-    registrationDate: "2023-06-05",
-    totalApplications: 4,
-    activeApplications: 1,
-    completedApplications: 3,
-    rejectedApplications: 0,
-    debt: 1200000,
-    applications: [
-      {
-        id: "APP011",
-        productName: "LG Dishwasher",
-        productPrice: 8000000,
-        totalAmount: 8800000,
-        fillialName: "Samarqand markaz",
-        merchantName: "Artel Plaza",
-        region: "Samarqand",
-        applicationDate: "2024-09-25",
-        contractMonths: 12,
-        monthlyPayment: 733333,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR011",
-        scoringDate: "2024-09-25",
-        result: "approved",
-        limitAmount: 15000000,
-        source: "operator",
-        operatorName: "Rahimov Jasur",
-        fillialName: "Sergeli filiali",
-        scoringScore: 388,
-        scoringModel: "Premium Model v2.0",
-      },
-    ],
-  },
-  {
-    id: 9,
-    fullName: "Qodirov Javohir",
-    phone: "+998902223344",
-    passport: "AI9988776",
-    birthDate: "1987-07-14",
-    region: "Xorazm",
-    address: "Urganch shahri, 12-uy",
-    registrationDate: "2023-09-18",
-    totalApplications: 2,
-    activeApplications: 1,
-    completedApplications: 1,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP012",
-        productName: "Samsung Washing Machine",
-        productPrice: 5500000,
-        totalAmount: 6050000,
-        fillialName: "Urganch filiali",
-        merchantName: "Texnomart",
-        region: "Xorazm",
-        applicationDate: "2024-11-05",
-        contractMonths: 10,
-        monthlyPayment: 605000,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR012",
-        scoringDate: "2024-11-05",
-        result: "approved",
-        limitAmount: 10000000,
-        source: "client_mobile",
-        scoringScore: 370,
-        scoringModel: "Premium Model v2.1",
-      },
-    ],
-  },
-  {
-    id: 10,
-    fullName: "Ismoilova Zarina",
-    phone: "+998908889977",
-    passport: "AJ1122335",
-    birthDate: "1996-02-08",
-    region: "Qashqadaryo",
-    address: "Qarshi shahri, 20-ko'cha",
-    registrationDate: "2023-10-22",
-    totalApplications: 3,
-    activeApplications: 1,
-    completedApplications: 1,
-    rejectedApplications: 1,
-    debt: 0,
-    applications: [
-      {
-        id: "APP013",
-        productName: "iPad Pro 12.9''",
-        productPrice: 14000000,
-        totalAmount: 15400000,
-        fillialName: "Qarshi filiali",
-        merchantName: "Texnomart",
-        region: "Qashqadaryo",
-        applicationDate: "2024-10-10",
-        contractMonths: 12,
-        monthlyPayment: 1283333,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR013",
-        scoringDate: "2024-10-10",
-        result: "approved",
-        limitAmount: 20000000,
-        source: "operator",
-        operatorName: "Saidov Otabek",
-        fillialName: "Uchtepa filiali",
-        scoringScore: 405,
-        scoringModel: "Premium Model v2.0",
-      },
-    ],
-  },
-  {
-    id: 11,
-    fullName: "Mirzayev Bobur",
-    phone: "+998906667788",
-    passport: "AK4455667",
-    birthDate: "1989-05-19",
-    region: "Surxondaryo",
-    address: "Termiz shahri, 7-mavze",
-    registrationDate: "2023-11-30",
-    totalApplications: 4,
-    activeApplications: 2,
-    completedApplications: 2,
-    rejectedApplications: 0,
-    debt: 500000,
-    applications: [
-      {
-        id: "APP014",
-        productName: "Artel Microwave",
-        productPrice: 2500000,
-        totalAmount: 2750000,
-        fillialName: "Termiz filiali",
-        merchantName: "Artel Plaza",
-        region: "Surxondaryo",
-        applicationDate: "2024-11-12",
-        contractMonths: 6,
-        monthlyPayment: 458333,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR014",
-        scoringDate: "2024-11-12",
-        result: "approved",
-        limitAmount: 5000000,
-        source: "client_mobile",
-        scoringScore: 355,
-        scoringModel: "Premium Model v1.5",
-      },
-    ],
-  },
-  {
-    id: 12,
-    fullName: "Ergasheva Feruza",
-    phone: "+998901112222",
-    passport: "AL8877665",
-    birthDate: "1994-08-03",
-    region: "Jizzax",
-    address: "Jizzax shahri, 18-uy",
-    registrationDate: "2023-12-15",
-    totalApplications: 2,
-    activeApplications: 1,
-    completedApplications: 1,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP015",
-        productName: "Dell XPS 15",
-        productPrice: 19000000,
-        totalAmount: 20900000,
-        fillialName: "Jizzax markaz",
-        merchantName: "Texnomart",
-        region: "Jizzax",
-        applicationDate: "2024-10-28",
-        contractMonths: 12,
-        monthlyPayment: 1741666,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR015",
-        scoringDate: "2024-10-28",
-        result: "approved",
-        limitAmount: 22000000,
-        source: "operator",
-        operatorName: "Normatova Saida",
-        fillialName: "Bektemir filiali",
-        scoringScore: 412,
-        scoringModel: "Premium Model v2.1",
-      },
-    ],
-  },
-  {
-    id: 13,
-    fullName: "Sharipov Otabek",
-    phone: "+998909998877",
-    passport: "AM5566778",
-    birthDate: "1990-10-11",
-    region: "Navoiy",
-    address: "Navoiy shahri, 9-ko'cha",
-    registrationDate: "2024-01-20",
-    totalApplications: 3,
-    activeApplications: 1,
-    completedApplications: 2,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP016",
-        productName: "Samsung Refrigerator",
-        productPrice: 9500000,
-        totalAmount: 10450000,
-        fillialName: "Navoiy filiali",
-        merchantName: "Artel Plaza",
-        region: "Navoiy",
-        applicationDate: "2024-11-15",
-        contractMonths: 12,
-        monthlyPayment: 870833,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR016",
-        scoringDate: "2024-11-15",
-        result: "approved",
-        limitAmount: 16000000,
-        source: "client_mobile",
-        scoringScore: 390,
-        scoringModel: "Premium Model v2.0",
-      },
-    ],
-  },
-  {
-    id: 14,
-    fullName: "Karimov Shoxrux",
-    phone: "+998903335577",
-    passport: "AN2233445",
-    birthDate: "1986-01-27",
-    region: "Sirdaryo",
-    address: "Guliston shahri, 14-mavze",
-    registrationDate: "2024-02-10",
-    totalApplications: 5,
-    activeApplications: 2,
-    completedApplications: 3,
-    rejectedApplications: 0,
-    debt: 0,
-    applications: [
-      {
-        id: "APP017",
-        productName: "HP Laptop",
-        productPrice: 10000000,
-        totalAmount: 11000000,
-        fillialName: "Guliston filiali",
-        merchantName: "Texnomart",
-        region: "Sirdaryo",
-        applicationDate: "2024-10-18",
-        contractMonths: 12,
-        monthlyPayment: 916666,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR017",
-        scoringDate: "2024-10-18",
-        result: "approved",
-        limitAmount: 14000000,
-        source: "operator",
-        operatorName: "Ergashev Sanjar",
-        fillialName: "Shayxontohur filiali",
-        scoringScore: 380,
-        scoringModel: "Premium Model v1.5",
-      },
-    ],
-  },
-  {
-    id: 15,
-    fullName: "Axmedova Sevara",
-    phone: "+998907776655",
-    passport: "AO6655443",
-    birthDate: "1997-12-05",
-    region: "Toshkent",
-    address: "Uchtepa tumani, 22-uy",
-    registrationDate: "2024-03-05",
-    totalApplications: 2,
-    activeApplications: 1,
-    completedApplications: 1,
-    rejectedApplications: 0,
-    debt: 950000,
-    applications: [
-      {
-        id: "APP018",
-        productName: "Artel Air Conditioner",
-        productPrice: 4800000,
-        totalAmount: 5280000,
-        fillialName: "Uchtepa filiali",
-        merchantName: "Artel Plaza",
-        region: "Toshkent",
-        applicationDate: "2024-11-08",
-        contractMonths: 10,
-        monthlyPayment: 528000,
-        status: "active",
-      },
-    ],
-    scorings: [
-      {
-        id: "SCR018",
-        scoringDate: "2024-11-08",
-        result: "approved",
-        limitAmount: 9000000,
-        source: "client_mobile",
-        scoringScore: 365,
-        scoringModel: "Premium Model v2.1",
-      },
-    ],
-  },
-];
-
 // Format functions
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("uz-UZ").format(amount) + " so'm";
@@ -770,22 +39,81 @@ const formatDate = (date: string) => {
 export default function Customers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
 
+  // Load ALL customers from API once
+  useEffect(() => {
+    loadCustomers();
+  }, []);
+
+  const loadCustomers = async () => {
+    try {
+      setLoading(true);
+      const response = await api.listCustomers({
+        page: 1,
+        pageSize: 1000, // Load all customers at once
+      });
+      console.log('API Response:', response);
+      console.log('Loaded customers:', response.value?.length, 'Total:', response.Count);
+      if (!response.value || response.value.length === 0) {
+        console.warn('No customers returned from API');
+      }
+      setAllCustomers(response.value || []);
+    } catch (error) {
+      console.error('Error loading customers:', error);
+      alert('Xatolik: ' + (error as any)?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter customers by search query (frontend)
   const filteredCustomers = useMemo(() => {
-    return MOCK_CUSTOMERS.filter((customer) =>
-      customer.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.phone.includes(searchQuery) ||
-      customer.passport.toLowerCase().includes(searchQuery.toLowerCase())
+    if (!searchQuery) return allCustomers;
+    const query = searchQuery.toLowerCase();
+    return allCustomers.filter((customer) =>
+      customer.fullName.toLowerCase().includes(query) ||
+      customer.phone.toLowerCase().includes(query) ||
+      customer.passport.toLowerCase().includes(query)
     );
-  }, [searchQuery]);
+  }, [allCustomers, searchQuery]);
 
+  // Pagination (frontend)
   const totalPages = Math.ceil(filteredCustomers.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const currentCustomers = filteredCustomers.slice(startIndex, endIndex);
+  const customers = filteredCustomers.slice(startIndex, endIndex);
+
+  const handleViewCustomer = async (customer: Customer) => {
+    console.log('Clicked customer:', customer);
+    setSelectedCustomer(customer);
+    setSelectedCustomerDetail(null);
+    setShowDetailModal(true);
+    setLoadingDetail(true);
+    
+    // Load full customer details
+    try {
+      const detail = await api.getCustomer(customer.id);
+      console.log('Customer detail loaded:', detail);
+      setSelectedCustomerDetail(detail);
+    } catch (error) {
+      console.error('Error loading customer detail:', error);
+      alert('Mijoz ma\'lumotlarini yuklashda xatolik yuz berdi');
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   return (
     <div className="mt-5 h-full w-full">
@@ -827,7 +155,7 @@ export default function Customers() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Jami mijozlar</p>
-                <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">{MOCK_CUSTOMERS.length}</p>
+                <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">{allCustomers.length}</p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500">
                 <User className="h-6 w-6 text-white" />
@@ -839,7 +167,7 @@ export default function Customers() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Faol arizalar</p>
                 <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">
-                  {MOCK_CUSTOMERS.reduce((sum, c) => sum + c.activeApplications, 0)}
+                  {allCustomers.reduce((sum, c) => sum + (c.activeApplications || 0), 0)}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500">
@@ -852,7 +180,7 @@ export default function Customers() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Yakunlangan</p>
                 <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">
-                  {MOCK_CUSTOMERS.reduce((sum, c) => sum + c.completedApplications, 0)}
+                  {allCustomers.reduce((sum, c) => sum + (c.completedApplications || 0), 0)}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-500">
@@ -865,7 +193,7 @@ export default function Customers() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rad etilgan</p>
                 <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">
-                  {MOCK_CUSTOMERS.reduce((sum, c) => sum + c.rejectedApplications, 0)}
+                  {allCustomers.reduce((sum, c) => sum + (c.rejectedApplications || 0), 0)}
                 </p>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-red-500">
@@ -887,9 +215,6 @@ export default function Customers() {
                   Mijoz
                 </th>
                 <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Passport
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
                   Hudud
                 </th>
                 <th className="pb-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
@@ -907,37 +232,48 @@ export default function Customers() {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.length === 0 ? (
+              {loading ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={7}
+                    className="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
+                  >
+                    Yuklanmoqda...
+                  </td>
+                </tr>
+              ) : customers.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={7}
                     className="py-8 text-center text-sm text-gray-500 dark:text-gray-400"
                   >
                     Ma'lumot topilmadi
                   </td>
                 </tr>
               ) : (
-                currentCustomers.map((customer, index) => (
+                customers.map((customer, index) => (
                   <tr
                     key={customer.id}
                     className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-900 cursor-pointer"
-                    onClick={() => {
-                      setSelectedCustomer(customer);
-                      setShowDetailModal(true);
-                    }}
+                    onClick={() => handleViewCustomer(customer)}
                   >
                     <td className="py-4 text-sm text-gray-600 dark:text-gray-400">
-                      {startIndex + index + 1}
+                      {(currentPage - 1) * pageSize + index + 1}
                     </td>
-                    <td className="py-4 text-sm font-medium text-navy-700 dark:text-white">
-                      <div>{customer.fullName}</div>
-                      <div className="text-xs text-gray-500">{customer.phone}</div>
-                    </td>
-                    <td className="py-4 text-sm font-mono text-gray-700 dark:text-gray-300">
-                      {customer.passport}
+                    <td className="py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 dark:bg-navy-700 text-gray-700 dark:text-gray-300 text-sm font-bold">
+                          {customer.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-navy-700 dark:text-white">{customer.fullName}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{customer.passport}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{customer.phone}</div>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-4 text-sm text-indigo-600 dark:text-indigo-400">
-                      {customer.region}
+                      {customer.region || "—"}
                     </td>
                     <td className="py-4 text-center text-sm">
                       <div className="flex items-center justify-center gap-2">
@@ -962,9 +298,10 @@ export default function Customers() {
                       {formatDate(customer.registrationDate)}
                     </td>
                     <td className="py-4 text-center">
-                      <button className="rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600">
-                        Ko'rish
-                      </button>
+                      <span className="inline-flex items-center gap-1 text-xs text-brand-500 dark:text-brand-400">
+                        <Eye className="h-4 w-4" />
+                        Batafsil
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -976,7 +313,9 @@ export default function Customers() {
         {/* Pagination */}
         <div className="mt-6 flex items-center justify-between gap-4">
           <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
-            {`${filteredCustomers.length} dan ${currentCustomers.length} ta ko'rsatilmoqda`}
+            {searchQuery 
+              ? `${filteredCustomers.length} ta topildi (${allCustomers.length} dan)` 
+              : `${filteredCustomers.length} dan ${customers.length} ta ko'rsatilmoqda`}
           </div>
           <div className="flex items-center gap-3">
             <CustomSelect
@@ -1021,6 +360,12 @@ export default function Customers() {
             </div>
 
             {/* Customer Info */}
+            {loadingDetail ? (
+              <div className="py-8 text-center">
+                <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
+                <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Yuklanmoqda...</p>
+              </div>
+            ) : (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -1029,7 +374,7 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Telefon</p>
-                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.phone}</p>
+                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.phone || "—"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
@@ -1039,165 +384,157 @@ export default function Customers() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Tug'ilgan sana</p>
-                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{formatDate(selectedCustomer.birthDate)}</p>
+                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.birthDate ? formatDate(selectedCustomer.birthDate) : "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Hudud</p>
-                  <p className="mt-1 text-base font-semibold text-indigo-600">{selectedCustomer.region}</p>
+                  <p className="mt-1 text-base font-semibold text-indigo-600">{selectedCustomer.region || "—"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Manzil</p>
-                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.address}</p>
+                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.address || "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Ro'yxatdan o'tgan sana</p>
-                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{formatDate(selectedCustomer.registrationDate)}</p>
+                  <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.registrationDate ? formatDate(selectedCustomer.registrationDate) : "—"}</p>
                 </div>
               </div>
+
+              {/* Workplaces Section */}
+              {selectedCustomerDetail?.workplaces && selectedCustomerDetail.workplaces.length > 0 && (
+                <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                  <div className="mb-3 flex items-center gap-2">
+                    <BuildingStore className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <p className="text-sm font-bold text-navy-700 dark:text-white">
+                      Ish joylari ({selectedCustomerDetail.workplaces.length})
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {selectedCustomerDetail.workplaces.map((cw: any) => (
+                      <div
+                        key={cw.id}
+                        className="rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-indigo-50/30 p-4 transition-all hover:shadow-md dark:border-gray-700 dark:from-gray-800 dark:to-indigo-900/10"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                                <BuildingStore className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-navy-700 dark:text-white">
+                                  {cw.workplace?.name || "—"}
+                                </p>
+                                <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                                  {cw.position}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                              {cw.is_current && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                  <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+                                  Joriy ish joyi
+                                </span>
+                              )}
+                              {cw.workplace?.work_type && (
+                                <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  {cw.workplace.work_type}
+                                </span>
+                              )}
+                              {cw.workplace?.inn && (
+                                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-mono text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                  INN: {cw.workplace.inn}
+                                </span>
+                              )}
+                            </div>
+                            {(cw.start_date || cw.end_date) && (
+                              <div className="mt-2 flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>
+                                  {cw.start_date && formatDate(cw.start_date)}
+                                  {cw.end_date ? ` - ${formatDate(cw.end_date)}` : ' - hozir'}
+                                </span>
+                              </div>
+                            )}
+                            {cw.workplace?.address && (
+                              <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+                                📍 {cw.workplace.address}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Applications Section */}
               <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
                 <p className="mb-3 text-sm font-bold text-navy-700 dark:text-white">
-                  Arizalar ro'yxati ({selectedCustomer.applications.length})
+                  Arizalar ro'yxati ({selectedCustomerDetail?.zayavkalar?.length || 0})
                 </p>
-                <div className="space-y-3">
-                  {selectedCustomer.applications.map((app) => (
-                    <div
-                      key={app.id}
-                      className={`rounded-lg border p-4 ${
-                        app.status === "completed"
-                          ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
-                          : app.status === "active"
-                          ? "border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
-                          : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
-                      }`}
-                    >
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-brand-500">{app.id}</span>
-                          <span className="text-xs text-gray-500">•</span>
-                          <span className="text-xs text-gray-600 dark:text-gray-400">
-                            {formatDate(app.applicationDate)}
-                          </span>
-                          <div className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
-                            app.status === "completed"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : app.status === "active"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          }`}>
-                            {app.status === "completed" ? "Yakunlangan" : app.status === "active" ? "Faol" : "Rad etilgan"}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div>
-                          <p className="font-semibold text-navy-700 dark:text-white">{app.productName}</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400">
-                            Narxi: {formatCurrency(app.productPrice)} • Jami: {formatCurrency(app.totalAmount)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400">
-                          <BuildingStore className="h-4 w-4" />
-                          <span>{app.merchantName} - {app.fillialName}</span>
-                          <span className="text-xs text-gray-500">({app.region})</span>
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          Muddat: {app.contractMonths} oy • Oylik to'lov: {formatCurrency(app.monthlyPayment)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Scorings Section */}
-              <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
-                <p className="mb-3 text-sm font-bold text-navy-700 dark:text-white">
-                  Skoring tarixi ({selectedCustomer.scorings.length})
-                </p>
-                <div className="space-y-3">
-                  {selectedCustomer.scorings.map((scoring) => (
-                    <div
-                      key={scoring.id}
-                      className={`rounded-lg border p-4 ${
-                        scoring.result === "approved"
-                          ? "border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20"
-                          : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
+                {!selectedCustomerDetail?.zayavkalar || selectedCustomerDetail.zayavkalar.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Arizalar mavjud emas</p>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedCustomerDetail.zayavkalar.map((zayavka: any) => {
+                      // Get first product from products array
+                      const product = zayavka.products?.[0] || null;
+                      return (
+                      <div
+                        key={zayavka.id}
+                        className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800"
+                      >
+                        <div className="mb-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-gray-500" />
-                            <span className="text-sm text-gray-600 dark:text-gray-400">
-                              {formatDate(scoring.scoringDate)}
+                            <span className="font-bold text-brand-500">#{zayavka.id}</span>
+                            <span className="text-xs text-gray-500">•</span>
+                            <span className="text-xs text-gray-600 dark:text-gray-400">
+                              {zayavka.createdAt ? formatDate(zayavka.createdAt) : "—"}
                             </span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            {scoring.source === "client_mobile" ? (
-                              <DeviceMobile className="h-4 w-4 text-blue-600" />
-                            ) : (
-                              <Phone className="h-4 w-4 text-purple-600" />
-                            )}
-                            <span className={`text-xs font-medium ${
-                              scoring.source === "client_mobile"
-                                ? "text-blue-600 dark:text-blue-400"
-                                : "text-purple-600 dark:text-purple-400"
-                            }`}>
-                              {scoring.source === "client_mobile" 
-                                ? "Client Mobile" 
-                                : `Operator${scoring.operatorName ? `: ${scoring.operatorName}` : ""}${scoring.fillialName ? ` (${scoring.fillialName})` : ""}`}
-                            </span>
+                            <div className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              {zayavka.status || "—"}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <div className={`rounded-full px-3 py-1.5 text-sm font-bold ${
-                            scoring.scoringScore >= 350
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : scoring.scoringScore >= 250
-                              ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          }`}>
-                            Ball: {scoring.scoringScore}
+                        <div className="space-y-2">
+                          <div>
+                            <p className="font-semibold text-navy-700 dark:text-white">
+                              {product?.name || "Mahsulot nomi yo'q"}
+                            </p>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Narxi: {product?.price ? formatCurrency(product.price) : "—"} 
+                              {zayavka.full_price && ` • Jami: ${formatCurrency(zayavka.full_price)}`}
+                            </p>
                           </div>
-                          <div className={`rounded-full px-3 py-1 text-sm font-bold ${
-                            scoring.result === "approved"
-                              ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                          }`}>
-                            {scoring.result === "approved" ? "Tasdiqlandi" : "Rad etildi"}
-                          </div>
+                          {zayavka.fillial && (
+                            <div className="flex items-center gap-1 text-sm text-indigo-600 dark:text-indigo-400">
+                              <BuildingStore className="h-4 w-4" />
+                              <span>{zayavka.fillial.merchant?.name || zayavka.merchant?.name || "—"} - {zayavka.fillial.name || "—"}</span>
+                              {zayavka.fillial.region && (
+                                <span className="text-xs text-gray-500">({zayavka.fillial.region})</span>
+                              )}
+                            </div>
+                          )}
+                          {zayavka.contract_month && (
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              Muddat: {zayavka.contract_month} oy
+                              {zayavka.monthly_pay && ` • Oylik to'lov: ${formatCurrency(zayavka.monthly_pay)}`}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3">
-                        <div className="text-sm">
-                          <span className="text-gray-600 dark:text-gray-400">Model: </span>
-                          <span className="font-medium text-indigo-600 dark:text-indigo-400">
-                            {scoring.scoringModel}
-                          </span>
-                        </div>
-                        {scoring.result === "approved" && scoring.limitAmount && (
-                          <div className="text-sm">
-                            <span className="text-gray-600 dark:text-gray-400">Limit: </span>
-                            <span className="font-bold text-green-600 dark:text-green-400">
-                              {formatCurrency(scoring.limitAmount)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      {scoring.result === "rejected" && scoring.rejectionReason && (
-                        <div className="mt-2 text-sm text-red-600 dark:text-red-400">
-                          Sabab: {scoring.rejectionReason}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
+            )}
 
             <div className="mt-6 flex justify-end">
               <button

@@ -145,6 +145,7 @@ const Payments = () => {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showAddMibModal, setShowAddMibModal] = useState(false);
+  const [applicationPayments, setApplicationPayments] = useState<Payment[]>([]);
 
   // Load payments from API
   useEffect(() => {
@@ -170,9 +171,22 @@ const Payments = () => {
       }
       
       const response = await paymentApi.getPayments(filters);
-      setPayments(response.data);
+      // Ensure we always set an array
+      const paymentsData = Array.isArray(response.data) ? response.data : [];
+      
+      // Map API data to component format
+      const mappedPayments = paymentsData.map((payment: any) => ({
+        ...payment,
+        customerName: payment.zayavka?.fullname || 'N/A',
+        customerPhone: payment.zayavka?.phone || 'N/A',
+        applicationId: payment.zayavka?.id ? String(payment.zayavka.id) : 'N/A',
+        branch: payment.fillial?.name || 'N/A',
+      }));
+      
+      setPayments(mappedPayments);
     } catch (error) {
       console.error('Error loading payments:', error);
+      setPayments([]); // Set empty array on error
     } finally {
       setLoading(false);
     }
@@ -254,13 +268,14 @@ const Payments = () => {
   const filteredPayments = useMemo(() => {
     return payments.filter((payment) => {
       const matchesSearch =
-        (payment.client?.full_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (payment.zayavka_id?.toString() || "").includes(searchQuery) ||
-        (payment.client?.phone || "").includes(searchQuery) ||
-        (payment.transactionId || "").includes(searchQuery);
+        (payment.customerName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (payment.applicationId || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (payment.customerPhone || "").includes(searchQuery) ||
+        (payment.transactionId || "").toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesProvider = filterProvider === "all" || payment.provider === filterProvider;
       const matchesStatus = filterStatus === "all" || payment.status === filterStatus;
+      const matchesBranch = filterBranch === "all" || payment.branch === filterBranch;
 
       // Date range filter
       let matchesDateRange = true;
@@ -279,9 +294,9 @@ const Payments = () => {
         }
       }
 
-      return matchesSearch && matchesProvider && matchesStatus && matchesDateRange;
+      return matchesSearch && matchesProvider && matchesStatus && matchesBranch && matchesDateRange;
     });
-  }, [payments, searchQuery, filterProvider, filterStatus, filterDateFrom, filterDateTo]);
+  }, [payments, searchQuery, filterProvider, filterStatus, filterBranch, filterDateFrom, filterDateTo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredPayments.length / pageSize);
@@ -485,26 +500,40 @@ const Payments = () => {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Ariza ID</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Mijoz</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Filial</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Summa</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Provayder</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Sana</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Holat</th>
-                <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Amallar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentPayments.map((payment) => (
-                <tr key={payment.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-700">
-                  <td className="py-4 text-sm font-bold text-navy-700 dark:text-white">{payment.applicationId}</td>
-                  <td className="py-4">
-                    <div>
-                      <p className="text-sm font-medium text-navy-700 dark:text-white">{payment.customerName}</p>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-500 border-t-transparent"></div>
+              <span className="ml-3 text-gray-600 dark:text-gray-400">Yuklanmoqda...</span>
+            </div>
+          ) : currentPayments.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <svg className="mb-4 h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <p className="text-lg font-medium text-gray-600 dark:text-gray-400">To'lovlar topilmadi</p>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-500">Filter sozlamalarini o'zgartiring yoki kutib turing</p>
+            </div>
+          ) : (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Ariza ID</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Mijoz</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Filial</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Summa</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Provayder</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Sana</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Holat</th>
+                  <th className="pb-3 text-left text-xs font-bold uppercase text-gray-600 dark:text-gray-400">Amallar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentPayments.map((payment) => (
+                  <tr key={payment.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-700">
+                    <td className="py-4 text-sm font-bold text-navy-700 dark:text-white">{payment.applicationId}</td>
+                    <td className="py-4">
+                      <div>
+                        <p className="text-sm font-medium text-navy-700 dark:text-white">{payment.customerName}</p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">{payment.customerPhone}</p>
                     </div>
                   </td>
@@ -523,9 +552,13 @@ const Payments = () => {
                   </td>
                   <td className="py-4">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setSelectedPayment(payment);
                         setShowDetailModal(true);
+                        
+                        // Load all payments for this application
+                        const appPayments = payments.filter(p => p.applicationId === payment.applicationId);
+                        setApplicationPayments(appPayments.sort((a, b) => new Date(a.paymentDate || 0).getTime() - new Date(b.paymentDate || 0).getTime()));
                       }}
                       className="rounded-lg p-2 text-brand-500 transition-colors hover:bg-brand-50 dark:hover:bg-brand-900/20"
                     >
@@ -536,9 +569,11 @@ const Payments = () => {
               ))}
             </tbody>
           </table>
+          )}
         </div>
 
         {/* Pagination */}
+        {!loading && currentPayments.length > 0 && (
         <div className="mt-6 flex items-center justify-between gap-4">
           <div className="text-sm text-gray-600 dark:text-gray-400">
             {`${filteredPayments.length} dan ${currentPayments.length} ta ko'rsatilmoqda`}
@@ -561,6 +596,7 @@ const Payments = () => {
             <Pagination page={currentPage} totalPages={totalPages} onPageChange={(p) => setCurrentPage(p)} />
           </div>
         </div>
+        )}
       </Card>
 
       {/* Detail Modal */}
@@ -653,6 +689,55 @@ const Payments = () => {
                     <h4 className="mb-3 text-sm font-bold uppercase text-gray-500 dark:text-gray-400">Izohlar</h4>
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
                       <p className="text-sm text-gray-700 dark:text-gray-300">{selectedPayment.notes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Monthly Payments */}
+                {applicationPayments.length > 0 && (
+                  <div>
+                    <h4 className="mb-3 text-sm font-bold uppercase text-gray-500 dark:text-gray-400">
+                      Arizaga tegishli to'lovlar ({applicationPayments.length} ta)
+                    </h4>
+                    <div className="max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-gray-100 dark:bg-gray-800">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400">№</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400">Sana</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400">Summa</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400">Provayder</th>
+                            <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 dark:text-gray-400">Holat</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {applicationPayments.map((appPayment, idx) => (
+                            <tr key={appPayment.id} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                              <td className="px-3 py-2 font-medium text-gray-700 dark:text-gray-300">{idx + 1}</td>
+                              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">{formatDate(appPayment.paymentDate)}</td>
+                              <td className="px-3 py-2 font-bold text-green-600 dark:text-green-400">{formatCurrency(appPayment.amount)}</td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${PROVIDER_COLORS[appPayment.provider]}`}>
+                                  {PROVIDER_LABELS[appPayment.provider]}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${STATUS_COLORS[appPayment.status]}`}>
+                                  {STATUS_LABELS[appPayment.status]}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="sticky bottom-0 bg-gray-100 dark:bg-gray-800">
+                          <tr>
+                            <td colSpan={2} className="px-3 py-2 text-right font-bold text-gray-700 dark:text-gray-300">Jami:</td>
+                            <td colSpan={3} className="px-3 py-2 font-bold text-green-600 dark:text-green-400">
+                              {formatCurrency(applicationPayments.reduce((sum, p) => sum + p.amount, 0))}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
                   </div>
                 )}

@@ -30,6 +30,9 @@ export default function SignIn(): JSX.Element {
     if (!login || login.trim().length === 0) {
       setLoginError("Login maydoni to'ldirilishi shart");
       hasError = true;
+    } else if (login.length < 12) {
+      setLoginError("Login kamida 12 ta belgidan iborat bo'lishi kerak (telefon raqami: 998901234567)");
+      hasError = true;
     }
     
     // Validate password

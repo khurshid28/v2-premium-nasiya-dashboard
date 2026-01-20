@@ -62,6 +62,21 @@ type Application = {
     timestamp: number;
     changes?: { field: string; value: any; label: string; isAmount?: boolean }[];
   }[];
+  actionLogs?: {
+    id: number;
+    action: string;
+    entity_type: string;
+    entity_id: number;
+    description?: string;
+    metadata?: any;
+    createdAt: string;
+    user?: {
+      id: number;
+      fullname: string;
+      phone?: string;
+      role?: string;
+    };
+  }[];
 };
 
 const ApplicationDetail = (): JSX.Element => {
@@ -582,7 +597,7 @@ const ApplicationDetail = (): JSX.Element => {
 
           {activeTab === 'history' && (
             <div>
-              {application.paymentHistory && application.paymentHistory.length > 0 ? (
+              {application.payments && application.payments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="border-b border-gray-200 dark:border-gray-700">
@@ -591,24 +606,17 @@ const ApplicationDetail = (): JSX.Element => {
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Sana</th>
                         <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Summa</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Provider</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">To'lov turi</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Transaction ID</th>
                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {application.paymentHistory.map((payment) => (
+                      {application.payments.map((payment: any) => (
                         <tr key={payment.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-navy-800">
                           <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.id}</td>
                           <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                            {(() => {
-                              const date = new Date(payment.date);
-                              const day = String(date.getDate()).padStart(2, '0');
-                              const month = String(date.getMonth() + 1).padStart(2, '0');
-                              const year = date.getFullYear();
-                              const hours = String(date.getHours()).padStart(2, '0');
-                              const minutes = String(date.getMinutes()).padStart(2, '0');
-                              return `${day}.${month}.${year} ${hours}:${minutes}`;
-                            })()}
+                            {formatDateNoSeconds(payment.createdAt)}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
                             {formatMoneyWithUZS(payment.amount)}
@@ -619,24 +627,38 @@ const ApplicationDetail = (): JSX.Element => {
                               payment.provider === 'PLUM' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
                               payment.provider === 'AUTO' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                               payment.provider === 'MIB' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                              payment.provider === 'CLICK' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' :
+                              payment.provider === 'UZUM' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' :
+                              payment.provider === 'APELSIN' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                              payment.provider === 'CASH' ? 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' :
                               'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                             }`}>
                               {payment.provider}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                            {payment.paymentType?.replace('_', ' ')}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
                             {payment.transactionId || '—'}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              payment.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                              payment.status === 'pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                              payment.status === 'failed' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              payment.status === 'COMPLETED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                              payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                              payment.status === 'FAILED' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                              payment.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                              payment.status === 'CANCELLED' ? 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' :
+                              payment.status === 'REFUNDED' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
                               'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                             }`}>
-                              {payment.status === 'completed' ? 'Muvaffaqiyatli' :
-                               payment.status === 'pending' ? 'Kutilmoqda' :
-                               payment.status === 'failed' ? 'Muvaffaqiyatsiz' : payment.status}
+                              {payment.status === 'COMPLETED' ? 'Muvaffaqiyatli' :
+                               payment.status === 'PENDING' ? 'Kutilmoqda' :
+                               payment.status === 'FAILED' ? 'Muvaffaqiyatsiz' :
+                               payment.status === 'PROCESSING' ? 'Jarayonda' :
+                               payment.status === 'CANCELLED' ? 'Bekor qilingan' :
+                               payment.status === 'REFUNDED' ? 'Qaytarilgan' :
+                               payment.status}
                             </span>
                           </td>
                         </tr>
@@ -646,10 +668,10 @@ const ApplicationDetail = (): JSX.Element => {
                       <tr>
                         <td colSpan={2} className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">Jami to'langan:</td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
-                          {formatMoneyWithUZS(application.paymentHistory.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0))}
+                          {formatMoneyWithUZS(application.payments.filter((p: any) => p.status === 'COMPLETED').reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
                         </td>
-                        <td colSpan={3} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                          {application.paymentHistory.filter(p => p.status === 'completed').length} ta to'lov
+                        <td colSpan={4} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                          {application.payments.filter((p: any) => p.status === 'COMPLETED').length} ta to'lov
                         </td>
                       </tr>
                     </tfoot>
@@ -657,7 +679,7 @@ const ApplicationDetail = (): JSX.Element => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400">So'ndirish tarixi mavjud emas</p>
+                  <p className="text-gray-600 dark:text-gray-400">To'lovlar tarixi mavjud emas</p>
                 </div>
               )}
             </div>
@@ -665,56 +687,82 @@ const ApplicationDetail = (): JSX.Element => {
 
           {activeTab === 'operations' && (
             <div>
-              {application.statusHistory && application.statusHistory.length > 0 ? (
+              {application.actionLogs && application.actionLogs.length > 0 ? (
                 <div className="space-y-4">
-                  {application.statusHistory.map((history, index) => {
-                    const date = new Date(history.date);
+                  {application.actionLogs.map((log: any) => {
+                    const date = new Date(log.createdAt);
                     const formattedDate = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
                     const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                     
-                    // Status labels
-                    const statusLabels: { [key: string]: { label: string; color: string } } = {
-                      'CREATED': { label: 'Ariza yaratildi', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
-                      'ADDED_DETAIL': { label: 'Ma\'lumotlar qo\'shildi', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
-                      'WAITING_SCORING': { label: 'Skoringda kutilmoqda', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-                      'LIMIT': { label: 'Limit tayinlandi', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
-                      'CANCELED_BY_SCORING': { label: 'Skoring tomonidan rad etildi', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
-                      'CANCELED_BY_CLIENT': { label: 'Mijoz tomonidan bekor qilindi', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-                      'CANCELED_BY_DAILY': { label: 'Kunlik limit tomonidan bekor qilindi', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
-                      'ADDED_PRODUCT': { label: 'Mahsulot qo\'shildi', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-                      'WAITING_BANK_UPDATE': { label: 'Bank yangilanishida', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200' },
-                      'WAITING_BANK_CONFIRM': { label: 'Bank tasdig\'ida', color: 'bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200' },
-                      'CONFIRMED': { label: 'Tasdiqlandi', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-                      'FINISHED': { label: 'Yakunlandi', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' }
+                    // Action type labels
+                    const actionTypeLabels: { [key: string]: { label: string; color: string } } = {
+                      'CREATE': { label: 'Yaratildi', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
+                      'UPDATE': { label: 'Tahrirlandi', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
+                      'DELETE': { label: 'O\'chirildi', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
+                      'STATUS_CHANGE': { label: 'Status o\'zgartirildi', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+                      'PAYMENT': { label: 'To\'lov', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+                      'SCORING': { label: 'Skoring', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+                      'APPROVE': { label: 'Tasdiqlandi', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' },
+                      'REJECT': { label: 'Rad etildi', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
+                      'CANCEL': { label: 'Bekor qilindi', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
                     };
                     
-                    const statusInfo = statusLabels[history.status] || { label: history.status, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' };
+                    const actionInfo = actionTypeLabels[log.action_type] || { label: log.action_type, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' };
                     
                     return (
-                      <div key={index} className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-navy-800 rounded-lg">
+                      <div key={log.id} className="flex items-start gap-4 p-4 bg-gray-50 dark:bg-navy-800 rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                              {statusInfo.label}
+                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${actionInfo.color}`}>
+                              {actionInfo.label}
                             </span>
                             <span className="text-sm text-gray-500 dark:text-gray-400">
                               {formattedDate} {formattedTime}
                             </span>
                           </div>
                           
-                          {/* Display changes */}
-                          {history.changes && history.changes.length > 0 && (
-                            <div className="mt-3 space-y-2">
-                              {history.changes.map((change, changeIndex) => (
-                                <div key={changeIndex} className="flex items-start gap-2 text-sm">
-                                  <span className="text-gray-500 dark:text-gray-400 min-w-[120px]">{change.label}:</span>
-                                  <span className="font-medium text-gray-900 dark:text-white">
-                                    {change.isAmount ? formatMoneyWithUZS(change.value) : change.value}
+                          {/* User info */}
+                          {log.user && (
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="font-medium text-gray-900 dark:text-white">{log.user.fullname}</span>
+                                <span className="mx-2">•</span>
+                                <span className={`px-2 py-0.5 rounded text-xs ${
+                                  log.user_role === 'SUPER' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                  log.user_role === 'ADMIN' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
+                                  log.user_role === 'AGENT' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                  log.user_role === 'USER' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                                  'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                                }`}>
+                                  {log.user_role}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Description */}
+                          {log.description && (
+                            <p className="text-sm text-gray-700 dark:text-gray-300 mb-2">{log.description}</p>
+                          )}
+                          
+                          {/* Metadata */}
+                          {log.metadata && typeof log.metadata === 'object' && Object.keys(log.metadata).length > 0 && (
+                            <div className="mt-3 space-y-1">
+                              {Object.entries(log.metadata).map(([key, value]: [string, any]) => (
+                                <div key={key} className="flex items-start gap-2 text-sm">
+                                  <span className="text-gray-500 dark:text-gray-400 min-w-[120px] font-medium">{key}:</span>
+                                  <span className="text-gray-900 dark:text-white">
+                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                                   </span>
                                 </div>
                               ))}
                             </div>
                           )}
+                          
+                          {/* IP and User Agent */}
+                          <div className="mt-2 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                            {log.ip_address && <span>IP: {log.ip_address}</span>}
+                          </div>
                         </div>
                       </div>
                     );

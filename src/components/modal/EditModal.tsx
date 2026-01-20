@@ -172,6 +172,18 @@ export default function EditModal({ isOpen, onClose, onSave, initial, type, api 
                 <PhoneInput value={form.phone ?? ""} onChange={(v) => update("phone", v)} placeholder="901234567" />
               </div>
             </div>
+            {!initial ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Password *</label>
+                <input 
+                  type="password" 
+                  value={form.password ?? ""} 
+                  onChange={(e) => update("password", e.target.value)} 
+                  className="mt-1 block w-full rounded-md border px-3 py-2" 
+                  placeholder="Enter password"
+                />
+              </div>
+            ) : null}
             <div>
               <label className="block text-sm font-medium text-gray-700">Fillials *</label>
               <div className="border rounded-md p-2 max-h-48 overflow-y-auto">

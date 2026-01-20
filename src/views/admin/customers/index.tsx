@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import Card from "components/card";
-import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin, Plus, Edit, Trash, X } from "tabler-icons-react";
+import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin, Plus, Edit, Trash, X, BuildingStore } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
 import apiReal from "lib/api";
@@ -30,33 +30,38 @@ type CustomerFormData = {
   passport: string;
   birth_date: string;
   address: string;
+  region: string;
 };
 
 export default function CustomersAdmin() {
   const location = useLocation();
+  const navigate = useNavigate();
   const api = useMemo(() => {
     const isDemoMode = location.pathname.startsWith('/demo');
     return isDemoMode ? demoApi : apiReal;
   }, [location.pathname]);
 
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
+  const [pageSize] = useState(5);
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [formData, setFormData] = useState<CustomerFormData>({
     full_name: '',
     phone: '',
     passport: '',
     birth_date: '',
-    address: ''
+    address: '',
+    region: ''
   });
   const [formErrors, setFormErrors] = useState<Partial<CustomerFormData>>({});
 
@@ -67,22 +72,31 @@ export default function CustomersAdmin() {
     type: 'success'
   });
 
-  // Load customers
+  // Load ALL customers once
   useEffect(() => {
     loadCustomers();
-  }, [currentPage, api]);
+  }, [api]);
+
+  // Reset to page 1 when search or region changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedRegion]);
 
   const loadCustomers = async () => {
     try {
       setLoading(true);
       const response = await api.listCustomers({
-        page: currentPage,
-        pageSize,
+        page: 1,
+        pageSize: 1000,
       });
       
+      console.log('API Response:', response);
+      console.log('First customer:', response?.value?.[0]);
+      
       if (response && response.value) {
-        setCustomers(response.value);
-        setTotalPages(response.totalPages || 1);
+        // Sort by ID descending (newest first)
+        const sortedCustomers = response.value.sort((a, b) => b.id - a.id);
+        setAllCustomers(sortedCustomers);
       }
     } catch (error: any) {
       showToast(error.message || "Ma'lumotlarni yuklashda xatolik", 'error');
@@ -96,20 +110,20 @@ export default function CustomersAdmin() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000);
   };
 
-  // Get unique regions
+  // Get unique regions from ALL customers
   const regions = useMemo(() => {
     const uniqueRegions = new Set<string>();
-    customers.forEach(customer => {
+    allCustomers.forEach(customer => {
       if (customer.region) {
         uniqueRegions.add(customer.region);
       }
     });
     return Array.from(uniqueRegions).sort();
-  }, [customers]);
+  }, [allCustomers]);
 
-  // Filter customers
+  // Filter customers from ALL customers
   const filteredCustomers = useMemo(() => {
-    return customers.filter(customer => {
+    return allCustomers.filter(customer => {
       if (searchQuery.trim()) {
         const searchLower = searchQuery.toLowerCase();
         const matchesSearch = 
@@ -126,17 +140,29 @@ export default function CustomersAdmin() {
 
       return true;
     });
-  }, [customers, searchQuery, selectedRegion]);
+  }, [allCustomers, searchQuery, selectedRegion]);
 
-  // Calculate stats
+  // Paginate filtered customers
+  const paginatedCustomers = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredCustomers.slice(startIndex, endIndex);
+  }, [filteredCustomers, currentPage, pageSize]);
+
+  // Calculate total pages
+  const totalPages = useMemo(() => {
+    return Math.ceil(filteredCustomers.length / pageSize);
+  }, [filteredCustomers.length, pageSize]);
+
+  // Calculate stats from ALL customers
   const stats = useMemo(() => {
     return {
-      totalCustomers: filteredCustomers.length,
-      activeApplications: filteredCustomers.reduce((sum, c) => sum + c.activeApplications, 0),
-      completedApplications: filteredCustomers.reduce((sum, c) => sum + c.completedApplications, 0),
-      rejectedApplications: filteredCustomers.reduce((sum, c) => sum + c.rejectedApplications, 0),
+      totalCustomers: allCustomers.length,
+      activeApplications: allCustomers.reduce((sum, c) => sum + c.activeApplications, 0),
+      completedApplications: allCustomers.reduce((sum, c) => sum + c.completedApplications, 0),
+      rejectedApplications: allCustomers.reduce((sum, c) => sum + c.rejectedApplications, 0),
     };
-  }, [filteredCustomers]);
+  }, [allCustomers]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("uz-UZ").format(amount);
@@ -188,10 +214,27 @@ export default function CustomersAdmin() {
       phone: '',
       passport: '',
       birth_date: '',
-      address: ''
+      address: '',
+      region: ''
     });
     setFormErrors({});
     setShowModal(true);
+  };
+
+  const handleViewCustomer = async (customer: Customer) => {
+    setSelectedCustomer(customer);
+    setSelectedCustomerDetail(null);
+    setShowDetailModal(true);
+    setLoadingDetail(true);
+    
+    try {
+      const detail = await api.getCustomer(customer.id);
+      setSelectedCustomerDetail(detail);
+    } catch (error) {
+      console.error('Error loading customer detail:', error);
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   const handleEdit = (customer: Customer) => {
@@ -202,7 +245,8 @@ export default function CustomersAdmin() {
       phone: customer.phone,
       passport: customer.passport,
       birth_date: customer.birthDate,
-      address: customer.address
+      address: customer.address,
+      region: customer.region || ''
     });
     setFormErrors({});
     setShowModal(true);
@@ -366,9 +410,6 @@ export default function CustomersAdmin() {
                   Mijoz
                 </th>
                 <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
-                  Passport
-                </th>
-                <th className="pb-3 text-left text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
                   Hudud
                 </th>
                 <th className="pb-3 text-center text-xs font-bold uppercase tracking-wide text-gray-600 dark:text-gray-400">
@@ -383,40 +424,31 @@ export default function CustomersAdmin() {
               </tr>
             </thead>
             <tbody>
-              {filteredCustomers.map((customer, index) => (
+              {paginatedCustomers.map((customer, index) => (
                 <tr 
                   key={customer.id}
-                  className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-800"
+                  onClick={() => handleViewCustomer(customer)}
+                  className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-800 cursor-pointer"
                 >
-                  <td className="py-4 text-sm text-gray-600 dark:text-gray-400">
+                  <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
                     {(currentPage - 1) * pageSize + index + 1}
                   </td>
-                  <td className="py-4">
+                  <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-sm font-bold text-white">
-                        {customer.fullName.charAt(0).toUpperCase()}
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-navy-700 text-gray-700 dark:text-gray-300 text-sm font-bold">
+                        {customer.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()}
                       </div>
-                      <div>
-                        <p className="font-semibold text-navy-700 dark:text-white">
-                          {customer.fullName}
-                        </p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                          <Phone className="mr-1 inline h-3 w-3" />
-                          {customer.phone}
-                        </p>
+                      <div className="flex flex-col gap-0.5">
+                        <div className="text-sm font-medium text-navy-700 dark:text-white">{customer.fullName}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{customer.passport}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{customer.phone}</div>
                       </div>
                     </div>
                   </td>
-                  <td className="py-4 text-sm font-mono text-navy-700 dark:text-white">
-                    {customer.passport}
+                  <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-400">
+                    {customer.region || '—'}
                   </td>
-                  <td className="py-4 text-sm">
-                    <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      {customer.region}
-                    </div>
-                  </td>
-                  <td className="py-4 text-center text-sm">
+                  <td className="px-4 py-4 text-center text-sm">
                     <div className="flex items-center justify-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
                         {customer.activeApplications} faol
@@ -426,7 +458,7 @@ export default function CustomersAdmin() {
                       </span>
                     </div>
                   </td>
-                  <td className="py-4 text-sm">
+                  <td className="px-4 py-4 text-sm text-center">
                     {customer.debt > 0 ? (
                       <span className="font-semibold text-red-600 dark:text-red-400">
                         {formatCurrency(customer.debt)} so'm
@@ -437,21 +469,14 @@ export default function CustomersAdmin() {
                       </span>
                     )}
                   </td>
-                  <td className="py-4 text-right">
+                  <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
-                        onClick={() => handleEdit(customer)}
+                        onClick={(e) => { e.stopPropagation(); handleEdit(customer); }}
                         className="rounded-lg bg-blue-500 p-2 text-white transition-colors hover:bg-blue-600"
                         title="Tahrirlash"
                       >
                         <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(customer)}
-                        className="rounded-lg bg-red-500 p-2 text-white transition-colors hover:bg-red-600"
-                        title="O'chirish"
-                      >
-                        <Trash className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -581,6 +606,23 @@ export default function CustomersAdmin() {
                 )}
               </div>
 
+              <div>
+                <label className="mb-2 block text-sm font-medium text-navy-700 dark:text-white">
+                  Hudud
+                </label>
+                <CustomSelect
+                  value={formData.region || ""}
+                  onChange={(value) => setFormData({ ...formData, region: value })}
+                  options={[
+                    { value: "", label: "Hudud tanlang" },
+                    ...regions.map(r => ({ value: r, label: r }))
+                  ]}
+                />
+                {formErrors.region && (
+                  <p className="mt-1 text-xs text-red-500">{formErrors.region}</p>
+                )}
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -597,6 +639,232 @@ export default function CustomersAdmin() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* View Detail Modal */}
+      {showDetailModal && selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white dark:bg-navy-800 shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4 dark:border-gray-700 dark:bg-navy-800">
+              <h3 className="text-lg font-bold text-navy-700 dark:text-white">
+                Mijoz ma'lumotlari
+              </h3>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              {loadingDetail ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+                </div>
+              ) : selectedCustomerDetail ? (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">F.I.O</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.full_name}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Telefon</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Passport</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.passport}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Tug'ilgan sana</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.birth_date}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Hudud</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.region || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Manzil</p>
+                      <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.address}</p>
+                    </div>
+                  </div>
+
+                  {/* Workplaces Section */}
+                  {selectedCustomerDetail?.workplaces && selectedCustomerDetail.workplaces.length > 0 && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <div className="mb-3 flex items-center gap-2">
+                        <BuildingStore className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        <p className="text-sm font-bold text-navy-700 dark:text-white">
+                          Ish joylari ({selectedCustomerDetail.workplaces.length})
+                        </p>
+                      </div>
+                      <div className="space-y-3">
+                        {selectedCustomerDetail.workplaces.map((cw: any) => (
+                          <div
+                            key={cw.id}
+                            className="rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-indigo-50/30 p-4 transition-all hover:shadow-md dark:border-gray-700 dark:from-gray-800 dark:to-indigo-900/10"
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                                    <BuildingStore className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-navy-700 dark:text-white">
+                                      {cw.workplace?.name || "—"}
+                                    </p>
+                                    <p className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+                                      {cw.position}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  {cw.is_current && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                      <div className="h-2 w-2 animate-pulse rounded-full bg-green-500"></div>
+                                      Joriy ish joyi
+                                    </span>
+                                  )}
+                                  {cw.workplace?.work_type && (
+                                    <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                      {cw.workplace.work_type}
+                                    </span>
+                                  )}
+                                  {cw.workplace?.inn && (
+                                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-mono text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                      INN: {cw.workplace.inn}
+                                    </span>
+                                  )}
+                                </div>
+                                {(cw.start_date || cw.end_date) && (
+                                  <div className="mt-2 flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                                    <Calendar className="h-3.5 w-3.5" />
+                                    <span>
+                                      {cw.start_date && new Date(cw.start_date).toLocaleDateString('uz-UZ')}
+                                      {cw.end_date ? ` - ${new Date(cw.end_date).toLocaleDateString('uz-UZ')}` : ' - hozir'}
+                                    </span>
+                                  </div>
+                                )}
+                                {cw.workplace?.address && (
+                                  <p className="mt-2 text-xs text-gray-500 dark:text-gray-500">
+                                    📍 {cw.workplace.address}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Applications List */}
+                  {selectedCustomerDetail.zayavkalar && selectedCustomerDetail.zayavkalar.length > 0 && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <h4 className="mb-3 font-bold text-navy-700 dark:text-white">
+                        Arizalari ({selectedCustomerDetail.zayavkalar.length})
+                      </h4>
+                      <div className="space-y-3">
+                        {selectedCustomerDetail.zayavkalar.map((app: any) => (
+                          <div 
+                            key={app.id} 
+                            onClick={() => {
+                              setShowDetailModal(false);
+                              const prefix = location.pathname.startsWith('/demo') ? '/demo' : location.pathname.startsWith('/super') ? '/super' : '/admin';
+                              navigate(`${prefix}/applications?passport=${selectedCustomerDetail.passport}`);
+                            }}
+                            className="cursor-pointer rounded-lg border border-gray-200 bg-gray-50 p-4 transition-all hover:border-brand-500 hover:shadow-md dark:border-gray-700 dark:bg-navy-700 dark:hover:border-brand-400"
+                          >
+                            <div className="mb-2 flex items-center justify-between">
+                              <span className="font-medium text-navy-700 dark:text-white">
+                                Ariza #{app.id}
+                              </span>
+                              <span className={`rounded-full px-3 py-1 text-xs font-medium ${
+                                app.status === 'CONFIRMED' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : app.status === 'REJECTED'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  : app.status === 'CREATED'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                  : app.status === 'CANCELLED_BY_SCORING'
+                                  ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                                  : (app.status?.includes('FINISHED') || app.status === 'COMPLETED' || app.status === 'ACTIVE')
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : (app.status?.includes('CANCELED') || app.status?.includes('RAD'))
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  : app.status?.includes('LIMIT')
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                              }`}>
+                                {app.status === 'CONFIRMED' ? 'Tasdiqlangan' 
+                                  : app.status === 'REJECTED' ? 'Rad etilgan'
+                                  : app.status === 'CREATED' ? 'Yaratilgan'
+                                  : app.status === 'CANCELLED_BY_SCORING' ? 'Skoring rad etdi'
+                                  : app.status === 'FINISHED' || app.status === 'COMPLETED' || app.status === 'ACTIVE' ? 'Tugatilgan'
+                                  : app.status?.includes('CANCELED') || app.status?.includes('RAD') ? 'Rad etilgan'
+                                  : app.status?.includes('LIMIT') ? 'Limit'
+                                  : app.status?.includes('PENDING') ? 'Kutilmoqda'
+                                  : app.status || 'Kutilmoqda'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">Summa:</span>
+                                <span className="ml-2 font-medium text-navy-700 dark:text-white">
+                                  {app.amount && app.amount > 0 ? `${app.amount.toLocaleString('uz-UZ')} so'm` : '—'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 dark:text-gray-400">Muddat:</span>
+                                <span className="ml-2 font-medium text-navy-700 dark:text-white">
+                                  {app.expired_month ? `${app.expired_month} oy` : '—'}
+                                </span>
+                              </div>
+                              {app.merchant && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400">Merchant:</span>
+                                  <span className="ml-2 font-medium text-navy-700 dark:text-white">
+                                    {app.merchant.name}
+                                  </span>
+                                </div>
+                              )}
+                              {app.fillial && (
+                                <div>
+                                  <span className="text-gray-500 dark:text-gray-400">Filial:</span>
+                                  <span className="ml-2 font-medium text-navy-700 dark:text-white">
+                                    {app.fillial.name}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="col-span-2">
+                                <span className="text-gray-500 dark:text-gray-400">Sana:</span>
+                                <span className="ml-2 font-medium text-navy-700 dark:text-white">
+                                  {new Date(app.createdAt).toLocaleDateString('uz-UZ')}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedCustomerDetail.zayavkalar && selectedCustomerDetail.zayavkalar.length === 0 && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <p className="text-center text-gray-500 dark:text-gray-400">
+                        Hozircha arizalar yo'q
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500">Ma'lumot yuklanmadi</p>
+              )}
+            </div>
           </div>
         </div>
       )}

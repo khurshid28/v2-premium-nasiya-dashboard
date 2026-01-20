@@ -1,4 +1,22 @@
-import apiClient from './index';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE || 'http://localhost:7777/api/v1';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token to requests
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export interface ScoringCriteria {
   id: number;
@@ -68,11 +86,16 @@ export const scoringApi = {
 
   // Activate scoring model
   activateScoringModel: (id: number) => {
-    return apiClient.patch<ScoringModel>(`/scoring/${id}/activate`);
+    return apiClient.post<ScoringModel>(`/scoring/${id}/activate`, {});
   },
 
   // Delete scoring model
   deleteScoringModel: (id: number) => {
     return apiClient.delete(`/scoring/${id}`);
+  },
+
+  // Get unique criteria names from all models
+  getCriteriaNames: () => {
+    return apiClient.get<string[]>('/scoring/criteria/names');
   },
 };

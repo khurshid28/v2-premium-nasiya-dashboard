@@ -206,6 +206,15 @@ const Applications = (): JSX.Element => {
     };
   }, []);
 
+  // Handle URL query parameters (e.g., passport filter)
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const passportParam = params.get('passport');
+    if (passportParam) {
+      setSearch(passportParam);
+    }
+  }, [location.search]);
+
   const filtered = React.useMemo(() => {
     const s = search.trim().toLowerCase();
     const start = startDate ? new Date(startDate) : null;
@@ -988,7 +997,36 @@ const Applications = (): JSX.Element => {
                     <div><strong className="text-gray-900 dark:text-white">Yaratilgan sana:</strong> <span className="text-gray-700 dark:text-gray-300">{formatDateNoSeconds(selected.createdAt)}</span></div>
                   )}
                   {selected.canceled_reason && (
-                    <div><strong className="text-red-600 dark:text-red-400">Bekor qilish sababi:</strong> <span className="text-red-600 dark:text-red-400">{selected.canceled_reason}</span></div>
+                    <div><strong className="text-red-600 dark:text-red-400">Bekor qilish sababi:</strong> <span className="text-red-600 dark:text-red-400">{(() => {
+                      const reason = selected.canceled_reason || '';
+                      
+                      // Translate known reasons or show as-is if already in Uzbek
+                      if (reason === 'Bank arizani rad etdi' || reason === 'Mijoz arizani rad etdi' || reason === 'Avtomatik bekor qilindi') {
+                        return reason;
+                      }
+                      
+                      // If contains Cyrillic or mojibake, try to translate
+                      if (reason.includes('Банк') || reason.includes('отмени')) {
+                        return 'Bank arizani rad etdi';
+                      }
+                      if (reason.includes('Клиент') || reason.includes('отклони')) {
+                        return 'Mijoz arizani rad etdi';
+                      }
+                      if (reason.includes('Автоматич')) {
+                        return 'Avtomatik bekor qilindi';
+                      }
+                      
+                      // If contains mojibake box characters, translate based on pattern
+                      if (/[\u2550-\u256C\u0410-\u044F]/.test(reason)) {
+                        // Contains Cyrillic or box drawing chars - likely corrupted Russian text
+                        if (reason.length > 20 && reason.length < 30) {
+                          return 'Bank arizani rad etdi';
+                        }
+                        return 'Bekor qilindi';
+                      }
+                      
+                      return reason;
+                    })()}</span></div>
                   )}
                   <div><strong className="text-gray-900 dark:text-white">Holat:</strong> {(() => { const b = appStatusBadge(selected.status); return <span className={b.className}>{b.label}</span>; })()}</div>
                   <div>
@@ -1018,6 +1056,61 @@ const Applications = (): JSX.Element => {
                       <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">Mahsulot yo'q</span>
                     )}
                   </div>
+                  
+                  {/* To'lovlar (Payments) */}
+                  {(selected as any).payments && (selected as any).payments.length > 0 && (
+                    <div>
+                      <strong className="text-gray-900 dark:text-white">To'lovlar:</strong>
+                      <div className="mt-2 border border-gray-200 dark:border-gray-600 rounded bg-white dark:bg-navy-800 p-2">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="text-left text-xs text-gray-500 dark:text-gray-400">
+                              <th className="px-2 py-1">Sana</th>
+                              <th className="px-2 py-1">Summa</th>
+                              <th className="px-2 py-1">Usul</th>
+                              <th className="px-2 py-1">Holat</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-gray-700 dark:text-gray-300">
+                            {(selected as any).payments.map((payment: any) => (
+                              <tr key={payment.id} className="border-t border-gray-200 dark:border-gray-600">
+                                <td className="px-2 py-1">{formatDateNoSeconds(payment.paymentDate || payment.createdAt)}</td>
+                                <td className="px-2 py-1 font-medium text-green-600 dark:text-green-400">{formatMoney(payment.amount)}</td>
+                                <td className="px-2 py-1">
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    payment.provider === 'MIB' ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300' :
+                                    payment.provider === 'AUTO' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300' :
+                                    'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+                                  }`}>
+                                    {payment.provider}
+                                  </span>
+                                </td>
+                                <td className="px-2 py-1">
+                                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    payment.status === 'COMPLETED' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                                    payment.status === 'PENDING' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                                    'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                  }`}>
+                                    {payment.status === 'COMPLETED' ? 'Bajarildi' : 
+                                     payment.status === 'PENDING' ? 'Kutilmoqda' : 
+                                     payment.status === 'FAILED' ? 'Xatolik' : payment.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="border-t-2 border-gray-300 dark:border-gray-500">
+                            <tr>
+                              <td className="px-2 py-2 font-semibold text-gray-900 dark:text-white">Jami:</td>
+                              <td className="px-2 py-2 font-bold text-green-600 dark:text-green-400" colSpan={3}>
+                                {formatMoney((selected as any).payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
+                              </td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4 text-gray-500 dark:text-gray-400">

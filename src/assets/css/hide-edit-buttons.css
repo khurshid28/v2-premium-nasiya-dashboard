@@ -1,0 +1,25 @@
+// Simple CSS to hide all edit/create/delete buttons in admin pages
+// Add this to your global CSS or create a new CSS file
+
+/* Hide all "Yangi" (Create) buttons */
+button:has(svg + *):has(*:contains("Yangi")) {
+  display: none !important;
+}
+
+/* Alternative: Hide by common class patterns */
+.bg-brand-500:has(svg):has(*:text-match("Yangi|Create|Qo'shish", "i")) {
+  display: none !important;
+}
+
+/* Hide Edit and Delete buttons in action columns */
+button[title*="Tahrirlash"],
+button[title*="Edit"],
+button[title*="O'chirish"],
+button[title*="Delete"] {
+  display: none !important;
+}
+
+/* Hide the entire EditModal */
+div[role="dialog"]:has(h2:contains("Tahrirlash")) {
+  display: none !important;
+}

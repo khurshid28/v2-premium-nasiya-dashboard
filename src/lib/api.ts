@@ -1,6 +1,6 @@
 import type { Paginated, User, Fillial, Zayavka, Merchant, Agent, Admin } from "types/api";
 
-const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:3333/api";
+const API_BASE = process.env.REACT_APP_API_BASE || "http://localhost:7777/api/v1";
 
 // Auth response types
 export interface LoginResponse {
@@ -311,12 +311,13 @@ export async function deleteFillial(id: number): Promise<void> {
 }
 
 // Zayavkalar (applications)
-export async function listZayavkalar(opts?: { page?: number; pageSize?: number; search?: string; status?: string }): Promise<Paginated<Zayavka>> {
+export async function listZayavkalar(opts?: { page?: number; pageSize?: number; search?: string; status?: string; clientId?: number }): Promise<Paginated<Zayavka>> {
   const params: any = {};
   if (opts?.page !== undefined) params.page = opts.page;
   if (opts?.pageSize !== undefined) params.pageSize = opts.pageSize;
   if (opts?.search) params.search = opts.search;
   if (opts?.status) params.status = opts.status;
+  if (opts?.clientId !== undefined) params.clientId = opts.clientId;
   
   // Add include parameter to fetch related data
   params.include = 'fillial,user,products,merchant';
@@ -352,7 +353,7 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {
-  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant,request`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant,request,payments`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Zayavka>(res);
 }
 
@@ -422,7 +423,7 @@ export async function getMerchant(id: number): Promise<Merchant> {
 }
 
 export async function createMerchant(payload: Partial<Merchant>): Promise<Merchant> {
-  const res = await fetchWithRetry(`${API_BASE}/merchant`, {
+  const res = await fetchWithRetry(`${API_BASE}/merchant/create`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders() },
     body: JSON.stringify(payload),
@@ -612,10 +613,30 @@ export async function listCustomers(params?: {
   page?: number;
   pageSize?: number;
 }): Promise<any> {
-  const res = await fetchWithRetry(`${API_BASE}/client/with-stats${qs(params)}`, {
+  // Birinchi marta barcha ma'lumotlarni olish uchun katta pageSize
+  const queryParams = {
+    ...params,
+    page: 1,
+    pageSize: 1000 // Barcha mijozlarni olish
+  };
+  
+  const res = await fetchWithRetry(`${API_BASE}/client/with-stats${qs(queryParams)}`, {
     headers: authHeaders(),
   });
-  return handleResponse(res);
+  const result: any = await handleResponse(res);
+  
+  // API response: { value: [...], Count: 141, page: 1, pageSize: 1000, totalPages: 1 }
+  // Frontend uchun barcha ma'lumotlarni qaytarish
+  if (result && result.value && Array.isArray(result.value)) {
+    return {
+      items: result.value, // Barcha mijozlar
+      total: result.Count || result.value.length,
+      page: params?.page || 1,
+      pageSize: params?.pageSize || 20
+    };
+  }
+  
+  return result;
 }
 
 export async function getCustomer(id: number): Promise<any> {

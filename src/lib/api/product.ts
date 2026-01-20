@@ -1,4 +1,22 @@
-import apiClient from './index';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE || 'http://localhost:7777/api/v1';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token to requests
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export interface Category {
   id: number;
@@ -52,23 +70,23 @@ export const productApi = {
     fillial_id?: number;
     isActive?: boolean;
   }) => {
-    return apiClient.get<Category[]>('/category', { params });
+    return apiClient.get<Category[]>('/product/category', { params });
   },
 
   getCategoryById: (id: number) => {
-    return apiClient.get<Category>(`/category/${id}`);
+    return apiClient.get<Category>(`/product/category/${id}`);
   },
 
   createCategory: (data: CreateCategoryDto) => {
-    return apiClient.post<Category>('/category', data);
+    return apiClient.post<Category>('/product/category', data);
   },
 
   updateCategory: (id: number, data: Partial<CreateCategoryDto>) => {
-    return apiClient.patch<Category>(`/category/${id}`, data);
+    return apiClient.put<Category>(`/product/category/${id}`, data);
   },
 
   deleteCategory: (id: number) => {
-    return apiClient.delete(`/category/${id}`);
+    return apiClient.delete(`/product/category/${id}`);
   },
 
   // Products
@@ -90,10 +108,19 @@ export const productApi = {
   },
 
   updateProduct: (id: number, data: Partial<CreateProductDto>) => {
-    return apiClient.patch<Product>(`/product/${id}`, data);
+    return apiClient.put<Product>(`/product/${id}`, data);
   },
 
   deleteProduct: (id: number) => {
     return apiClient.delete(`/product/${id}`);
+  },
+
+  // Bulk Import
+  bulkImportProducts: (data: {
+    products: CreateProductDto[];
+    default_merchant_ids?: number[];
+    default_fillial_ids?: number[];
+  }) => {
+    return apiClient.post('/product/bulk-import', data);
   },
 };

@@ -11,8 +11,10 @@ export interface Payment {
   status: PaymentStatus;
   paymentType: PaymentType;
   transactionId?: string;
+  checkNumber?: string;
   externalId?: string;
   receiptUrl?: string;
+  monthNumber?: number;
   
   zayavka_id?: number;
   client_id?: number;
@@ -41,8 +43,10 @@ export interface CreatePaymentDto {
   provider: PaymentProvider;
   paymentType?: PaymentType;
   transactionId?: string;
+  checkNumber?: string;
   externalId?: string;
   receiptUrl?: string;
+  monthNumber?: number;
   
   zayavka_id?: number;
   client_id?: number;
@@ -61,8 +65,10 @@ export interface UpdatePaymentDto {
   status?: PaymentStatus;
   paymentType?: PaymentType;
   transactionId?: string;
+  checkNumber?: string;
   externalId?: string;
   receiptUrl?: string;
+  monthNumber?: number;
   
   paymentDate?: string;
   processedAt?: string;
@@ -128,5 +134,25 @@ export const paymentApi = {
   // Get payment statistics
   getPaymentStats: (filters?: { startDate?: string; endDate?: string; merchant_id?: number; fillial_id?: number }) => {
     return apiClient.get('/payment/stats', { params: filters });
+  },
+
+  // Generate monthly payments for a zayavka
+  generatePaymentsForZayavka: (zayavkaId: number) => {
+    return apiClient.post(`/payment/generate/${zayavkaId}`);
+  },
+
+  // Generate payments for all zayavkas
+  generatePaymentsForAll: () => {
+    return apiClient.post('/payment/generate-all');
+  },
+
+  // Calculate debt for a zayavka
+  calculateDebt: (zayavkaId: number) => {
+    return apiClient.get(`/payment/debt/${zayavkaId}`);
+  },
+
+  // Get all debts
+  getAllDebts: (filters?: { merchant_id?: number; fillial_id?: number; minDebt?: number }) => {
+    return apiClient.get('/payment/debts', { params: filters });
   },
 };

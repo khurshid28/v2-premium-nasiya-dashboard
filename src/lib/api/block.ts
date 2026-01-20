@@ -1,8 +1,26 @@
-import apiClient from './index';
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_BASE || 'http://localhost:7777/api/v1';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add token to requests
+apiClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export interface Block {
   id: number;
-  type: 'USER' | 'MERCHANT' | 'FILLIAL';
+  type: 'USER' | 'MERCHANT' | 'FILLIAL' | 'WORKPLACE';
   reason: string;
   startDate: string;
   endDate?: string;
@@ -11,19 +29,21 @@ export interface Block {
   user_id?: number;
   merchant_id?: number;
   fillial_id?: number;
+  workplace_name?: string;
   createdBy: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface CreateBlockDto {
-  type: 'USER' | 'MERCHANT' | 'FILLIAL';
+  type: 'USER' | 'MERCHANT' | 'FILLIAL' | 'WORKPLACE';
   reason: string;
   isPermanent: boolean;
   endDate?: string;
   user_id?: number;
   merchant_id?: number;
   fillial_id?: number;
+  workplace_name?: string;
 }
 
 export interface UpdateBlockDto {
@@ -35,7 +55,7 @@ export interface UpdateBlockDto {
 export const blockApi = {
   // Get all blocks with optional filters
   getBlocks: (params?: {
-    type?: 'USER' | 'MERCHANT' | 'FILLIAL';
+    type?: 'USER' | 'MERCHANT' | 'FILLIAL' | 'WORKPLACE';
     isActive?: boolean;
     merchant_id?: number;
     fillial_id?: number;

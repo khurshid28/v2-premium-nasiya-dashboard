@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
-import { Search, Plus, Eye, Settings, Clock, Check } from "tabler-icons-react";
+import { Search, Plus, Eye, Settings, Clock, Check, Trash } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
 import { scoringApi, ScoringModel as ApiScoringModel } from "lib/api/scoring";
+import Toast from "components/toast/ToastNew";
 
 // Types
 type ModelStatus = "active" | "inactive" | "draft";
@@ -32,6 +33,9 @@ type ScoringModel = {
   categories: CategoryConfig[];
   createdAt: string;
   updatedAt: string;
+  totalApplications?: number;
+  approvedLimits?: number;
+  successRate?: number;
 };
 
 const CATEGORY_LABELS: Record<ModelCategory, string> = {
@@ -39,6 +43,35 @@ const CATEGORY_LABELS: Record<ModelCategory, string> = {
   CARD_TURNOVER: "Karta aylanma",
   PENSIONER: "Pensiyaner",
   MILITARY: "Harbiylar",
+};
+
+// Default kriteriyalar har bir kategoriya uchun
+const DEFAULT_CRITERIAS: Record<ModelCategory, ScoringCriteria[]> = {
+  OFFICIAL: [
+    { id: 1, name: "Ish tajribasi", weight: 25, maxScore: 100 },
+    { id: 2, name: "Oylik maosh", weight: 30, maxScore: 100 },
+    { id: 3, name: "Kompaniya reytingi", weight: 20, maxScore: 100 },
+    { id: 4, name: "Lavozim", weight: 15, maxScore: 100 },
+    { id: 5, name: "Shartnoma turi", weight: 10, maxScore: 100 },
+  ],
+  CARD_TURNOVER: [
+    { id: 1, name: "Oylik aylanma", weight: 40, maxScore: 100 },
+    { id: 2, name: "Tranzaksiya soni", weight: 25, maxScore: 100 },
+    { id: 3, name: "Karta foydalanish davri", weight: 20, maxScore: 100 },
+    { id: 4, name: "Xarid turlari xilma-xilligi", weight: 15, maxScore: 100 },
+  ],
+  PENSIONER: [
+    { id: 1, name: "Pensiya miqdori", weight: 40, maxScore: 100 },
+    { id: 2, name: "Pensiya staji", weight: 30, maxScore: 100 },
+    { id: 3, name: "Qo'shimcha daromad", weight: 20, maxScore: 100 },
+    { id: 4, name: "Yashash sharoiti", weight: 10, maxScore: 100 },
+  ],
+  MILITARY: [
+    { id: 1, name: "Xizmat unvoni", weight: 30, maxScore: 100 },
+    { id: 2, name: "Xizmat muddati", weight: 25, maxScore: 100 },
+    { id: 3, name: "Maosh darajasi", weight: 30, maxScore: 100 },
+    { id: 4, name: "Mukofotlar", weight: 15, maxScore: 100 },
+  ],
 };
 
 // Mock Data - will be replaced with API
@@ -66,15 +99,37 @@ export default function ScoringModels() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [models, setModels] = useState<ScoringModel[]>([]);
+  const [availableCriteriaNames, setAvailableCriteriaNames] = useState<string[]>([]);
   const [minPassScore, setMinPassScore] = useState(300);
   const [globalMinLimit, setGlobalMinLimit] = useState(1000000);
   const [globalMaxLimit, setGlobalMaxLimit] = useState(50000000);
   const [maxProcessingTime, setMaxProcessingTime] = useState(20);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    show: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ show: false, title: '', message: '', onConfirm: () => {} });
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+  }>({ show: false, message: '', type: 'info' });
 
-  // Load scoring models from API
+  // Load scoring models and criteria names from API
   useEffect(() => {
     loadModels();
+    loadCriteriaNames();
   }, []);
+
+  const loadCriteriaNames = async () => {
+    try {
+      const response = await scoringApi.getCriteriaNames();
+      setAvailableCriteriaNames(response.data);
+    } catch (error) {
+      console.error('Error loading criteria names:', error);
+    }
+  };
 
   const loadModels = async () => {
     try {
@@ -83,6 +138,173 @@ export default function ScoringModels() {
       setModels(response.data as any);
     } catch (error) {
       console.error('Error loading scoring models:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Create new scoring model
+  const handleCreateModel = async () => {
+    if (!modelName || !modelVersion || selectedCategories.length === 0) {
+      alert("Iltimos, barcha ma'lumotlarni to'ldiring");
+      return;
+    }
+
+    // Validate categories have criterias
+    for (const category of selectedCategories) {
+      const config = categoryConfigs[category];
+      if (!config.criterias || config.criterias.length === 0) {
+        alert(`${CATEGORY_LABELS[category]} kategoriyasi uchun kriteriyalar qo'shing`);
+        return;
+      }
+      if (!config.minAge || !config.maxAge) {
+        alert(`${CATEGORY_LABELS[category]} kategoriyasi uchun yosh oralig'ini kiriting`);
+        return;
+      }
+    }
+
+    try {
+      setLoading(true);
+      const createData = {
+        name: modelName,
+        version: modelVersion,
+        minPassScore,
+        minLimitAmount: globalMinLimit,
+        maxLimitAmount: globalMaxLimit,
+        maxProcessingTime,
+        status: 'DRAFT',
+        categories: selectedCategories.map(cat => {
+          const config = categoryConfigs[cat];
+          return {
+            category: cat,
+            minAge: config.minAge!,
+            maxAge: config.maxAge!,
+            criterias: config.criterias!.map(c => ({
+              name: c.name,
+              weight: c.weight,
+              maxScore: c.maxScore,
+            })),
+          };
+        }),
+      };
+
+      await scoringApi.createScoringModel(createData);
+      await loadModels();
+      setShowCreateModal(false);
+      // Reset form
+      setModelName("");
+      setModelVersion("");
+      setSelectedCategories([]);
+      setCategoryConfigs({
+        OFFICIAL: {},
+        CARD_TURNOVER: {},
+        PENSIONER: {},
+        MILITARY: {},
+      });
+      setToast({
+        show: true,
+        message: "Model muvaffaqiyatli yaratildi!\n\nYangi model ertangi kecha soat 00:00 da avtomatik faollashadi.",
+        type: 'success'
+      });
+    } catch (error: any) {
+      console.error('Create error:', error);
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Modelni yaratishda xatolik",
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Delete scoring model - DISABLED
+  const handleDeleteModel = async (id: number) => {
+    // Disable delete functionality - all scoring models cannot be deleted
+    setToast({
+      show: true,
+      message: "Skoring modellarni o'chirish taqiqlangan!",
+      type: 'error'
+    });
+    return;
+    
+    /* Original delete logic disabled
+    // Check if it's default model (id: 1 or name contains "Default")
+    if (selectedModel?.name?.toLowerCase().includes('default')) {
+      alert("Default modelni o'chirib bo'lmaydi!");
+      return;
+    }
+
+    setConfirmDialog({
+      show: true,
+      title: "Modelni o'chirish",
+      message: "Haqiqatan ham bu modelni o'chirmoqchimisiz?",
+      onConfirm: async () => {
+        await executeDeleteModel(id);
+        setConfirmDialog({ show: false, title: '', message: '', onConfirm: () => {} });
+      },
+    });
+    */
+  };
+
+  const executeDeleteModel = async (id: number) => {
+
+    try {
+      setLoading(true);
+      await scoringApi.deleteScoringModel(id);
+      await loadModels();
+      setShowDetailModal(false);
+      setSelectedModel(null);
+      setToast({
+        show: true,
+        message: "Model muvaffaqiyatli o'chirildi!",
+        type: 'success'
+      });
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Modelni o'chirishda xatolik",
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Activate scoring model
+  const handleActivateModel = async (id: number) => {
+    setConfirmDialog({
+      show: true,
+      title: "Modelni faollashtirish",
+      message: "Haqiqatan ham bu modelni faollashtirmoqchimisiz? Boshqa faol modellar o'chiriladi.",
+      onConfirm: async () => {
+        await executeActivateModel(id);
+        setConfirmDialog({ show: false, title: '', message: '', onConfirm: () => {} });
+      },
+    });
+  };
+
+  const executeActivateModel = async (id: number) => {
+
+    try {
+      setLoading(true);
+      await scoringApi.activateScoringModel(id);
+      await loadModels();
+      setShowDetailModal(false);
+      setSelectedModel(null);
+      setToast({
+        show: true,
+        message: "Model muvaffaqiyatli faollashtirildi!",
+        type: 'success'
+      });
+    } catch (error: any) {
+      console.error('Activate error:', error);
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Modelni faollashtir ishda xatolik",
+        type: 'error'
+      });
     } finally {
       setLoading(false);
     }
@@ -146,14 +368,14 @@ export default function ScoringModels() {
       });
     } else {
       setSelectedCategories([...selectedCategories, category]);
-      // Initialize category config with defaults
+      // Initialize category config with defaults and default criterias
       setCategoryConfigs({
         ...categoryConfigs,
         [category]: {
           category,
           minAge: 21,
           maxAge: 65,
-          criterias: [],
+          criterias: [...DEFAULT_CRITERIAS[category]], // Default kriteriyalarni qo'shish
         },
       });
     }
@@ -193,13 +415,13 @@ export default function ScoringModels() {
 
   const updateCriteria = (
     category: ModelCategory,
-    criteriaId: string,
+    criteriaId: number,
     field: keyof ScoringCriteria,
     value: string | number
   ) => {
     const config = categoryConfigs[category];
     const updatedCriterias = (config.criterias || []).map((c) =>
-      (c.id as any) == criteriaId ? { ...c, [field]: value } : c
+      c.id === criteriaId ? { ...c, [field]: value } : c
     );
 
     setCategoryConfigs({
@@ -246,7 +468,22 @@ export default function ScoringModels() {
             </div>
           </div>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              // Modal ochilganda OFFICIAL kategoriyasini default tanlash
+              setSelectedCategories(['OFFICIAL']);
+              setCategoryConfigs({
+                OFFICIAL: {
+                  category: 'OFFICIAL',
+                  minAge: 21,
+                  maxAge: 65,
+                  criterias: [...DEFAULT_CRITERIAS.OFFICIAL],
+                },
+                CARD_TURNOVER: {},
+                PENSIONER: {},
+                MILITARY: {},
+              });
+              setShowCreateModal(true);
+            }}
             className="flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-600"
           >
             <Plus className="h-4 w-4" />
@@ -321,7 +558,14 @@ export default function ScoringModels() {
                         <Settings className="h-6 w-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="text-lg font-bold text-navy-700 dark:text-white">{model.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-bold text-navy-700 dark:text-white">{model.name}</h3>
+                          {model.name?.toLowerCase().includes('default') && (
+                            <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-bold text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+                              DEFAULT
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">{model.version}</p>
                       </div>
                     </div>
@@ -334,6 +578,22 @@ export default function ScoringModels() {
                   <div className="flex-grow space-y-4">
                     {/* Stats Grid */}
                     <div className="space-y-3">
+                      {/* Statistics */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-900/20">
+                          <span className="text-xs font-medium text-blue-600 dark:text-blue-400">Jami arizalar</span>
+                          <span className="mt-1 text-lg font-bold text-blue-700 dark:text-blue-300">
+                            {model.totalApplications || 0}
+                          </span>
+                        </div>
+                        <div className="flex flex-col rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/50 dark:bg-green-900/20">
+                          <span className="text-xs font-medium text-green-600 dark:text-green-400">Limit berilgan</span>
+                          <span className="mt-1 text-lg font-bold text-green-700 dark:text-green-300">
+                            {model.approvedLimits || 0}
+                          </span>
+                        </div>
+                      </div>
+                      
                       {/* Created Date */}
                       <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-900/50">
                         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Yaratilgan sana</span>
@@ -409,7 +669,19 @@ export default function ScoringModels() {
             {/* Modal Header */}
             <div className="relative bg-gradient-to-br from-brand-500 via-brand-600 to-indigo-600 px-8 py-6">
               <button
-                onClick={() => setShowCreateModal(false)}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  // Reset form
+                  setModelName("");
+                  setModelVersion("");
+                  setSelectedCategories([]);
+                  setCategoryConfigs({
+                    OFFICIAL: {},
+                    CARD_TURNOVER: {},
+                    PENSIONER: {},
+                    MILITARY: {},
+                  });
+                }}
                 className="absolute right-6 top-6 rounded-lg bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
               >
                 <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,6 +702,21 @@ export default function ScoringModels() {
 
             {/* Modal Content */}
             <div className="p-6 sm:p-8">
+              {/* Info message about activation */}
+              <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                      Avtomatik faollashtirish
+                    </p>
+                    <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                      Yangi model yaratilgandan keyin, u keyingi kecha soat 00:00 da avtomatik ravishda faollashadi.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="space-y-5">
                 {/* Basic Info */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -621,13 +908,21 @@ export default function ScoringModels() {
                                       {index + 1}
                                     </div>
                                     <div className="flex-1 space-y-2">
-                                      <input
-                                        type="text"
-                                        placeholder="Mezon nomi"
-                                        value={criteria.name}
-                                        onChange={(e) => updateCriteria(category, criteria.id, "name", e.target.value)}
-                                        className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
-                                      />
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          placeholder="Mezon nomi (yozishni boshlang)"
+                                          value={criteria.name}
+                                          onChange={(e) => updateCriteria(category, criteria.id, "name", e.target.value)}
+                                          list={`criteria-names-${category}-${criteria.id}`}
+                                          className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                                        />
+                                        <datalist id={`criteria-names-${category}-${criteria.id}`}>
+                                          {availableCriteriaNames.map((name, idx) => (
+                                            <option key={idx} value={name} />
+                                          ))}
+                                        </datalist>
+                                      </div>
                                       <div className="grid grid-cols-2 gap-2">
                                         <input
                                           type="number"
@@ -668,14 +963,30 @@ export default function ScoringModels() {
               {/* Action Buttons */}
               <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-6 dark:border-gray-700">
                 <button
-                  onClick={() => setShowCreateModal(false)}
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    // Reset form
+                    setModelName("");
+                    setModelVersion("");
+                    setSelectedCategories([]);
+                    setCategoryConfigs({
+                      OFFICIAL: {},
+                      CARD_TURNOVER: {},
+                      PENSIONER: {},
+                      MILITARY: {},
+                    });
+                  }}
                   className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-gray-600 hover:to-gray-700"
                 >
                   Bekor qilish
                 </button>
-                <button className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-brand-600 hover:to-brand-700">
+                <button 
+                  onClick={handleCreateModel}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-brand-600 hover:to-brand-700 disabled:opacity-50"
+                >
                   <Check className="h-5 w-5" />
-                  Saqlash
+                  {loading ? 'Saqlanmoqda...' : 'Saqlash'}
                 </button>
               </div>
             </div>
@@ -707,7 +1018,14 @@ export default function ScoringModels() {
                     <Eye className="h-7 w-7 text-white" />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold text-white">{selectedModel.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-2xl font-bold text-white">{selectedModel.name}</h3>
+                      {selectedModel.name?.toLowerCase().includes('default') && (
+                        <span className="rounded-full bg-yellow-400 px-3 py-1 text-xs font-bold text-yellow-900">
+                          DEFAULT
+                        </span>
+                      )}
+                    </div>
                     <p className="mt-1 text-sm text-white/80">{selectedModel.version} - {getStatusText(selectedModel.isActive)}</p>
                   </div>
                 </div>
@@ -721,6 +1039,23 @@ export default function ScoringModels() {
             {/* Modal Content */}
             <div className="p-6 sm:p-8">
               <div className="space-y-6">
+                {/* Default Model Warning */}
+                {selectedModel.name?.toLowerCase().includes('default') && (
+                  <div className="rounded-xl border-2 border-yellow-200 bg-gradient-to-r from-yellow-50 to-white p-4 dark:border-yellow-900/50 dark:from-yellow-900/20 dark:to-navy-800">
+                    <div className="flex items-start gap-3">
+                      <Settings className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                          Default Model
+                        </p>
+                        <p className="mt-1 text-xs text-yellow-600 dark:text-yellow-400">
+                          Bu tizimning standart modeli bo'lib, uni o'chirib bo'lmaydi. Faqat yangi modellar yaratish orqali almashtirish mumkin.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Updated Date */}
                 <div className="rounded-xl border-2 border-blue-200 bg-gradient-to-r from-blue-50 to-white p-4 dark:border-blue-900/50 dark:from-blue-900/20 dark:to-navy-800">
                   <div className="flex items-center justify-between">
@@ -824,21 +1159,71 @@ export default function ScoringModels() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-6 dark:border-gray-700">
-                <button
-                  onClick={() => {
-                    setShowDetailModal(false);
-                    setSelectedModel(null);
-                  }}
-                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-gray-600 hover:to-gray-700"
-                >
-                  Yopish
-                </button>
+              <div className="mt-6 flex justify-between gap-3 border-t border-gray-200 pt-6 dark:border-gray-700">
+                {/* Delete button removed - scoring models cannot be deleted */}
+                <div className="flex gap-3">
+                  {!selectedModel.isActive && (
+                    <button
+                      onClick={() => handleActivateModel(selectedModel.id)}
+                      disabled={loading}
+                      className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-500 to-green-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-green-600 hover:to-green-700 disabled:opacity-50"
+                    >
+                      <Check className="h-5 w-5" />
+                      Faollashtirish
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setShowDetailModal(false);
+                      setSelectedModel(null);
+                    }}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-gray-600 hover:to-gray-700"
+                  >
+                    Yopish
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Custom Confirm Dialog */}
+      {confirmDialog.show && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-navy-800">
+            <h3 className="text-xl font-bold text-navy-700 dark:text-white">
+              {confirmDialog.title}
+            </h3>
+            <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
+              {confirmDialog.message}
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setConfirmDialog({ show: false, title: '', message: '', onConfirm: () => {} })}
+                className="flex-1 rounded-xl bg-gray-200 px-4 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Bekor qilish
+              </button>
+              <button
+                onClick={confirmDialog.onConfirm}
+                className="flex-1 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-3 font-semibold text-white shadow-lg transition-all hover:from-brand-600 hover:to-brand-700"
+              >
+                Tasdiqlash
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ ...toast, show: false })}
+        duration={3000}
+      />
     </div>
   );
 }

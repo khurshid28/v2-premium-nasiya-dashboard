@@ -255,14 +255,8 @@ const Fillials = (): JSX.Element => {
         {/* Buttons and filters row */}
         <div className="flex flex-wrap gap-2">
           <button onClick={() => { 
-            if (location.pathname.startsWith('/demo')) {
-              setEditInitial(null);
-              setEditOpen(true);
-            } else {
-              setToastType("error");
-              setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-              setToastOpen(true);
-            }
+            setEditInitial(null);
+            setEditOpen(true);
           }} className="h-11 rounded-xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 px-4 text-white font-medium shadow-sm hover:shadow-md transition-all duration-200 text-sm whitespace-nowrap">
             <span className="hidden sm:inline">Filial qo'shish</span>
             <span className="sm:hidden">+ Filial</span>
@@ -699,15 +693,9 @@ const Fillials = (): JSX.Element => {
                         Barcha ma'lumotlarni ko'chirish
                       </button>
                       <button className="rounded bg-blue-600 hover:bg-blue-700 px-3 py-1 text-white" onClick={() => { 
-                        if (location.pathname.startsWith('/demo')) {
-                          setEditInitial(selected);
-                          setEditOpen(true);
-                          setOpen(false);
-                        } else {
-                          setToastType("error");
-                          setToastMessage("Vaqtincha bu funksiya ishlamayapti");
-                          setToastOpen(true);
-                        }
+                        setEditInitial(selected);
+                        setEditOpen(true);
+                        setOpen(false);
                       }}>Tahrirlash</button>
                     </div>
                   </div>
@@ -732,18 +720,31 @@ const Fillials = (): JSX.Element => {
                   setToastOpen(true);
                   return;
                 }
-                if (editInitial && editInitial.id) {
-                  await api.updateFillial(editInitial.id, payload);
-                } else {
-                  await api.createFillial(payload);
+                try {
+                  if (editInitial && editInitial.id) {
+                    await api.updateFillial(editInitial.id, payload);
+                    setToastType('success');
+                    setToastMessage('Filial muvaffaqiyatli tahrirlandi');
+                  } else {
+                    await api.createFillial(payload);
+                    setToastType('success');
+                    setToastMessage('Filial muvaffaqiyatli qo\'shildi');
+                  }
+                  const res = await api.listFillials({
+                    page: page,
+                    pageSize: pageSize,
+                    search: search,
+                    region: regionFilter === "all" ? undefined : regionFilter
+                  });
+                  setData(res.items || []);
+                  setToastOpen(true);
+                  setEditOpen(false);
+                  setEditInitial(null);
+                } catch (error) {
+                  setToastType('error');
+                  setToastMessage(error.message || 'Xatolik yuz berdi');
+                  setToastOpen(true);
                 }
-                const res = await api.listFillials({
-                  page: page,
-                  pageSize: pageSize,
-                  search: search,
-                  region: regionFilter === "all" ? undefined : regionFilter
-                });
-                setData(res.items || []);
               }}
             />
 
