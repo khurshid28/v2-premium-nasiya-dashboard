@@ -858,15 +858,61 @@ const ApplicationDetail = (): JSX.Element => {
                           
                           {/* Metadata */}
                           {log.metadata && typeof log.metadata === 'object' && Object.keys(log.metadata).length > 0 && (
-                            <div className="mt-3 space-y-1">
-                              {Object.entries(log.metadata).map(([key, value]: [string, any]) => (
-                                <div key={key} className="flex items-start gap-2 text-sm">
-                                  <span className="text-gray-500 dark:text-gray-400 min-w-[120px] font-medium">{key}:</span>
-                                  <span className="text-gray-900 dark:text-white">
-                                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                                  </span>
-                                </div>
-                              ))}
+                            <div className="mt-3 p-3 bg-white dark:bg-navy-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {Object.entries(log.metadata).map(([key, value]: [string, any]) => {
+                                  // Key nomlarini o'zbekchaga o'girish
+                                  const keyLabels: Record<string, string> = {
+                                    clientId: 'Mijoz ID',
+                                    passport: 'Pasport',
+                                    isNewClient: 'Yangi mijoz',
+                                    limit: 'Limit',
+                                    bank: 'Bank',
+                                    bankId: 'Bank ID',
+                                    expired_month: 'Muddat (oy)',
+                                    percent: 'Foiz',
+                                    amount: 'Summa',
+                                    payment_amount: 'To\'lov summasi',
+                                    reason: 'Sabab',
+                                    status: 'Status',
+                                    productCount: 'Mahsulotlar soni',
+                                    totalPrice: 'Umumiy narx',
+                                  };
+                                  
+                                  const label = keyLabels[key] || key;
+                                  
+                                  // Value formatlash
+                                  let displayValue: any = value;
+                                  if (typeof value === 'boolean') {
+                                    displayValue = value ? (
+                                      <span className="px-2 py-0.5 rounded text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                                        Ha
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
+                                        Yo'q
+                                      </span>
+                                    );
+                                  } else if (key === 'limit' || key === 'amount' || key === 'payment_amount' || key === 'totalPrice') {
+                                    displayValue = formatMoneyWithUZS(Number(value));
+                                  } else if (typeof value === 'object') {
+                                    displayValue = JSON.stringify(value, null, 2);
+                                  } else {
+                                    displayValue = String(value);
+                                  }
+                                  
+                                  return (
+                                    <div key={key} className="flex flex-col gap-1">
+                                      <span className="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
+                                        {label}
+                                      </span>
+                                      <span className="text-sm text-gray-900 dark:text-white font-medium">
+                                        {displayValue}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           )}
                           
