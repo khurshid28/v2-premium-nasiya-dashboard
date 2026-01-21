@@ -349,7 +349,7 @@ const Applications = (): JSX.Element => {
     const approvedPaidAmount = approvedPaid.reduce((s, a) => s + (a.amount ?? 0), 0);
     
     // Approved ichida to'lanmaganlar
-    const approvedUnpaid = approvedItems.filter((a) => !a.paid || a.paid === false);
+    const approvedUnpaid = approvedItems.filter((a) => a.paid !== true);
     const approvedUnpaidAmount = approvedUnpaid.reduce((s, a) => s + (a.amount ?? 0), 0);
     
     console.log('📊 Statistics:', {
