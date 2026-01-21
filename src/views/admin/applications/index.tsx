@@ -330,13 +330,39 @@ const Applications = (): JSX.Element => {
   }, [applications, search, statusFilter, startDate, endDate, paidFilter, paymentMethodFilter, fillialFilter, regionFilter, expiredMonthFilter, amountRange, fillialsList, selectedMerchantId, selectedAgentId, agents]);
 
   const stats = React.useMemo(() => {
-    const items = filtered;
+    const items = filtered; // Filterlanagn hamma zayavkalar (paginationdan oldin)
     const totalCount = items.length;
-    // For amount stats use only current filtered items (based on status filter)
-    const approvedItems = items.filter((a) => a.status === "CONFIRMED" || a.status === "FINISHED" || a.status === "COMPLETED" || a.status === "ACTIVE");
+    
+    // Faqat tasdiqlangan (approved) zayavkalar
+    const approvedItems = items.filter((a) => 
+      a.status === "CONFIRMED" || 
+      a.status === "FINISHED" || 
+      a.status === "COMPLETED" || 
+      a.status === "ACTIVE"
+    );
+    
+    // Approved jami summa
     const approvedAmount = approvedItems.reduce((s, a) => s + (a.amount ?? 0), 0);
-    const approvedPaidAmount = approvedItems.filter((a) => a.paid).reduce((s, a) => s + (a.amount ?? 0), 0);
-    const approvedUnpaidAmount = approvedAmount - approvedPaidAmount;
+    
+    // Approved ichida to'langanlar
+    const approvedPaid = approvedItems.filter((a) => a.paid === true);
+    const approvedPaidAmount = approvedPaid.reduce((s, a) => s + (a.amount ?? 0), 0);
+    
+    // Approved ichida to'lanmaganlar
+    const approvedUnpaid = approvedItems.filter((a) => !a.paid || a.paid === false);
+    const approvedUnpaidAmount = approvedUnpaid.reduce((s, a) => s + (a.amount ?? 0), 0);
+    
+    console.log('📊 Statistics:', {
+      totalCount,
+      approvedCount: approvedItems.length,
+      approvedAmount,
+      paidCount: approvedPaid.length,
+      approvedPaidAmount,
+      unpaidCount: approvedUnpaid.length,
+      approvedUnpaidAmount,
+      sum: approvedPaidAmount + approvedUnpaidAmount
+    });
+    
     return { totalCount, approvedAmount, approvedPaidAmount, approvedUnpaidAmount };
   }, [filtered]);
 
