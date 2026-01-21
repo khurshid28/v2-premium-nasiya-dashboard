@@ -21,6 +21,7 @@ type Application = {
   status?: string | null;
   fillial_id?: number;
   bank_id?: number;
+  bank?: { id: number; name: string } | null;
   request_id?: string | null;
   createdAt?: string;
   updatedAt?: string | null;
