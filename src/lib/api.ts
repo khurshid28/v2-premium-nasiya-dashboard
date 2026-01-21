@@ -353,7 +353,7 @@ export async function listZayavkalar(opts?: { page?: number; pageSize?: number; 
 }
 
 export async function getZayavka(id: number): Promise<Zayavka> {
-  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant,request,payments`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
+  const res = await fetchWithRetry(`${API_BASE}/app/${id}?include=fillial,user,products,merchant,request,payments,actionLogs`, { headers: { "Content-Type": "application/json", ...authHeaders() } });
   return handleResponse<Zayavka>(res);
 }
 

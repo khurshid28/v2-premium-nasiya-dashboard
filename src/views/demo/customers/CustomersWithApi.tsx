@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Card from "components/card";
 import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin } from "tabler-icons-react";
@@ -44,21 +44,10 @@ export default function CustomersWithApi() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [customerApplications, setCustomerApplications] = useState<any[]>([]);
   const [loadingApplications, setLoadingApplications] = useState(false);
+  const loadedCustomerIdRef = useRef<number | null>(null);
   const navigate = useNavigate();
 
-  // Load all customers once on mount
-  useEffect(() => {
-    loadCustomers();
-  }, [api]);
-
-  // Load customer applications when modal opens
-  useEffect(() => {
-    if (showViewModal && selectedCustomer) {
-      loadCustomerApplications(selectedCustomer.id);
-    }
-  }, [showViewModal, selectedCustomer, api]);
-
-  const loadCustomers = async () => {
+  const loadCustomers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await api.listCustomers();
@@ -76,29 +65,47 @@ export default function CustomersWithApi() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
 
-  const loadCustomerApplications = async (clientId: number) => {
+  const loadCustomerDetail = useCallback(async (customerId: number) => {
     try {
       setLoadingApplications(true);
       setCustomerApplications([]);
-      const response = await api.listApplications({ 
-        clientId,
-        pageSize: 100 
-      });
       
-      if (response && response.items && Array.isArray(response.items)) {
-        setCustomerApplications(response.items);
-      } else if (response && response.value && Array.isArray(response.value)) {
-        setCustomerApplications(response.value);
+      // Backend dan to'liq customer ma'lumotini olish (zayavkalar bilan)
+      const customerDetail = await api.getCustomer(customerId);
+      
+      if (customerDetail && customerDetail.zayavkalar && Array.isArray(customerDetail.zayavkalar)) {
+        setCustomerApplications(customerDetail.zayavkalar);
+        loadedCustomerIdRef.current = customerId;
       }
     } catch (error) {
-      console.error("Failed to load customer applications:", error);
+      console.error("Failed to load customer detail:", error);
       setCustomerApplications([]);
     } finally {
       setLoadingApplications(false);
     }
-  };
+  }, [api]);
+
+  // Load all customers once on mount
+  useEffect(() => {
+    loadCustomers();
+  }, [loadCustomers]);
+
+  // Load customer detail with zayavkalar when modal opens
+  useEffect(() => {
+    if (showViewModal && selectedCustomer) {
+      // Faqat yangi customer uchun yuklash
+      if (loadedCustomerIdRef.current !== selectedCustomer.id) {
+        loadCustomerDetail(selectedCustomer.id);
+      }
+    } else {
+      // Modal yopilganda reset qilish
+      loadedCustomerIdRef.current = null;
+      setCustomerApplications([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showViewModal, selectedCustomer?.id]);
 
   // Get unique regions
   const regions = useMemo(() => {
@@ -358,7 +365,6 @@ export default function CustomersWithApi() {
                 onClick={() => {
                   setSelectedCustomer(customer);
                   setShowViewModal(true);
-                  loadCustomerApplications(customer.id);
                 }}
                 className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-800"
               >

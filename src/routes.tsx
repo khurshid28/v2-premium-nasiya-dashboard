@@ -15,11 +15,11 @@ import SignIn from "views/auth/SignIn";
 
 // Admin imports - used in /super with real API
 import Permissions from "views/admin/permissions";
-import Debts from "views/demo/debts";
+import Debts from "views/super/debts";
 import CustomersWithApi from "views/demo/customers/CustomersWithApi";
 import ScoringHistory from "views/demo/scoringHistory";
 import ScoringModels from "views/demo/scoringModels";
-import Payments from "views/demo/payments";
+import Payments from "views/super/payments";
 import Products from "views/demo/products";
 import DemoApplications from "views/demo/applications";
 import ApplicationDetail from "views/demo/applications/detail";

@@ -54,17 +54,24 @@ type Application = {
     work_schedule?: string;
   } | null;
   products?: { id: number; name: string; price: number; count?: number | null }[];
-  payments?: { date: string; prAmount: number; totalAmount: number; remainingMainDebt: number; paid?: boolean }[];
-  paymentHistory?: { id: string; date: string; amount: number; provider: string; transactionId?: string; status: string }[];
-  statusHistory?: { 
-    status: string; 
-    date: string; 
-    timestamp: number;
-    changes?: { field: string; value: any; label: string; isAmount?: boolean }[];
+  payments?: {
+    id: number;
+    amount: number;
+    provider: string;
+    status: string;
+    paymentType?: string;
+    transactionId?: string;
+    createdAt: string;
+    client?: {
+      id: number;
+      full_name: string;
+      phone: string;
+    };
   }[];
   actionLogs?: {
     id: number;
-    action: string;
+    action_type: string;
+    user_role: string;
     entity_type: string;
     entity_id: number;
     description?: string;
@@ -77,6 +84,28 @@ type Application = {
       role?: string;
     };
   }[];
+  debtInfo?: {
+    totalAmount: number;
+    paidAmount: number;
+    remainingDebt: number;
+    overdueAmount: number;
+    nextPaymentAmount: number;
+    nextPaymentDate: string | null;
+    monthlyPayment: number;
+    totalMonths: number;
+    completedMonths: number;
+    remainingMonths: number;
+    schedule: {
+      monthNumber: number;
+      dueDate: string;
+      amount: number;
+      paid: boolean;
+      paidAmount: number;
+      status: 'PENDING' | 'COMPLETED' | 'OVERDUE';
+      isOverdue: boolean;
+      daysPastDue: number;
+    }[];
+  } | null;
 };
 
 const ApplicationDetail = (): JSX.Element => {
@@ -92,28 +121,21 @@ const ApplicationDetail = (): JSX.Element => {
   const [loading, setLoading] = React.useState(true);
   const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'debt' | 'payments' | 'history' | 'operations'>('application');
 
-  // Debug logging for payment history
-  React.useEffect(() => {
-    if (activeTab === 'history' && application) {
-      console.log('=== SO\'NDIRISH TAB ===');
-      console.log('Application ID:', application.id);
-      console.log('Application data:', application);
-      console.log('Has paymentHistory?', !!application.paymentHistory);
-      console.log('PaymentHistory length:', application.paymentHistory?.length);
-      console.log('PaymentHistory data:', application.paymentHistory);
-    }
-  }, [activeTab, application]);
-
   React.useEffect(() => {
     const fetchApplication = async () => {
       if (!id) return;
       
       try {
         setLoading(true);
+        console.log('🔍 Fetching application:', id);
         const response = await api.getApplication(parseInt(id));
+        console.log('✅ Application response:', response);
+        console.log('   - workplace:', response.workplace);
+        console.log('   - payments count:', response.payments?.length);
+        console.log('   - actionLogs count:', response.actionLogs?.length);
         setApplication(response);
       } catch (error) {
-        console.error('Error fetching application:', error);
+        console.error('❌ Error fetching application:', error);
       } finally {
         setLoading(false);
       }
@@ -198,26 +220,32 @@ const ApplicationDetail = (): JSX.Element => {
           >
             Ish joyi
           </button>
-          <button
-            onClick={() => setActiveTab('debt')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'debt'
-                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            Qarzdorlik
-          </button>
-          <button
-            onClick={() => setActiveTab('payments')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'payments'
-                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            To'lovlar
-          </button>
+          {/* Faqat CONFIRMED va FINISHED statuslarda Qarzdorlik tabini ko'rsatish */}
+          {(application.status === 'CONFIRMED' || application.status === 'FINISHED') && (
+            <button
+              onClick={() => setActiveTab('debt')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                activeTab === 'debt'
+                  ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Qarzdorlik
+            </button>
+          )}
+          {/* Faqat CONFIRMED va FINISHED statuslarda To'lovlar tabini ko'rsatish */}
+          {(application.status === 'CONFIRMED' || application.status === 'FINISHED') && (
+            <button
+              onClick={() => setActiveTab('payments')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                activeTab === 'payments'
+                  ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              To'lovlar
+            </button>
+          )}
           <button
             onClick={() => setActiveTab('history')}
             className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
@@ -484,104 +512,98 @@ const ApplicationDetail = (): JSX.Element => {
           )}
 
           {activeTab === 'debt' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Jami summa</p>
-                <p className="text-xl font-bold text-navy-700 dark:text-white">{formatMoneyWithUZS(application.amount)}</p>
+            <div className="space-y-6">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Jami summa</p>
+                  <p className="text-xl font-bold text-navy-700 dark:text-white">
+                    {application.debtInfo ? formatMoneyWithUZS(application.debtInfo.totalAmount) : formatMoneyWithUZS(application.amount || 0)}
+                  </p>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">To'langan</p>
+                  <p className="text-xl font-bold text-green-600 dark:text-green-400">
+                    {application.debtInfo ? formatMoneyWithUZS(application.debtInfo.paidAmount) : '0 so\'m'}
+                  </p>
+                </div>
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Qoldiq qarz</p>
+                  <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                    {application.debtInfo ? formatMoneyWithUZS(application.debtInfo.remainingDebt) : formatMoneyWithUZS((application.amount || 0) - (application.payment_amount || 0))}
+                  </p>
+                </div>
+                <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Muddati o'tgan</p>
+                  <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                    {application.debtInfo ? formatMoneyWithUZS(application.debtInfo.overdueAmount) : '0 so\'m'}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">To'langan summa</p>
-                <p className="text-xl font-bold text-green-500">{formatMoneyWithUZS(application.payment_amount)}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Qoldiq qarz</p>
-                <p className="text-xl font-bold text-red-500">
-                  {formatMoneyWithUZS((application.amount || 0) - (application.payment_amount || 0))}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Muddat</p>
-                <p className="text-xl font-bold text-navy-700 dark:text-white">{application.expired_month ? `${application.expired_month} oy` : '—'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Foiz stavkasi</p>
-                <p className="text-xl font-bold text-navy-700 dark:text-white">{application.percent ? `${application.percent}%` : '—'}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Holati</p>
-                {(() => {
-                  const badge = appStatusBadge(application.status || '');
-                  return <span className={badge.className}>{badge.label}</span>;
-                })()}
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'payments' && (
-            <div>
-              {application.payments && application.payments.length > 0 ? (
+              {/* Payment Schedule Table */}
+              {application.debtInfo && application.debtInfo.schedule && application.debtInfo.schedule.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="border-b border-gray-200 dark:border-gray-700">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">№</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Oy</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">To'lov sanasi</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Asosiy qarz</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Jami to'lov</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Qoldiq qarz</th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">To'langan</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Summa</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">To'langan</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Holat</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(application.payments as any[]).map((payment, index) => (
-                        <tr key={index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-navy-800">
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{index + 1}</td>
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                            {(() => {
-                              const date = new Date(payment.date);
-                              const day = String(date.getDate()).padStart(2, '0');
-                              const month = String(date.getMonth() + 1).padStart(2, '0');
-                              const year = date.getFullYear();
-                              return `${day}.${month}.${year}`;
-                            })()}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
-                            {formatMoneyWithUZS(payment.prAmount)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
-                            {formatMoneyWithUZS(payment.totalAmount)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-medium text-orange-600 dark:text-orange-400">
-                            {formatMoneyWithUZS(payment.remainingMainDebt)}
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            {payment.paid ? (
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-green-500 text-white">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                </svg>
+                      {application.debtInfo.schedule.map((item) => {
+                        const dueDate = new Date(item.dueDate);
+                        const formattedDate = `${String(dueDate.getDate()).padStart(2, '0')}.${String(dueDate.getMonth() + 1).padStart(2, '0')}.${dueDate.getFullYear()}`;
+                        
+                        let statusLabel = 'Kutilmoqda';
+                        let statusClass = 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+                        
+                        if (item.status === 'COMPLETED') {
+                          statusLabel = 'To\'landi';
+                          statusClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                        } else if (item.status === 'OVERDUE') {
+                          statusLabel = `Kechikkan (${item.daysPastDue} kun)`;
+                          statusClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                        }
+                        
+                        return (
+                          <tr key={item.monthNumber} className="border-b border-gray-100 dark:border-gray-800">
+                            <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                              {item.monthNumber === 0 ? 'Boshlang\'ich' : `${item.monthNumber}-oy`}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{formattedDate}</td>
+                            <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
+                              {formatMoney(item.amount)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
+                              {formatMoney(item.paidAmount)}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}>
+                                {statusLabel}
                               </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600"></span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                     <tfoot className="bg-gray-50 dark:bg-navy-800">
                       <tr>
                         <td colSpan={2} className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">Jami:</td>
-                        <td className="px-4 py-3 text-right text-sm font-bold text-gray-900 dark:text-white">
-                          {formatMoneyWithUZS((application.payments as any[]).reduce((sum, p) => sum + (p.prAmount || 0), 0))}
+                        <td className="px-4 py-3 text-right text-sm font-bold text-navy-700 dark:text-white">
+                          {formatMoney(application.debtInfo.totalAmount)}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
-                          {formatMoneyWithUZS((application.payments as any[]).reduce((sum, p) => sum + (p.totalAmount || 0), 0))}
+                          {formatMoney(application.debtInfo.paidAmount)}
                         </td>
-                        <td className="px-4 py-3 text-right text-sm font-bold text-orange-600 dark:text-orange-400">
-                          {application.payments.length > 0 ? formatMoneyWithUZS((application.payments as any[])[application.payments.length - 1].remainingMainDebt || 0) : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
-                          {(application.payments as any[]).filter(p => p.paid).length} / {application.payments.length}
+                        <td className="px-4 py-3 text-center text-sm">
+                          <span className="font-medium text-gray-600 dark:text-gray-400">
+                            {application.debtInfo.completedMonths} / {application.debtInfo.totalMonths}
+                          </span>
                         </td>
                       </tr>
                     </tfoot>
@@ -589,7 +611,87 @@ const ApplicationDetail = (): JSX.Element => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400">To'lovlar tarixi mavjud emas</p>
+                  <p className="text-gray-600 dark:text-gray-400">To'lov grafigi mavjud emas</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'payments' && (
+            <div>
+              {application.expired_month && application.payment_amount ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b border-gray-200 dark:border-gray-700">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Oy</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">To'lov sanasi</th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Oylik to'lov</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Holat</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const months = parseInt(application.expired_month);
+                        const monthlyPayment = Math.round(application.payment_amount / months);
+                        const createdDate = application.createdAt ? new Date(application.createdAt) : new Date();
+                        const currentDate = new Date();
+                        
+                        return Array.from({ length: months }, (_, index) => {
+                          const monthNumber = index + 1;
+                          const dueDate = new Date(createdDate);
+                          dueDate.setMonth(dueDate.getMonth() + monthNumber);
+                          
+                          // Holat: o'tgan oy, joriy oy, kelgusi oy
+                          const isPast = dueDate < currentDate;
+                          const isCurrent = dueDate.getMonth() === currentDate.getMonth() && dueDate.getFullYear() === currentDate.getFullYear();
+                          
+                          let statusLabel = 'Kutilmoqda';
+                          let statusClass = 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+                          
+                          if (isPast) {
+                            statusLabel = 'Muddati o\'tgan';
+                            statusClass = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                          } else if (isCurrent) {
+                            statusLabel = 'Joriy oy';
+                            statusClass = 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400';
+                          }
+                          
+                          return (
+                            <tr key={monthNumber} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-navy-800">
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{monthNumber}-oy</td>
+                              <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                                {String(dueDate.getDate()).padStart(2, '0')}.{String(dueDate.getMonth() + 1).padStart(2, '0')}.{dueDate.getFullYear()}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-medium text-gray-900 dark:text-white">
+                                {formatMoneyWithUZS(monthNumber === months ? application.payment_amount - (monthlyPayment * (months - 1)) : monthlyPayment)}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}`}>
+                                  {statusLabel}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                    <tfoot className="bg-gray-50 dark:bg-navy-800">
+                      <tr>
+                        <td colSpan={2} className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white">Jami:</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
+                          {formatMoneyWithUZS(application.payment_amount)}
+                        </td>
+                        <td className="px-4 py-3 text-center text-sm text-gray-600 dark:text-gray-400">
+                          {application.expired_month} oy
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600 dark:text-gray-400">To'lov grafigi mavjud emas</p>
                 </div>
               )}
             </div>
@@ -597,29 +699,32 @@ const ApplicationDetail = (): JSX.Element => {
 
           {activeTab === 'history' && (
             <div>
-              {application.payments && application.payments.length > 0 ? (
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold text-navy-700 dark:text-white">So'ndirish (Amalga oshirilgan to'lovlar)</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Shu ariza uchun to'langan barcha to'lovlar</p>
+              </div>
+              {Array.isArray(application.payments) && application.payments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead className="border-b border-gray-200 dark:border-gray-700">
                       <tr>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">ID</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">№</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Sana</th>
                         <th className="px-4 py-3 text-right text-sm font-semibold text-gray-900 dark:text-white">Summa</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Provider</th>
                         <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">To'lov turi</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">Transaction ID</th>
                         <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900 dark:text-white">Status</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {application.payments.map((payment: any) => (
-                        <tr key={payment.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-navy-800">
-                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{payment.id}</td>
+                      {application.payments.map((payment: any, index: number) => (
+                        <tr key={payment.id || index} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-navy-800">
+                          <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{index + 1}</td>
                           <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                            {formatDateNoSeconds(payment.createdAt)}
+                            {payment.createdAt ? formatDateNoSeconds(payment.createdAt) : '—'}
                           </td>
                           <td className="px-4 py-3 text-right text-sm font-medium text-green-600 dark:text-green-400">
-                            {formatMoneyWithUZS(payment.amount)}
+                            {formatMoneyWithUZS(payment.amount || 0)}
                           </td>
                           <td className="px-4 py-3 text-sm">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -629,36 +734,25 @@ const ApplicationDetail = (): JSX.Element => {
                               payment.provider === 'MIB' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                               payment.provider === 'CLICK' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' :
                               payment.provider === 'UZUM' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' :
-                              payment.provider === 'APELSIN' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
-                              payment.provider === 'CASH' ? 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' :
                               'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                             }`}>
-                              {payment.provider}
+                              {payment.provider || 'N/A'}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                            {payment.paymentType?.replace('_', ' ')}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400 font-mono">
-                            {payment.transactionId || '—'}
+                            {payment.paymentType ? payment.paymentType.replace('_', ' ') : '—'}
                           </td>
                           <td className="px-4 py-3 text-center">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                               payment.status === 'COMPLETED' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                               payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
                               payment.status === 'FAILED' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                              payment.status === 'PROCESSING' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                              payment.status === 'CANCELLED' ? 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400' :
-                              payment.status === 'REFUNDED' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
                               'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
                             }`}>
                               {payment.status === 'COMPLETED' ? 'Muvaffaqiyatli' :
                                payment.status === 'PENDING' ? 'Kutilmoqda' :
                                payment.status === 'FAILED' ? 'Muvaffaqiyatsiz' :
-                               payment.status === 'PROCESSING' ? 'Jarayonda' :
-                               payment.status === 'CANCELLED' ? 'Bekor qilingan' :
-                               payment.status === 'REFUNDED' ? 'Qaytarilgan' :
-                               payment.status}
+                               payment.status || 'Noma\'lum'}
                             </span>
                           </td>
                         </tr>
@@ -670,7 +764,7 @@ const ApplicationDetail = (): JSX.Element => {
                         <td className="px-4 py-3 text-right text-sm font-bold text-green-600 dark:text-green-400">
                           {formatMoneyWithUZS(application.payments.filter((p: any) => p.status === 'COMPLETED').reduce((sum: number, p: any) => sum + (p.amount || 0), 0))}
                         </td>
-                        <td colSpan={4} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                        <td colSpan={3} className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                           {application.payments.filter((p: any) => p.status === 'COMPLETED').length} ta to'lov
                         </td>
                       </tr>
@@ -679,7 +773,7 @@ const ApplicationDetail = (): JSX.Element => {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-600 dark:text-gray-400">To'lovlar tarixi mavjud emas</p>
+                  <p className="text-gray-600 dark:text-gray-400">Hali to'lovlar amalga oshirilmagan</p>
                 </div>
               )}
             </div>
@@ -694,17 +788,23 @@ const ApplicationDetail = (): JSX.Element => {
                     const formattedDate = `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`;
                     const formattedTime = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                     
-                    // Action type labels
+                    // Action type labels (based on Prisma ActionType enum)
                     const actionTypeLabels: { [key: string]: { label: string; color: string } } = {
                       'CREATE': { label: 'Yaratildi', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' },
                       'UPDATE': { label: 'Tahrirlandi', color: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' },
                       'DELETE': { label: 'O\'chirildi', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
-                      'STATUS_CHANGE': { label: 'Status o\'zgartirildi', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
-                      'PAYMENT': { label: 'To\'lov', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-                      'SCORING': { label: 'Skoring', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+                      'VIEW': { label: 'Ko\'rib chiqildi', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
+                      'CANCEL': { label: 'Bekor qilindi', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
                       'APPROVE': { label: 'Tasdiqlandi', color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200' },
                       'REJECT': { label: 'Rad etildi', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' },
-                      'CANCEL': { label: 'Bekor qilindi', color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' },
+                      'ADD_DETAIL': { label: 'Ma\'lumot qo\'shildi', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' },
+                      'SEND_SCORING': { label: 'Skoring yuborildi', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+                      'CHECK_SCORING': { label: 'Skoring tekshirildi', color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200' },
+                      'ADD_PRODUCT': { label: 'Mahsulot qo\'shildi', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+                      'SELECT': { label: 'Tanlandi', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200' },
+                      'FINISH': { label: 'Yakunlandi', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
+                      'MERCHANT_PAY': { label: 'Merchant to\'lovi', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
+                      'GENERATE_GRAPH': { label: 'Grafik yaratildi', color: 'bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200' },
                     };
                     
                     const actionInfo = actionTypeLabels[log.action_type] || { label: log.action_type, color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200' };
@@ -736,6 +836,16 @@ const ApplicationDetail = (): JSX.Element => {
                                 }`}>
                                   {log.user_role}
                                 </span>
+                                {/* Bank name - faqat limit berish va tasdiqlash paytida */}
+                                {application.bank && application.bank.name && 
+                                 (log.action_type === 'CHECK_SCORING' || log.action_type === 'APPROVE' || log.action_type === 'SELECT') && (
+                                  <>
+                                    <span className="mx-2">•</span>
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                      🏦 {application.bank.name}
+                                    </span>
+                                  </>
+                                )}
                               </span>
                             </div>
                           )}

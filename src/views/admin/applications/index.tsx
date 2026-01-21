@@ -226,7 +226,8 @@ const Applications = (): JSX.Element => {
       const fullname = (a.fullname ?? "").toLowerCase();
       const phone = (a.phone ?? "").toLowerCase();
       const passport = (a.passport ?? "").toLowerCase();
-      const matchesSearch = !s || fullname.includes(s) || phone.includes(s) || passport.includes(s);
+      const id = String(a.id ?? "");
+      const matchesSearch = !s || fullname.includes(s) || phone.includes(s) || passport.includes(s) || id.includes(s);
       
       // Status filter with category matching
       let matchesStatus = true;

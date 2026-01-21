@@ -71,8 +71,9 @@ export default function SignIn(): JSX.Element {
         role: response.user.role,
       });
       
-      // Navigate to super default
-      navigate("/super/dashboard");
+      // Navigate to super default using window.location to ensure full page reload
+      // This ensures isAuth check in App.tsx re-evaluates with new token
+      window.location.href = "/super/dashboard";
     } catch (err: any) {
       console.error("Login error:", err);
       
