@@ -74,6 +74,14 @@ const Debts = () => {
       // Response format: { totalDebts: number, totalDebtAmount: number, debts: [...] }
       const debtsData = response.data.debts || [];
       
+      // Debug: log first debt to check values
+      if (debtsData.length > 0) {
+        console.log('First debt data:', debtsData[0]);
+        console.log('totalAmount:', debtsData[0].totalAmount);
+        console.log('totalPaid:', debtsData[0].totalPaid);
+        console.log('totalDebt:', debtsData[0].totalDebt);
+      }
+      
       setDebts(debtsData);
     } catch (error) {
       console.error('Error loading debts:', error);

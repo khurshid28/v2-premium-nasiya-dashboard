@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
-import { Eye, Plus, Search } from "tabler-icons-react";
+import { Eye, Plus, Search, Phone } from "tabler-icons-react";
 import CustomSelect from "components/dropdown/CustomSelect";
 import Pagination from "components/pagination";
 import { paymentApi, Payment as ApiPayment, PaymentProvider, PaymentStatus } from "lib/api/payment";
@@ -532,11 +532,14 @@ const Payments = () => {
                   <tr key={payment.id} className="border-b border-gray-100 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-navy-700">
                     <td className="py-4 text-sm font-bold text-navy-700 dark:text-white">{payment.applicationId}</td>
                     <td className="py-4">
-                      <div>
+                      <div className="flex flex-col gap-1">
                         <p className="text-sm font-medium text-navy-700 dark:text-white">{payment.customerName}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{payment.customerPhone}</p>
-                    </div>
-                  </td>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                          <Phone className="h-3.5 w-3.5" />
+                          <span>{payment.customerPhone}</span>
+                        </div>
+                      </div>
+                    </td>
                   <td className="py-4 text-sm text-gray-600 dark:text-gray-400">{payment.branch}</td>
                   <td className="py-4 text-sm font-bold text-green-600 dark:text-green-400">{formatCurrency(payment.amount)}</td>
                   <td className="py-4">
@@ -642,7 +645,10 @@ const Payments = () => {
                     <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
                       <p className="text-xs text-gray-600 dark:text-gray-400">Mijoz</p>
                       <p className="mt-1 text-sm font-bold text-navy-700 dark:text-white">{selectedPayment.customerName}</p>
-                      <p className="text-xs text-gray-500">{selectedPayment.customerPhone}</p>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                        <Phone className="h-3.5 w-3.5" />
+                        <span>{selectedPayment.customerPhone}</span>
+                      </div>
                     </div>
                   </div>
                 </div>

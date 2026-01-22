@@ -9,11 +9,13 @@ import {
   User,
   Clock,
   Refresh,
-  Plus
+  Plus,
+  Phone
 } from "tabler-icons-react";
 import Toast from "components/toast/ToastNew";
 import { blockApi } from "lib/api/block";
 import { listMerchants, listFillials, listUsers } from "lib/api";
+import apiClient from "lib/api/index";
 
 // Types
 interface PermissionItem {
@@ -49,6 +51,7 @@ const Permissions = () => {
     entityId: 0,
     reason: "",
     duration: "",
+    workplaceId: 0,
     workplaceName: "",
   });
   const [entitySearch, setEntitySearch] = useState("");
@@ -89,6 +92,8 @@ const Permissions = () => {
   const loadData = async () => {
     setLoading(true);
     try {
+      console.log('📊 Loading permissions data for tab:', activeTab);
+      
       // Load blocks
       let blockType: 'USER' | 'MERCHANT' | 'FILLIAL' | 'WORKPLACE' | undefined;
       if (activeTab === "merchant") blockType = "MERCHANT";
@@ -96,23 +101,96 @@ const Permissions = () => {
       else if (activeTab === "customer") blockType = "USER";
       else if (activeTab === "workplace") blockType = "WORKPLACE";
       
+      console.log('🔍 Fetching blocks with type:', blockType);
+      // Jadvalda faqat AKTIV blocklar ko'rsatish
       const blocksRes = await blockApi.getBlocks({ type: blockType, isActive: true });
+      console.log('✅ Blocks loaded (active only):', blocksRes.data.length);
       setBlocks(blocksRes.data);
 
-      // Load relevant entities
+      // Load relevant entities (modal uchun BARCHA entitylar kerak)
       if (activeTab === "merchant") {
+        console.log('🏢 Fetching ALL merchants...');
         const merchantsRes = await listMerchants();
+        console.log('✅ Merchants loaded:', merchantsRes.items?.length || 0);
         setMerchants(merchantsRes.items || []);
+        
+        // Workplace blocklarni ham olib qo'yamiz (modal uchun)
+        const workplaceRes = await blockApi.getBlocks({ type: 'WORKPLACE' });
+        console.log('📋 All workplace blocks loaded:', workplaceRes.data.length);
       } else if (activeTab === "fillial") {
+        console.log('🏠 Fetching ALL fillials...');
         const filialsRes = await listFillials();
+        console.log('✅ Fillials loaded:', filialsRes.items?.length || 0);
         setFillials(filialsRes.items || []);
       } else if (activeTab === "customer") {
+        console.log('👤 Fetching ALL users...');
         const usersRes = await listUsers();
+        console.log('✅ Users loaded:', usersRes.items?.length || 0);
         setUsers(usersRes.items || []);
+      } else if (activeTab === "workplace") {
+        console.log('🏢 Loading all workplaces from database...');
+        try {
+          // BARCHA workplace lar ni olish (database dan)
+          const workplacesRes = await apiClient.get('/client/workplaces/all');
+          const data = workplacesRes.data?.value || workplacesRes.data || [];
+          console.log('✅ Workplaces loaded from database:', data.length);
+          
+          const mappedWorkplaces = data
+            .map((w: any) => ({
+              id: w.id,
+              name: w.name,
+              address: w.address,
+              phone: w.phone
+            }))
+            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+          
+          console.log('📋 Workplaces:', mappedWorkplaces);
+          setMerchants(mappedWorkplaces);
+        } catch (err) {
+          console.error('❌ Failed to load workplaces from database:', err);
+          console.log('⚠️ Fallback: Loading from blocks...');
+          
+          // Fallback: Blocklardan olish
+          try {
+            const allWorkplaceBlocks = await blockApi.getBlocks({ type: 'WORKPLACE' });
+            const workplaceMap = new Map<number, any>();
+            
+            allWorkplaceBlocks.data.forEach((block: any) => {
+              if (block.workplace_id && block.workplace) {
+                workplaceMap.set(block.workplace_id, {
+                  id: block.workplace_id,
+                  name: block.workplace.name || block.workplace_name
+                });
+              } else if (block.workplace_name) {
+                // Eski format - faqat nom
+                workplaceMap.set(block.id, {
+                  id: 0,
+                  name: block.workplace_name,
+                  _oldFormat: true
+                });
+              }
+            });
+            
+            const uniqueWorkplaces = Array.from(workplaceMap.values())
+              .sort((a, b) => a.name.localeCompare(b.name));
+            
+            console.log('✅ Fallback workplaces:', uniqueWorkplaces.length);
+            setMerchants(uniqueWorkplaces);
+          } catch (fallbackErr) {
+            console.error('❌ Fallback also failed:', fallbackErr);
+            setMerchants([]);
+          }
+        }
       }
-    } catch (error) {
-      console.error('Ma\'lumotlarni yuklashda xatolik:', error);
-      showToast('Ma\'lumotlarni yuklashda xatolik yuz berdi', 'error');
+    } catch (error: any) {
+      console.error('❌ Ma\'lumotlarni yuklashda xatolik:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+      showToast('Ma\'lumotlarni yuklashda xatolik yuz berdi: ' + (error.message || 'Noma\'lum xato'), 'error');
     } finally {
       setLoading(false);
     }
@@ -123,60 +201,83 @@ const Permissions = () => {
     let items: PermissionItem[] = [];
 
     if (activeTab === "merchant") {
-      // Merge merchants with blocks
-      items = merchants.filter(m => m.work_status === "BLOCKED").map(merchant => {
-        const block = blocks.find(b => b.merchant_id === merchant.id);
-        return {
-          id: merchant.id,
-          name: merchant.name || merchant.merchant_name,
-          phone: merchant.phone,
-          status: "BLOCKED" as const,
-          reason: block?.reason,
-          blockedAt: block?.createdAt,
-          blockedUntil: block?.endDate,
-          createdAt: merchant.createdAt,
-          blockId: block?.id,
-        };
-      });
+      // Show all active blocks for merchants
+      console.log('🏢 Processing merchant blocks:', blocks.filter(b => b.type === "MERCHANT").length);
+      console.log('📋 Available merchants:', merchants.length);
+      
+      items = blocks
+        .filter(b => b.type === "MERCHANT" && b.merchant_id)
+        .map(block => {
+          const merchant = merchants.find(m => m.id === block.merchant_id);
+          console.log(`🔍 Block merchant_id: ${block.merchant_id}, Found:`, merchant ? `${merchant.name || merchant.merchant_name}` : 'NOT FOUND');
+          
+          return {
+            id: block.merchant_id,
+            name: merchant?.name || merchant?.merchant_name || block.merchant?.name || block.merchant?.merchant_name || `Merchant #${block.merchant_id}`,
+            phone: merchant?.phone || block.merchant?.phone,
+            status: "BLOCKED" as const,
+            reason: block?.reason,
+            blockedAt: block?.createdAt,
+            blockedUntil: block?.endDate,
+            createdAt: block.createdAt,
+            blockId: block?.id,
+          };
+        });
     } else if (activeTab === "fillial") {
-      items = fillials.filter(f => f.work_status === "BLOCKED").map(fillial => {
-        const block = blocks.find(b => b.fillial_id === fillial.id);
-        return {
-          id: fillial.id,
-          name: fillial.name || fillial.fillial_name,
-          phone: fillial.phone,
-          status: "BLOCKED" as const,
-          reason: block?.reason,
-          blockedAt: block?.createdAt,
-          blockedUntil: block?.endDate,
-          createdAt: fillial.createdAt,
-          blockId: block?.id,
-        };
-      });
+      // Show all active blocks for fillials
+      console.log('🏠 Processing fillial blocks:', blocks.filter(b => b.type === "FILLIAL").length);
+      console.log('📋 Available fillials:', fillials.length);
+      
+      items = blocks
+        .filter(b => b.type === "FILLIAL" && b.fillial_id)
+        .map(block => {
+          const fillial = fillials.find(f => f.id === block.fillial_id);
+          console.log(`🔍 Block fillial_id: ${block.fillial_id}, Found:`, fillial ? `${fillial.name || fillial.fillial_name}` : 'NOT FOUND');
+          
+          return {
+            id: block.fillial_id,
+            name: fillial?.name || fillial?.fillial_name || block.fillial?.name || block.fillial?.fillial_name || `Fillial #${block.fillial_id}`,
+            phone: fillial?.phone || block.fillial?.phone,
+            status: "BLOCKED" as const,
+            reason: block?.reason,
+            blockedAt: block?.createdAt,
+            blockedUntil: block?.endDate,
+            createdAt: block.createdAt,
+            blockId: block?.id,
+          };
+        });
     } else if (activeTab === "customer") {
-      items = users.filter(u => u.work_status === "BLOCKED").map(user => {
-        const block = blocks.find(b => b.user_id === user.id);
-        return {
-          id: user.id,
-          name: user.full_name || user.name,
-          phone: user.phone,
-          passport: user.passport,
-          status: "BLOCKED" as const,
-          reason: block?.reason,
-          blockedAt: block?.createdAt,
-          blockedUntil: block?.endDate,
-          createdAt: user.createdAt,
-          blockId: block?.id,
-        };
-      });
+      // Show all active blocks for users
+      console.log('👤 Processing user blocks:', blocks.filter(b => b.type === "USER").length);
+      console.log('📋 Available users:', users.length);
+      
+      items = blocks
+        .filter(b => b.type === "USER" && b.user_id)
+        .map(block => {
+          const user = users.find(u => u.id === block.user_id);
+          console.log(`🔍 Block user_id: ${block.user_id}, Found:`, user ? `${user.fullname || user.full_name || user.name}` : 'NOT FOUND');
+          
+          return {
+            id: block.user_id,
+            name: user?.fullname || user?.full_name || user?.name || block.user?.fullname || block.user?.full_name || block.user?.name || `Mijoz #${block.user_id}`,
+            phone: user?.phone || block.user?.phone,
+            passport: user?.passport || block.user?.passport,
+            status: "BLOCKED" as const,
+            reason: block?.reason,
+            blockedAt: block?.createdAt,
+            blockedUntil: block?.endDate,
+            createdAt: block.createdAt,
+            blockId: block?.id,
+          };
+        });
     } else if (activeTab === "workplace") {
       // Workplace blocks - only show blocks with type WORKPLACE
       items = blocks
-        .filter(b => b.type === "WORKPLACE" && b.workplace_name)
+        .filter(b => b.type === "WORKPLACE")
         .map(block => ({
-          id: block.id,
-          name: block.workplace_name,
-          phone: "",
+          id: block.workplace_id || block.id,
+          name: block.workplace?.name || block.workplace_name || `Workplace #${block.workplace_id || block.id}`,
+          phone: block.workplace?.phone || "",
           status: "BLOCKED" as const,
           reason: block.reason,
           blockedAt: block.createdAt,
@@ -301,14 +402,17 @@ const Permissions = () => {
         blockData.user_id = blockForm.entityId;
       } else if (activeTab === "workplace") {
         blockData.type = "WORKPLACE";
-        blockData.workplace_name = blockForm.workplaceName;
+        if (blockForm.workplaceId) {
+          blockData.workplace_id = blockForm.workplaceId;
+        }
+        blockData.workplace_name = blockForm.workplaceName; // Fallback
       }
 
       await blockApi.createBlock(blockData);
       showToast('Block muvaffaqiyatli qo\'shildi!', 'success');
       setShowAddModal(false);
       setEntitySearch("");
-      setBlockForm({ entityId: 0, reason: "", duration: "", workplaceName: "" });
+      setBlockForm({ entityId: 0, reason: "", duration: "", workplaceId: 0, workplaceName: "" });
       
       // Reload data
       await loadData();
@@ -426,7 +530,7 @@ const Permissions = () => {
               onClick={() => {
                 setShowAddModal(true);
                 setEntitySearch("");
-                setBlockForm({ entityId: 0, reason: "", duration: "", workplaceName: "" });
+                setBlockForm({ entityId: 0, reason: "", duration: "", workplaceId: 0, workplaceName: "" });
               }}
               className="flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-brand-600 hover:shadow-lg active:scale-95"
             >
@@ -508,16 +612,43 @@ const Permissions = () => {
                         {activeTab === "workplace" && <Clock className="h-5 w-5 text-white" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-navy-700 dark:text-white truncate">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-bold text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                            ID: {item.id}
+                          </span>
+                          {activeTab === "merchant" && (
+                            <span className="inline-flex items-center rounded-md bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                              Merchant
+                            </span>
+                          )}
+                          {activeTab === "fillial" && (
+                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                              Filial
+                            </span>
+                          )}
+                          {activeTab === "customer" && (
+                            <span className="inline-flex items-center rounded-md bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                              Mijoz
+                            </span>
+                          )}
+                          {activeTab === "workplace" && (
+                            <span className="inline-flex items-center rounded-md bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
+                              Ish joyi
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-bold text-navy-700 dark:text-white truncate text-sm">{item.name}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
                           {item.phone && (
-                            <span className="text-xs text-gray-600 dark:text-gray-400">
-                              📱 {item.phone}
+                            <span className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
+                              <Phone className="h-3.5 w-3.5" />
+                              <span className="font-medium">{item.phone}</span>
                             </span>
                           )}
                           {item.passport && (
-                            <span className="inline-flex items-center rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                              🆔 {item.passport}
+                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">
+                              <span>🆔</span>
+                              <span>{item.passport}</span>
                             </span>
                           )}
                         </div>
@@ -745,7 +876,7 @@ const Permissions = () => {
                 onClick={() => {
                   setShowAddModal(false);
                   setEntitySearch("");
-                  setBlockForm({ entityId: 0, reason: "", duration: "", workplaceName: "" });
+                  setBlockForm({ entityId: 0, reason: "", duration: "", workplaceId: 0, workplaceName: "" });
                 }}
                 className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-navy-700"
               >
@@ -759,135 +890,299 @@ const Permissions = () => {
 
               {/* Entity Selector with Search OR Workplace Text Input */}
               {activeTab === "workplace" ? (
-                <div className="w-full">
+                <div>
                   <label className="mb-2 block text-sm font-medium text-navy-700 dark:text-white">
-                    Ish joyi nomini kiriting *
+                    Ish joyi tanlang *
                   </label>
-                  <input
-                    type="text"
-                    value={blockForm.workplaceName}
-                    onChange={(e) => setBlockForm({ ...blockForm, workplaceName: e.target.value })}
-                    placeholder="Masalan: Artel, Samsung Plaza, Oliy Majlis..."
-                    className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-navy-600 dark:bg-navy-900 dark:text-white placeholder:text-gray-400"
-                  />
-                  {blockForm.workplaceName.trim() && (
-                    <p className="mt-2 text-xs font-medium text-brand-600 dark:text-brand-400">
-                      ✓ "{blockForm.workplaceName}" nomli ish joyi blocklanadi
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 transition-colors peer-focus:text-brand-500 dark:peer-focus:text-brand-400 z-10" />
+                    <input
+                      type="text"
+                      value={blockForm.workplaceId ? 
+                        merchants.find(w => w.id === blockForm.workplaceId)?.name || ""
+                        : blockForm.workplaceName
+                      }
+                      onChange={(e) => {
+                        setBlockForm({ ...blockForm, workplaceName: e.target.value, workplaceId: 0 });
+                      }}
+                      placeholder="Qidiruv yoki yangi nom yozing..."
+                      className="peer w-full rounded-lg border border-gray-200 bg-white pl-11 pr-4 py-2.5 text-sm text-navy-700 outline-none focus:border-brand-500 placeholder:text-gray-400 focus:placeholder:text-gray-500 dark:border-navy-600 dark:bg-navy-900 dark:text-white dark:focus:border-brand-400 dark:placeholder:text-gray-500 dark:focus:placeholder:text-gray-400"
+                    />
+                  </div>
+                  
+                  {/* Workplace list - tanlangan yoki qidiruv */}
+                  {blockForm.workplaceId > 0 ? (
+                    // Tanlangan workplace ko'rsatish
+                    merchants.length > 0 && (() => {
+                      const w = merchants.find(x => x.id === blockForm.workplaceId);
+                      return w ? (
+                        <div className="rounded-lg border-2 border-brand-500 bg-white dark:border-brand-400 dark:bg-navy-900">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBlockForm({ ...blockForm, workplaceId: 0, workplaceName: "" });
+                            }}
+                            className="w-full px-4 py-2.5 text-left text-sm bg-brand-500 text-white hover:bg-brand-600 transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-medium">{w.name}</span>
+                                {w.address && <span className="text-xs opacity-75">{w.address}</span>}
+                              </div>
+                              <span className="text-xs opacity-75">✓ Tanlandi</span>
+                            </div>
+                          </button>
+                        </div>
+                      ) : null;
+                    })()
+                  ) : (
+                    // List ko'rsatish
+                  merchants.length > 0 && (
+                    <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-navy-600 dark:bg-navy-900">
+                      <div className="px-4 py-1.5 border-b border-gray-200 dark:border-navy-600 bg-gray-50 dark:bg-navy-800">
+                        <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                          📋 Ish joylari ({merchants.filter(w => !blockForm.workplaceName || w.name.toLowerCase().includes(blockForm.workplaceName.toLowerCase())).length} ta)
+                        </p>
+                      </div>
+                      <div className="overflow-y-auto" style={{ maxHeight: '180px' }}>
+                        {merchants
+                          .filter(w => !blockForm.workplaceName || w.name.toLowerCase().includes(blockForm.workplaceName.toLowerCase()))
+                          .map(w => (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => {
+                                setBlockForm({ ...blockForm, workplaceId: w.id, workplaceName: w.name });
+                              }}
+                              className={`w-full px-4 py-2 text-left text-sm transition-colors border-b border-gray-100 dark:border-navy-700 last:border-b-0 ${
+                                blockForm.workplaceId === w.id 
+                                  ? 'bg-brand-500 text-white hover:bg-brand-600' 
+                                  : 'hover:bg-brand-50 dark:hover:bg-navy-700 text-navy-700 dark:text-white'
+                              }`}
+                            >
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-medium">{w.name}</span>
+                                {w.address && <span className="text-xs opacity-75">{w.address}</span>}
+                              </div>
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )
+                  )}
+                  
+                  {blockForm.workplaceName.trim() && !blockForm.workplaceId && (
+                    <p className="mt-2 text-xs font-medium text-green-600 dark:text-green-400">
+                      ✨ Yangi ish joyi: "{blockForm.workplaceName}"
                     </p>
                   )}
                 </div>
               ) : (
-              <div className="w-full">
+              <div>
                 <label className="mb-2 block text-sm font-medium text-navy-700 dark:text-white">
                   {activeTab === "merchant" && "Merchant tanlang *"}
                   {activeTab === "fillial" && "Filial tanlang *"}
                   {activeTab === "customer" && "Mijoz tanlang *"}
                 </label>
-                <div className="relative mb-3 w-full">
-                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 z-10" />
+                <div className="relative mb-3">
+                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400 transition-colors peer-focus:text-brand-500 dark:peer-focus:text-brand-400 z-10" />
                   <input
                     type="text"
-                    value={blockForm.entityId ? 
-                      (() => {
-                        if (activeTab === "merchant") {
-                          const m = merchants.find(x => x.id === blockForm.entityId);
-                          return m?.name || m?.merchant_name || "";
-                        } else if (activeTab === "fillial") {
-                          const f = fillials.find(x => x.id === blockForm.entityId);
-                          return f?.name || f?.fillial_name || "";
-                        } else if (activeTab === "customer") {
-                          const u = users.find(x => x.id === blockForm.entityId);
-                          return u?.full_name || u?.name || "";
-                        }
-                        return "";
-                      })()
-                      : entitySearch
-                    }
+                    value={entitySearch}
                     onChange={(e) => {
                       setEntitySearch(e.target.value);
-                      setBlockForm({ ...blockForm, entityId: 0 });
+                      if (e.target.value) {
+                        setBlockForm({ ...blockForm, entityId: 0 });
+                      }
                     }}
-                    placeholder="Qidiruv..."
-                    className="w-full rounded-lg border border-gray-200 bg-white pl-11 pr-4 py-3 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-navy-600 dark:bg-navy-900 dark:text-white placeholder:text-gray-400"
+                    placeholder={
+                      blockForm.entityId ? 
+                        (() => {
+                          if (activeTab === "merchant") {
+                            const m = merchants.find(x => x.id === blockForm.entityId);
+                            return `Tanlangan: ${m?.name || m?.merchant_name || ""}`;
+                          } else if (activeTab === "fillial") {
+                            const f = fillials.find(x => x.id === blockForm.entityId);
+                            return `Tanlangan: ${f?.name || f?.fillial_name || ""}`;
+                          } else if (activeTab === "customer") {
+                            const u = users.find(x => x.id === blockForm.entityId);
+                            return `Tanlangan: ${u?.fullname || u?.full_name || u?.name || ""}`;
+                          }
+                          return "Qidiruv...";
+                        })()
+                        : "Qidiruv..."
+                    }
+                    className="peer w-full rounded-lg border border-gray-200 bg-white pl-11 pr-4 py-2.5 text-sm text-navy-700 outline-none focus:border-brand-500 placeholder:text-gray-400 focus:placeholder:text-gray-500 dark:border-navy-600 dark:bg-navy-900 dark:text-white dark:focus:border-brand-400 dark:placeholder:text-gray-500 dark:focus:placeholder:text-gray-400"
                   />
                 </div>
-                <div className="w-full rounded-lg border-2 border-gray-200 bg-white dark:border-navy-600 dark:bg-navy-900" style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                  <select
-                    value={blockForm.entityId}
-                    onChange={(e) => {
-                      const selectedId = Number(e.target.value);
-                      setBlockForm({ ...blockForm, entityId: selectedId });
-                      setEntitySearch("");
-                    }}
-                    size={8}
-                    className="w-full px-0 py-0 text-sm outline-none dark:text-white cursor-pointer"
-                    style={{ border: 'none', background: 'transparent', minHeight: '200px', width: '100%' }}
-                  >
-                    <option value={0} className="py-3 px-4 bg-gray-50 dark:bg-navy-800" disabled>— Tanlang —</option>
+                
+                {/* List - faqat tanlangan element yoki qidiruv bo'lsa ko'rinadi */}
+                {blockForm.entityId > 0 ? (
+                  // Tanlangan element ko'rsatish
+                  <div className="rounded-lg border-2 border-brand-500 bg-white dark:border-brand-400 dark:bg-navy-900">
+                    {activeTab === "merchant" && (() => {
+                      const m = merchants.find(x => x.id === blockForm.entityId);
+                      return m ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: 0 });
+                            setEntitySearch("");
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm bg-brand-500 text-white hover:bg-brand-600 transition-colors flex items-center justify-between"
+                        >
+                          <span className="font-medium">{m.name || m.merchant_name}</span>
+                          <span className="text-xs opacity-75">✓ Tanlandi (o'chirish uchun bosing)</span>
+                        </button>
+                      ) : null;
+                    })()}
+                    {activeTab === "fillial" && (() => {
+                      const f = fillials.find(x => x.id === blockForm.entityId);
+                      return f ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: 0 });
+                            setEntitySearch("");
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm bg-brand-500 text-white hover:bg-brand-600 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium">{f.name || f.fillial_name}</span>
+                              {f.address && <span className="text-xs opacity-75">{f.address}</span>}
+                            </div>
+                            <span className="text-xs opacity-75">✓ Tanlandi</span>
+                          </div>
+                        </button>
+                      ) : null;
+                    })()}
+                    {activeTab === "customer" && (() => {
+                      const u = users.find(x => x.id === blockForm.entityId);
+                      return u ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: 0 });
+                            setEntitySearch("");
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-sm bg-brand-500 text-white hover:bg-brand-600 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <div className="font-semibold">{u.fullname || u.full_name || u.name}</div>
+                              <div className="flex gap-3 text-xs opacity-85">
+                                {u.phone && <span>📞 {u.phone}</span>}
+                                {u.passport && <span>🆔 {u.passport}</span>}
+                              </div>
+                            </div>
+                            <span className="text-xs opacity-75">✓ Tanlandi</span>
+                          </div>
+                        </button>
+                      ) : null;
+                    })()}
+                  </div>
+                ) : (
+                  // List ko'rsatish (tanlangan bo'lmasa)
+                <div className="rounded-lg border-2 border-gray-200 bg-white dark:border-navy-600 dark:bg-navy-900">
+                  <div className="px-4 py-1.5 border-b border-gray-200 dark:border-navy-600 bg-gray-50 dark:bg-navy-800">
+                    <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
+                      📋 {activeTab === "merchant" && `Merchantlar (${merchants.filter(m => m.work_status !== "BLOCKED").filter(m => !entitySearch || (m.name || m.merchant_name || "").toLowerCase().includes(entitySearch.toLowerCase())).length} ta)`}
+                      {activeTab === "fillial" && `Filliallar (${fillials.filter(f => f.work_status !== "BLOCKED").filter(f => !entitySearch || (f.name || f.fillial_name || "").toLowerCase().includes(entitySearch.toLowerCase())).length} ta)`}
+                      {activeTab === "customer" && `Mijozlar (${users.filter(u => u.work_status !== "BLOCKED").filter(u => !entitySearch || (u.fullname || u.full_name || u.name || "").toLowerCase().includes(entitySearch.toLowerCase()) || (u.phone || "").includes(entitySearch)).length} ta)`}
+                    </p>
+                  </div>
+                  <div className="overflow-y-auto" style={{ maxHeight: '180px' }}>
                     {activeTab === "merchant" && merchants
                       .filter(m => m.work_status !== "BLOCKED")
                       .filter(m => !entitySearch || (m.name || m.merchant_name || "").toLowerCase().includes(entitySearch.toLowerCase()))
                       .map(m => (
-                        <option 
-                          key={m.id} 
-                          value={m.id} 
-                          className="py-3 px-4 cursor-pointer hover:bg-brand-50 dark:hover:bg-navy-700"
-                          style={{ 
-                            backgroundColor: blockForm.entityId === m.id ? '#4318FF' : 'transparent',
-                            color: blockForm.entityId === m.id ? 'white' : 'inherit',
-                            fontWeight: blockForm.entityId === m.id ? '600' : 'normal'
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: m.id });
+                            setEntitySearch("");
                           }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors border-b border-gray-100 dark:border-navy-700 last:border-b-0 ${
+                            blockForm.entityId === m.id 
+                              ? 'bg-brand-500 text-white hover:bg-brand-600' 
+                              : 'hover:bg-brand-50 dark:hover:bg-navy-700 text-navy-700 dark:text-white'
+                          }`}
                         >
-                          {m.name || m.merchant_name}
-                        </option>
+                          <span className="font-medium">{m.name || m.merchant_name}</span>
+                        </button>
                       ))
                     }
                     {activeTab === "fillial" && fillials
                       .filter(f => f.work_status !== "BLOCKED")
                       .filter(f => !entitySearch || (f.name || f.fillial_name || "").toLowerCase().includes(entitySearch.toLowerCase()))
                       .map(f => (
-                        <option 
-                          key={f.id} 
-                          value={f.id} 
-                          className="py-3 px-4 cursor-pointer hover:bg-brand-50 dark:hover:bg-navy-700"
-                          style={{ 
-                            backgroundColor: blockForm.entityId === f.id ? '#4318FF' : 'transparent',
-                            color: blockForm.entityId === f.id ? 'white' : 'inherit',
-                            fontWeight: blockForm.entityId === f.id ? '600' : 'normal'
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: f.id });
+                            setEntitySearch("");
                           }}
+                          className={`w-full px-4 py-2 text-left text-sm transition-colors border-b border-gray-100 dark:border-navy-700 last:border-b-0 ${
+                            blockForm.entityId === f.id 
+                              ? 'bg-brand-500 text-white hover:bg-brand-600' 
+                              : 'hover:bg-brand-50 dark:hover:bg-navy-700 text-navy-700 dark:text-white'
+                          }`}
                         >
-                          {f.name || f.fillial_name}
-                        </option>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="font-medium">{f.name || f.fillial_name}</span>
+                            {f.address && <span className="text-xs opacity-75">{f.address}</span>}
+                          </div>
+                        </button>
                       ))
                     }
                     {activeTab === "customer" && users
                       .filter(u => u.work_status !== "BLOCKED")
                       .filter(u => !entitySearch || 
-                        (u.full_name || u.name || "").toLowerCase().includes(entitySearch.toLowerCase()) ||
+                        (u.fullname || u.full_name || u.name || "").toLowerCase().includes(entitySearch.toLowerCase()) ||
                         (u.phone || "").includes(entitySearch)
                       )
                       .map(u => (
-                        <option 
-                          key={u.id} 
-                          value={u.id} 
-                          className="py-3 px-4 cursor-pointer hover:bg-brand-50 dark:hover:bg-navy-700"
-                          style={{ 
-                            backgroundColor: blockForm.entityId === u.id ? '#4318FF' : 'transparent',
-                            color: blockForm.entityId === u.id ? 'white' : 'inherit',
-                            fontWeight: blockForm.entityId === u.id ? '600' : 'normal'
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setBlockForm({ ...blockForm, entityId: u.id });
+                            setEntitySearch("");
                           }}
+                          className={`w-full px-4 py-2.5 text-left transition-colors border-b border-gray-100 dark:border-navy-700 last:border-b-0 ${
+                            blockForm.entityId === u.id 
+                              ? 'bg-brand-500 text-white hover:bg-brand-600' 
+                              : 'hover:bg-brand-50 dark:hover:bg-navy-700 text-navy-700 dark:text-white'
+                          }`}
                         >
-                          {u.full_name || u.name} ({u.phone})
-                        </option>
+                          <div className="space-y-1">
+                            <div className="font-semibold text-sm">{u.fullname || u.full_name || u.name || "Noma'lum"}</div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs" style={{ opacity: 0.85 }}>
+                              {u.phone && (
+                                <span className="inline-flex items-center gap-1">
+                                  <span>📞</span>
+                                  <span>{u.phone}</span>
+                                </span>
+                              )}
+                              {u.passport && (
+                                <span className="inline-flex items-center gap-1">
+                                  <span>🆔</span>
+                                  <span>{u.passport}</span>
+                                </span>
+                              )}
+                              {!u.phone && !u.passport && (
+                                <span className="text-gray-400 italic">Ma'lumot yo'q</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
                       ))
                     }
-
-                  </select>
+                  </div>
                 </div>
-                {blockForm.entityId > 0 && (
-                  <p className="mt-2 text-xs font-medium text-brand-600 dark:text-brand-400">
-                    ✓ Tanlandi
-                  </p>
                 )}
               </div>
               )}
@@ -956,7 +1251,7 @@ const Permissions = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setEntitySearch("");
-                    setBlockForm({ entityId: 0, reason: "", duration: "", workplaceName: "" });
+                    setBlockForm({ entityId: 0, reason: "", duration: "", workplaceId: 0, workplaceName: "" });
                   }}
                   className="flex-1 rounded-lg border-2 border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700 transition-all hover:bg-gray-50 hover:border-gray-400 dark:border-navy-600 dark:text-gray-300 dark:hover:bg-navy-700"
                 >

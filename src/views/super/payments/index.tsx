@@ -1,9 +1,14 @@
 import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
-import { Eye, Plus, Search } from "tabler-icons-react";
+import { Eye, Plus, Search, Phone } from "tabler-icons-react";
 import CustomSelect from "components/dropdown/CustomSelect";
 import Pagination from "components/pagination";
+import DateRangePicker from "components/DateRangePicker";
+import ReactDatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import Toast from "components/toast/ToastNew";
 import { paymentApi, Payment as ApiPayment, PaymentProvider, PaymentStatus } from "lib/api/payment";
+import * as api from "lib/api";
 
 // Payment Provider Types - mapped to API
 type Provider = PaymentProvider;
@@ -70,17 +75,33 @@ const Payments = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterProvider, setFilterProvider] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [filterDateFrom, setFilterDateFrom] = useState("");
-  const [filterDateTo, setFilterDateTo] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  
+  // MIB Payment Modal State
+  const [showAddMibModal, setShowAddMibModal] = useState(false);
+  const [mibSearchQuery, setMibSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedApplication, setSelectedApplication] = useState<any>(null);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const [mibAmount, setMibAmount] = useState("");
+  const [mibPaymentDate, setMibPaymentDate] = useState("");
+  const [mibNotes, setMibNotes] = useState("");
+  
+  // Toast State
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info' | 'warning'>('info');
 
   // Load payments from API
   useEffect(() => {
     loadPayments();
-  }, [filterProvider, filterStatus, filterDateFrom, filterDateTo]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterProvider, filterStatus, startDate, endDate]);
 
   const loadPayments = async () => {
     try {
@@ -93,22 +114,23 @@ const Payments = () => {
       if (filterStatus !== 'all') {
         filters.status = filterStatus;
       }
-      if (filterDateFrom) {
-        filters.startDate = filterDateFrom;
+      if (startDate) {
+        filters.startDate = startDate;
       }
-      if (filterDateTo) {
-        filters.endDate = filterDateTo;
+      if (endDate) {
+        filters.endDate = endDate;
       }
       
       const response = await paymentApi.getPayments(filters);
+      
       // Response format: { value: [...], Count: number }
       const paymentsData = (response.data as any)?.value || response.data || [];
       
       // Map API data to component format
       const mappedPayments = paymentsData.map((payment: any) => ({
         ...payment,
-        customerName: payment.client?.full_name || 'N/A',
-        customerPhone: payment.client?.phone || 'N/A',
+        customerName: payment.client?.full_name || payment.zayavka?.fullname || 'N/A',
+        customerPhone: payment.client?.phone || payment.zayavka?.phone || 'N/A',
         applicationId: payment.zayavka_id ? String(payment.zayavka_id) : 'N/A',
         branch: payment.fillial?.name || 'N/A',
       }));
@@ -125,14 +147,21 @@ const Payments = () => {
   // Filtered data
   const filteredData = useMemo(() => {
     return payments.filter((payment) => {
-      const matchesSearch =
-        !searchQuery ||
-        payment.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        payment.customerPhone?.includes(searchQuery) ||
-        payment.transactionId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        payment.applicationId?.includes(searchQuery);
+      if (!searchQuery) return true;
+      
+      const search = searchQuery.toLowerCase().trim();
+      
+      // Check all possible fields
+      const matchesId = payment.id?.toString().includes(searchQuery.trim());
+      const matchesCustomerName = payment.customerName?.toLowerCase().includes(search);
+      const matchesCustomerPhone = payment.customerPhone?.replace(/\s+/g, '').includes(search.replace(/\s+/g, ''));
+      const matchesTransactionId = payment.transactionId?.toLowerCase().includes(search);
+      const matchesCheckNumber = payment.checkNumber?.toLowerCase().includes(search);
+      const matchesApplicationId = payment.applicationId?.toString().includes(searchQuery.trim());
+      const matchesZayavkaId = payment.zayavka_id?.toString().includes(searchQuery.trim());
 
-      return matchesSearch;
+      return matchesId || matchesCustomerName || matchesCustomerPhone || 
+             matchesTransactionId || matchesCheckNumber || matchesApplicationId || matchesZayavkaId;
     });
   }, [payments, searchQuery]);
 
@@ -168,6 +197,123 @@ const Payments = () => {
   const handleViewPayment = (payment: Payment) => {
     setSelectedPayment(payment);
     setShowDetailModal(true);
+  };
+
+  // Search for applications by ID, phone, fullname, or passport (auto-search)
+  const handleSearchApplications = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setSelectedApplication(null);
+      return;
+    }
+
+    try {
+      setLoadingSearch(true);
+      
+      // Check if search is ID-only (starts with #)
+      const isIdSearch = query.trim().startsWith('#');
+      const searchValue = isIdSearch ? query.trim().substring(1) : query.trim();
+      
+      // Real API call - search for CONFIRMED or FINISHED applications
+      const response = await api.listZayavkalar({ 
+        search: searchValue,
+        status: 'CONFIRMED,FINISHED',
+        pageSize: 20
+      });
+      
+      const applications = response.items || [];
+      
+      // Debug: log first result to see structure
+      if (applications.length > 0) {
+        console.log('Application structure:', applications[0]);
+      }
+      
+      // Filter results
+      let filteredApps = applications.filter((app: any) => 
+        app.status === 'CONFIRMED' || app.status === 'FINISHED'
+      );
+      
+      // If ID-only search, filter by exact ID match
+      if (isIdSearch && searchValue) {
+        filteredApps = filteredApps.filter((app: any) => 
+          app.id.toString() === searchValue
+        );
+      }
+      
+      setSearchResults(filteredApps);
+      setLoadingSearch(false);
+    } catch (error) {
+      console.error("Error searching applications:", error);
+      setSearchResults([]);
+      setLoadingSearch(false);
+    }
+  };
+
+  // Auto-search effect
+  useEffect(() => {
+    if (!showAddMibModal) return;
+    
+    const timeoutId = setTimeout(() => {
+      handleSearchApplications(mibSearchQuery);
+    }, 500); // Debounce 500ms
+
+    return () => clearTimeout(timeoutId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mibSearchQuery, showAddMibModal]);
+
+  // Handle Add MIB Payment
+  const handleAddMibPayment = async () => {
+    if (!selectedApplication) {
+      setToastMessage("Iltimos avval ariza tanlang");
+      setToastType('warning');
+      setToastOpen(true);
+      return;
+    }
+    if (!mibAmount || !mibPaymentDate) {
+      setToastMessage("Iltimos barcha majburiy maydonlarni to'ldiring");
+      setToastType('warning');
+      setToastOpen(true);
+      return;
+    }
+
+    try {
+      const payment = await paymentApi.createPayment({
+        zayavka_id: selectedApplication.id,
+        client_id: selectedApplication.client_id,
+        amount: Number(mibAmount),
+        provider: 'MIB',
+        paymentType: 'INITIAL_PAYMENT',
+        paymentDate: mibPaymentDate,
+        notes: mibNotes
+      });
+      
+      // MIB to'lovlarni darhol COMPLETED qilish
+      const paymentId = (payment.data as any)?.id;
+      if (paymentId) {
+        await paymentApi.processPayment(paymentId, 'COMPLETED');
+      }
+      
+      setToastMessage("MIB to'lov muvaffaqiyatli qo'shildi");
+      setToastType('success');
+      setToastOpen(true);
+      
+      // Reset form
+      setMibSearchQuery("");
+      setSearchResults([]);
+      setSelectedApplication(null);
+      setMibAmount("");
+      setMibPaymentDate("");
+      setMibNotes("");
+      setShowAddMibModal(false);
+      
+      // Reload payments
+      loadPayments();
+    } catch (error: any) {
+      console.error("Error adding MIB payment:", error);
+      setToastMessage(error.response?.data?.message || "To'lov qo'shishda xatolik yuz berdi");
+      setToastType('error');
+      setToastOpen(true);
+    }
   };
 
   return (
@@ -237,6 +383,13 @@ const Payments = () => {
           <div className="text-xl font-bold text-navy-700 dark:text-white">
             To'lovlar
           </div>
+          <button
+            onClick={() => setShowAddMibModal(true)}
+            className="flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-amber-600 hover:shadow-lg"
+          >
+            <Plus className="h-5 w-5" />
+            MIB to'lov qo'shish
+          </button>
         </header>
 
         {/* Filters */}
@@ -309,35 +462,13 @@ const Payments = () => {
         </div>
 
         {/* Date Range Filters */}
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Boshlanish sanasi
-            </label>
-            <input
-              type="date"
-              value={filterDateFrom}
-              onChange={(e) => {
-                setFilterDateFrom(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-white/10 dark:bg-navy-900 dark:text-white"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Tugash sanasi
-            </label>
-            <input
-              type="date"
-              value={filterDateTo}
-              onChange={(e) => {
-                setFilterDateTo(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-brand-500 dark:border-white/10 dark:bg-navy-900 dark:text-white"
-            />
-          </div>
+        <div className="mt-3">
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+          />
         </div>
 
         {/* Table */}
@@ -391,13 +522,14 @@ const Payments = () => {
                       #{payment.id}
                     </td>
                     <td className="py-3 text-sm">
-                      <div>
+                      <div className="flex flex-col gap-1">
                         <p className="font-medium text-navy-700 dark:text-white">
                           {payment.customerName}
                         </p>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">
-                          {payment.customerPhone}
-                        </p>
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+                          <Phone className="h-3.5 w-3.5" />
+                          <span>{payment.customerPhone}</span>
+                        </div>
                       </div>
                     </td>
                     <td className="py-3 text-sm text-navy-700 dark:text-white">
@@ -499,9 +631,10 @@ const Payments = () => {
                     <p className="font-medium text-navy-700 dark:text-white">
                       {selectedPayment.customerName}
                     </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      {selectedPayment.customerPhone}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                      <Phone className="h-3.5 w-3.5" />
+                      <span>{selectedPayment.customerPhone}</span>
+                    </div>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400">Filial</p>
@@ -613,6 +746,272 @@ const Payments = () => {
           </Card>
         </div>
       )}
+
+      {/* Add MIB Payment Modal */}
+      {showAddMibModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card extra="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-amber-500 px-6 py-4 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                  <Plus className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">MIB To'lov Qo'shish</h3>
+                  <p className="mt-1 text-sm text-white/80">Qo'lda kiritilgan to'lov</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddMibModal(false);
+                  setMibSearchQuery("");
+                  setSearchResults([]);
+                  setSelectedApplication(null);
+                  setMibAmount("");
+                  setMibPaymentDate("");
+                  setMibNotes("");
+                }}
+                className="rounded-lg p-2 text-white transition-colors hover:bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-8">
+              <div className="space-y-5">
+                {/* Step 1: Search Application */}
+                <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-900/20">
+                  <h4 className="mb-3 text-sm font-bold text-amber-900 dark:text-amber-400">
+                    1-qadam: Ariza qidirish
+                  </h4>
+                  <p className="mb-3 text-xs text-amber-800 dark:text-amber-300">
+                    ID bo'yicha: #120, Umumiy: telefon, F.I.O yoki passport (faqat tasdiqlangan)
+                  </p>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      value={mibSearchQuery}
+                      onChange={(e) => setMibSearchQuery(e.target.value)}
+                      placeholder="ID: #120, Umumiy: +998901234567, Aliyev Vali, AB1234567..."
+                      className="h-11 w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 text-sm outline-none focus:border-amber-500 dark:border-gray-700 dark:bg-navy-900 dark:text-white"
+                    />
+                    {loadingSearch && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent"></div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Search Results - Multiple Cards */}
+                  {searchResults.length > 0 && (
+                    <div className="mt-4 space-y-3">
+                      <p className="text-xs font-medium text-amber-900 dark:text-amber-400">
+                        {searchResults.length} ta natija topildi. Birini tanlang:
+                      </p>
+                      <div className="max-h-96 space-y-2 overflow-y-auto">
+                        {searchResults.map((app) => (
+                          <div
+                            key={app.id}
+                            onClick={() => setSelectedApplication(app)}
+                            className={`cursor-pointer rounded-lg border-2 p-3 transition-all hover:shadow-md ${
+                              selectedApplication?.id === app.id
+                                ? "border-green-500 bg-green-50 dark:border-green-500 dark:bg-green-900/30"
+                                : "border-gray-200 bg-white hover:border-amber-300 dark:border-gray-700 dark:bg-navy-800 dark:hover:border-amber-600"
+                            }`}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                                selectedApplication?.id === app.id
+                                  ? "bg-green-500"
+                                  : "bg-amber-500"
+                              }`}>
+                                <span className="text-sm font-bold text-white">
+                                  {selectedApplication?.id === app.id ? "✓" : "#"}
+                                </span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="mb-2 flex items-start justify-between">
+                                  <div>
+                                    <p className="text-sm font-bold text-navy-700 dark:text-white">
+                                      Ariza #{app.id}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                                      {app.createdAt ? new Date(app.createdAt).toLocaleDateString('uz-UZ') : 'N/A'}
+                                    </p>
+                                  </div>
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    app.status === 'CONFIRMED'
+                                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                      : app.status === 'FINISHED'
+                                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                      : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400'
+                                  }`}>
+                                    {app.status === 'CONFIRMED' ? 'Tasdiqlangan' : app.status === 'FINISHED' ? 'Tugallangan' : app.status}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Mijoz:</span>
+                                    <p className="font-medium text-navy-700 dark:text-white">
+                                      {app.fullname || app.user?.fullname || 'N/A'}
+                                    </p>
+                                    <div className="mt-0.5 flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                                      <Phone className="h-3 w-3" />
+                                      <span>{app.phone || app.user?.phone || 'N/A'}</span>
+                                    </div>
+                                    <p className="mt-0.5 text-gray-600 dark:text-gray-400">
+                                      🆔 {app.passport || app.user?.passport || 'N/A'}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Do'kon:</span>
+                                    <p className="font-medium text-navy-700 dark:text-white">
+                                      {app.merchant?.name}
+                                    </p>
+                                    <p className="mt-0.5 text-gray-600 dark:text-gray-400">
+                                      {app.fillial?.name}
+                                    </p>
+                                    <p className="text-gray-500 dark:text-gray-500">
+                                      {app.fillial?.region}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Summa:</span>
+                                    <p className="font-bold text-green-600 dark:text-green-400">
+                                      {formatCurrency(app.payment_amount || 0)}
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600 dark:text-gray-400">Muddat:</span>
+                                    <p className="font-medium text-navy-700 dark:text-white">
+                                      {app.expired_month || 0} oy
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Results */}
+                  {!loadingSearch && mibSearchQuery && searchResults.length === 0 && (
+                    <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-900/50 dark:bg-red-900/20">
+                      <p className="text-sm text-red-700 dark:text-red-400">
+                        Tasdiqlangan ariza topilmadi. Boshqa qidiruv so'zi bilan urinib ko'ring.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Step 2: Payment Details */}
+                {selectedApplication && (
+                  <div className="space-y-4 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 dark:border-blue-900/50 dark:bg-blue-900/20">
+                    <h4 className="text-sm font-bold text-blue-900 dark:text-blue-400">
+                      2-qadam: To'lov ma'lumotlari
+                    </h4>
+
+                    {/* Amount */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Summa (so'm) *
+                      </label>
+                      <input
+                        type="number"
+                        value={mibAmount}
+                        onChange={(e) => setMibAmount(e.target.value)}
+                        placeholder="Masalan: 500000"
+                        className="h-11 w-full rounded-lg border border-gray-200 bg-white px-4 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-navy-900 dark:text-white"
+                      />
+                    </div>
+
+                    {/* Payment Date */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        To'lov sanasi *
+                      </label>
+                      <div className="h-11 rounded-xl border border-gray-200 dark:border-navy-600 bg-white dark:bg-navy-700 px-3 shadow-sm hover:shadow-md hover:border-brand-500 dark:hover:border-brand-400 transition-all duration-200 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <ReactDatePicker
+                          selected={mibPaymentDate ? new Date(mibPaymentDate) : null}
+                          onChange={(date: Date | null) => {
+                            if (date) {
+                              const year = date.getFullYear();
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              setMibPaymentDate(`${year}-${month}-${day}`);
+                            } else {
+                              setMibPaymentDate("");
+                            }
+                          }}
+                          placeholderText="Sanani tanlang"
+                          dateFormat="dd.MM.yyyy"
+                          className="flex-1 text-sm font-medium bg-transparent dark:text-white border-none outline-none placeholder-gray-400 dark:placeholder-gray-500"
+                          withPortal
+                        />
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        Izoh (ixtiyoriy)
+                      </label>
+                      <textarea
+                        value={mibNotes}
+                        onChange={(e) => setMibNotes(e.target.value)}
+                        placeholder="Qo'shimcha ma'lumot..."
+                        rows={3}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm outline-none focus:border-blue-500 dark:border-gray-700 dark:bg-navy-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowAddMibModal(false);
+                    setMibSearchQuery("");
+                    setSearchResults([]);
+                    setSelectedApplication(null);
+                    setMibAmount("");
+                    setMibPaymentDate("");
+                    setMibNotes("");
+                  }}
+                  className="rounded-lg bg-gray-200 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-300 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  onClick={handleAddMibPayment}
+                  disabled={!selectedApplication || !mibAmount || !mibPaymentDate}
+                  className="rounded-lg bg-amber-500 px-5 py-2.5 text-sm font-medium text-white transition-all hover:bg-amber-600 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  To'lov qo'shish
+                </button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={toastOpen}
+        onClose={() => setToastOpen(false)}
+        message={toastMessage}
+        type={toastType}
+      />
     </div>
   );
 };
