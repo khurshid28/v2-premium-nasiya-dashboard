@@ -615,13 +615,19 @@ export default function ScoringHistory() {
                     Kriteriyalar bo'yicha balllar
                   </h4>
                   <div className="space-y-3">
-                    {Object.entries(selectedItem.criteria_scores).map(([criteriaName, score]) => {
+                    {Object.entries(selectedItem.criteria_scores).map(([criteriaName, scoreData]) => {
                       // Find the criteria details from the scoring category
                       const criteria = selectedItem.scoringCategory.criterias?.find(
                         (c: any) => c.name === criteriaName
                       );
+                      
+                      // Extract actual score value
+                      const actualScore = typeof scoreData === 'object' && scoreData !== null 
+                        ? (scoreData as any).score || (scoreData as any).value || 0
+                        : (scoreData as number);
+                      
                       const maxScore = criteria?.maxScore || 100;
-                      const percentage = ((score as number) / maxScore) * 100;
+                      const percentage = (actualScore / maxScore) * 100;
                       
                       return (
                         <div key={criteriaName} className="space-y-1.5">
@@ -630,7 +636,7 @@ export default function ScoringHistory() {
                               {criteriaName}
                             </span>
                             <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                              {`${score}/${maxScore} ball`}
+                              {actualScore}/{maxScore} ball
                             </span>
                           </div>
                           <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-navy-600">
