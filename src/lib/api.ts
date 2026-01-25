@@ -375,6 +375,47 @@ export async function updateZayavka(id: number, payload: Partial<Zayavka>): Prom
   return handleResponse<Zayavka>(res);
 }
 
+export async function downloadOferta(id: number): Promise<Blob> {
+  const res = await fetchWithRetry(`${API_BASE}/app/oferta/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Oferta yuklab olishda xatolik');
+  }
+  return res.blob();
+}
+
+export async function downloadShartnoma(id: number): Promise<Blob> {
+  const res = await fetchWithRetry(`${API_BASE}/app/shartnoma/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Shartnoma yuklab olishda xatolik');
+  }
+  return res.blob();
+}
+
+export async function downloadGraph(id: number): Promise<Blob> {
+  const res = await fetchWithRetry(`${API_BASE}/app/graph/${id}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Grafik yuklab olishda xatolik');
+  }
+  return res.blob();
+}
+
+export async function getMyIdProfile(passport: string, masked: boolean = false): Promise<any> {
+  const params = masked ? '?masked=true' : '';
+  const res = await fetchWithRetry(`${API_BASE}/myid/profile/${passport}/formatted${params}`, {
+    headers: authHeaders(),
+  });
+  return handleResponse(res);
+}
+
 export async function deleteZayavka(id: number): Promise<void> {
   const res = await fetchWithRetry(`${API_BASE}/app/${id}`, {
     method: "DELETE",
@@ -833,6 +874,12 @@ const api = {
   // Scoring
   listScoringModels,
   getScoringModel,
+  // Documents
+  downloadOferta,
+  downloadShartnoma,
+  downloadGraph,
+  // MyID
+  getMyIdProfile,
 };
 
 export default api;

@@ -23,9 +23,10 @@ import Payments from "views/super/payments";
 import Products from "views/demo/products";
 import DemoApplications from "views/demo/applications";
 import ApplicationDetail from "views/demo/applications/detail";
+import Contracts from "views/super/contracts";
 
 // Icon Imports (Tabler icons)
-import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck, ShieldLock, Receipt, Settings, CreditCard, Clock, Package } from "tabler-icons-react";
+import { LayoutDashboard, Home, User, FileText, Login, InfoCircle, Report, BuildingStore, Users as UsersIcon, UserCheck, ShieldLock, Receipt, Settings, CreditCard, Clock, Package, FileCheck } from "tabler-icons-react";
 
 const routes = [
   {
@@ -93,10 +94,25 @@ const routes = [
     component: <DemoApplications />,
   },
   {
+    name: "Shartnomalar",
+    layout: "/super",
+    path: "contracts",
+    icon: <FileCheck size={20} />,
+    component: <Contracts />,
+  },
+  {
     name: "Ariza batafsil",
     layout: "/super",
     path: "applications/:id",
     icon: <FileText size={20} />,
+    component: <ApplicationDetail />,
+    hidden: true,
+  },
+  {
+    name: "Shartnoma batafsil",
+    layout: "/super",
+    path: "contract/:id",
+    icon: <FileCheck size={20} />,
     component: <ApplicationDetail />,
     hidden: true,
   },

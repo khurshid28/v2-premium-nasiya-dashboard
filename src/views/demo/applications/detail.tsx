@@ -5,6 +5,7 @@ import apiReal from "lib/api";
 import demoApi from "lib/demoApi";
 import { formatPhone, formatMoney, formatMoneyWithUZS, appStatusBadge, formatDateNoSeconds } from "lib/formatters";
 import Card from "components/card";
+import Toast from "components/toast/Toast";
 
 type Application = {
   id: number;
@@ -53,6 +54,15 @@ type Application = {
     phone?: string;
     director_name?: string | null;
     work_schedule?: string;
+  } | null;
+  myid?: {
+    id: number;
+    response_id?: string | null;
+    comparison_value?: number | null;
+    passport?: string | null;
+    profile?: any;
+    createdAt?: string;
+    updatedAt?: string;
   } | null;
   products?: { id: number; name: string; price: number; count?: number | null }[];
   payments?: {
@@ -120,7 +130,59 @@ const ApplicationDetail = (): JSX.Element => {
 
   const [application, setApplication] = React.useState<Application | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'debt' | 'payments' | 'history' | 'operations'>('application');
+  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'client' | 'debt' | 'payments' | 'history' | 'operations'>('application');
+  const [toast, setToast] = React.useState<{ show: boolean; message: string; type: 'main' | 'success' | 'error' }>({ 
+    show: false, 
+    message: '', 
+    type: 'main' 
+  });
+  const [myidImageUrl, setMyidImageUrl] = React.useState<string | null>(null);
+  const [myidImageError, setMyidImageError] = React.useState(false);
+
+  // Load MyID image with token
+  React.useEffect(() => {
+    const loadMyidImage = async () => {
+      if (!application?.myid?.id || !application?.passport) return;
+      
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setMyidImageError(true);
+          return;
+        }
+
+        const imageUrl = `http://localhost:7777/myid/${application.passport}-${application.myid.id}.png`;
+        const response = await fetch(imageUrl, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          setMyidImageUrl(objectUrl);
+          setMyidImageError(false);
+        } else {
+          setMyidImageError(true);
+        }
+      } catch (error) {
+        console.error('Error loading MyID image:', error);
+        setMyidImageError(true);
+      }
+    };
+
+    if (application) {
+      loadMyidImage();
+    }
+
+    // Cleanup
+    return () => {
+      if (myidImageUrl) {
+        URL.revokeObjectURL(myidImageUrl);
+      }
+    };
+  }, [application]);
 
   React.useEffect(() => {
     const fetchApplication = async () => {
@@ -132,6 +194,8 @@ const ApplicationDetail = (): JSX.Element => {
         const response = await api.getApplication(parseInt(id));
         console.log('✅ Application response:', response);
         console.log('   - workplace:', response.workplace);
+        console.log('   - myid:', response.myid);
+        console.log('   - myid.profile:', response.myid?.profile);
         console.log('   - payments count:', response.payments?.length);
         console.log('   - actionLogs count:', response.actionLogs?.length);
         setApplication(response);
@@ -180,7 +244,7 @@ const ApplicationDetail = (): JSX.Element => {
         </button>
         <div>
           <h4 className="text-2xl font-bold text-navy-700 dark:text-white">
-            Ariza #{application.id}
+            {location.pathname.includes('/contract/') ? 'Shartnoma' : 'Ariza'} #{application.id}
           </h4>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             {application.fullname}
@@ -220,6 +284,16 @@ const ApplicationDetail = (): JSX.Element => {
             }`}
           >
             Ish joyi
+          </button>
+          <button
+            onClick={() => setActiveTab('client')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === 'client'
+                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Mijoz ma'lumotlari
           </button>
           {/* Faqat CONFIRMED va FINISHED statuslarda Qarzdorlik tabini ko'rsatish */}
           {(application.status === 'CONFIRMED' || application.status === 'FINISHED') && (
@@ -355,6 +429,117 @@ const ApplicationDetail = (): JSX.Element => {
                   </div>
                 </div>
               )}
+
+              {/* Hujjatlarni yuklash */}
+              <div className="md:col-span-2 mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Hujjatlar</p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={async () => {
+                      try {
+                        setToast({ show: true, message: 'Oferta yuklanmoqda...', type: 'main' });
+                        const blob = await api.downloadOferta(application.id);
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `oferta-${application.id}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        setToast({ show: true, message: 'Oferta muvaffaqiyatli yuklandi', type: 'success' });
+                      } catch (error: any) {
+                        console.error('Oferta yuklab olishda xatolik:', error);
+                        const errorMessage = error?.message || 'Oferta yuklab olishda xatolik yuz berdi';
+                        setToast({ 
+                          show: true, 
+                          message: errorMessage.includes('topilmadi') || errorMessage.includes('404') 
+                            ? `Oferta-${application.id}.pdf fayli topilmadi` 
+                            : errorMessage,
+                          type: 'error'
+                        });
+                      }
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Oferta yuklash
+                  </button>
+                  
+                  {(application.status === 'CONFIRMED' || application.status === 'FINISHED') && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setToast({ show: true, message: 'Shartnoma yuklanmoqda...', type: 'main' });
+                            const blob = await api.downloadShartnoma(application.id);
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `shartnoma-${application.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            setToast({ show: true, message: 'Shartnoma muvaffaqiyatli yuklandi', type: 'success' });
+                          } catch (error: any) {
+                            console.error('Shartnoma yuklab olishda xatolik:', error);
+                            const errorMessage = error?.message || 'Shartnoma yuklab olishda xatolik yuz berdi';
+                            setToast({ 
+                              show: true, 
+                              message: errorMessage.includes('topilmadi') || errorMessage.includes('404') 
+                                ? `Shartnoma-${application.id}.pdf fayli topilmadi` 
+                                : errorMessage,
+                              type: 'error'
+                            });
+                          }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Shartnoma yuklash
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            setToast({ show: true, message: 'Grafik yuklanmoqda...', type: 'main' });
+                            const blob = await api.downloadGraph(application.id);
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `graph-${application.id}.pdf`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            setToast({ show: true, message: 'Grafik muvaffaqiyatli yuklandi', type: 'success' });
+                          } catch (error: any) {
+                            console.error('Grafik yuklab olishda xatolik:', error);
+                            const errorMessage = error?.message || 'Grafik yuklab olishda xatolik yuz berdi';
+                            setToast({ 
+                              show: true, 
+                              message: errorMessage.includes('topilmadi') || errorMessage.includes('404') 
+                                ? `Graph-${application.id}.pdf fayli topilmadi` 
+                                : errorMessage,
+                              type: 'error'
+                            });
+                          }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg transition-colors text-sm font-medium"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        Grafik yuklash
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -507,6 +692,316 @@ const ApplicationDetail = (): JSX.Element => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500 dark:text-gray-400">Ish joyi ma'lumotlari mavjud emas</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'client' && (
+            <div className="space-y-4">
+              {application.myid?.profile ? (
+                <>
+                  {/* MyID Image and Comparison */}
+                  {(application.myid.comparison_value || application.myid.id) && (
+                    <Card extra="p-6">
+                      <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">MyID Verifikatsiya</h5>
+                      <div className="flex flex-col md:flex-row gap-6 items-center">
+                        {/* MyID Selfie Image */}
+                        {application.myid.id && application.passport && (
+                          <div className="flex flex-col items-center">
+                            {myidImageError ? (
+                              <div className="w-48 h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                                <p className="text-sm text-gray-500 dark:text-gray-400 text-center">Rasm topilmadi</p>
+                              </div>
+                            ) : myidImageUrl ? (
+                              <img 
+                                src={myidImageUrl}
+                                alt="MyID Selfie"
+                                className="w-48 h-48 object-cover rounded-lg border-2 border-gray-200 dark:border-gray-700 shadow-md"
+                              />
+                            ) : (
+                              <div className="w-48 h-48 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-700">
+                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+                              </div>
+                            )}
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">MyID Selfie</p>
+                          </div>
+                        )}
+                        
+                        {/* Comparison Value */}
+                        {application.myid.comparison_value && (
+                          <div className="flex-1">
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">O'xshashlik darajasi</p>
+                              <div className="flex items-center gap-3">
+                                <div className="flex-1">
+                                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                    <div 
+                                      className="bg-green-500 h-3 rounded-full transition-all duration-500"
+                                      style={{ width: `${application.myid.comparison_value * 100}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                                <span className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                  {(application.myid.comparison_value * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                {application.myid.comparison_value >= 0.8 ? '✅ Tasdiqlangan' : 
+                                 application.myid.comparison_value >= 0.6 ? '⚠️ Qoniqarli' : '❌ Rad etilgan'}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Shaxsiy ma'lumotlar */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Shaxsiy ma'lumotlar</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">PINFL</p>
+                        <p className="text-base font-mono font-semibold text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.pinfl || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">F.I.O (Lotin)</p>
+                        <p className="text-base font-semibold text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.last_name_en} {application.myid.profile.common_data?.first_name_en}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">F.I.O (Kirill)</p>
+                        <p className="text-base font-semibold text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.last_name} {application.myid.profile.common_data?.first_name} {application.myid.profile.common_data?.middle_name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Tug'ilgan sana</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.birth_date || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Tug'ilgan joy</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.birth_place || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Jinsi</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.gender === '1' ? 'Erkak' : application.myid.profile.common_data?.gender === '2' ? 'Ayol' : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Millati</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.nationality || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Fuqaroligi</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.common_data?.citizenship || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Pasport ma'lumotlari */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Pasport ma'lumotlari</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Pasport seriyasi va raqami</p>
+                        <p className="text-base font-mono font-bold text-navy-700 dark:text-white">
+                          {application.myid.profile.doc_data?.pass_data || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Hujjat turi</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.doc_data?.doc_type || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Berilgan sana</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.doc_data?.issued_date || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Amal qilish muddati</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.doc_data?.expiry_date || '-'}
+                        </p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Kim tomonidan berilgan</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.doc_data?.issued_by || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Aloqa ma'lumotlari */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Aloqa ma'lumotlari</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Telefon raqami</p>
+                        <p className="text-base font-mono font-semibold text-navy-700 dark:text-white">
+                          {application.phone ? formatPhone(application.phone) : (application.myid.profile.contacts?.phone ? `+998 ${application.myid.profile.contacts.phone}` : '-')}
+                        </p>
+                      </div>
+                      {application.phone2 && (
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Qo'shimcha telefon</p>
+                          <p className="text-base font-mono font-semibold text-navy-700 dark:text-white">
+                            {formatPhone(application.phone2)}
+                          </p>
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Email</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.contacts?.email || '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Doimiy yashash manzili */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Doimiy yashash manzili</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="md:col-span-2">
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Manzil</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.address || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Viloyat</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.region || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Tuman</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.district || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">MFY</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.mfy || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Kadastr raqami</p>
+                        <p className="text-base font-mono font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.cadastre || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Ro'yxatga olingan sana</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.address?.permanent_registration?.registration_date 
+                            ? new Date(application.myid.profile.address.permanent_registration.registration_date).toLocaleDateString('uz-UZ')
+                            : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Vaqtinchalik yashash manzili */}
+                  {application.myid.profile.address?.temporary_registration && (
+                    <Card extra="p-6">
+                      <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Vaqtinchalik yashash manzili</h5>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Manzil</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.address || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Viloyat</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.region || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Tuman</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.district || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">MFY</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.mfy || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Kadastr raqami</p>
+                          <p className="text-base font-mono font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.cadastre || '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Amal qilish muddati</p>
+                          <p className="text-base font-medium text-navy-700 dark:text-white">
+                            {application.myid.profile.address.temporary_registration.date_from && application.myid.profile.address.temporary_registration.date_till
+                              ? `${new Date(application.myid.profile.address.temporary_registration.date_from).toLocaleDateString('uz-UZ')} - ${new Date(application.myid.profile.address.temporary_registration.date_till).toLocaleDateString('uz-UZ')}`
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* MyID ma'lumotlari */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">MyID ma'lumotlari</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Response ID</p>
+                        <p className="text-base font-mono text-xs text-navy-700 dark:text-white break-all">
+                          {application.myid.response_id || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Taqqoslash qiymati</p>
+                        <p className="text-base font-semibold text-navy-700 dark:text-white">
+                          {application.myid.comparison_value ? `${(application.myid.comparison_value * 100).toFixed(1)}%` : '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Autentifikatsiya usuli</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.profile.authentication_method === 'strong' ? 'Kuchli' : application.myid.profile.authentication_method || '-'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Tekshirilgan sana</p>
+                        <p className="text-base font-medium text-navy-700 dark:text-white">
+                          {application.myid.createdAt ? formatDateNoSeconds(application.myid.createdAt) : '-'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">Mijoz ma'lumotlari mavjud emas</p>
                 </div>
               )}
             </div>
@@ -934,6 +1429,14 @@ const ApplicationDetail = (): JSX.Element => {
           )}
         </div>
       </Card>
+
+      {/* Toast Notification */}
+      <Toast
+        isOpen={toast.show}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ ...toast, show: false })}
+      />
     </div>
   );
 };

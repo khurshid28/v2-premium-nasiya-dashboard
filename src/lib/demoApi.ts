@@ -465,6 +465,24 @@ const demoApi = {
   listProductCategories: async () => ({ value: [] as any[], Count: 0 }),
   listScoringModels: async () => ({ value: [] as any[], Count: 0 }),
   getScoringModel: async (id: number) => ({} as any),
+  // Documents
+  downloadOferta: async (id: number): Promise<Blob> => {
+    // Demo mode: return empty blob
+    return Promise.resolve(new Blob(['Demo PDF content'], { type: 'application/pdf' }));
+  },
+  downloadShartnoma: async (id: number): Promise<Blob> => {
+    // Demo mode: return empty blob
+    return Promise.resolve(new Blob(['Demo PDF content'], { type: 'application/pdf' }));
+  },
+  downloadGraph: async (id: number): Promise<Blob> => {
+    // Demo mode: return empty blob
+    return Promise.resolve(new Blob(['Demo PDF content'], { type: 'application/pdf' }));
+  },
+  // MyID
+  getMyIdProfile: async (passport: string, masked?: boolean): Promise<any> => {
+    // Demo mode: return empty object
+    return Promise.resolve({});
+  },
 } as any; // Type assertion to allow additional properties
 
 export default demoApi;

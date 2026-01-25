@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import Card from "components/card";
-import { Clock, Search, CircleCheck, CircleX, Activity, User, TrendingUp, Calendar, Bolt, Award } from "tabler-icons-react";
+import { Clock, Search, CircleCheck, CircleX, Activity, User, TrendingUp, Calendar, Bolt, Award, Download } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
 import { scoringHistoryApi, ScoringHistoryItem } from "lib/api/scoringHistory";
@@ -45,6 +45,55 @@ const getCategoryName = (category: string) => {
     RETIRED: "Pensioner",
   };
   return categories[category] || category;
+};
+
+const exportToExcel = (data: ScoringHistoryItem[]) => {
+  // Create CSV content
+  const headers = [
+    "ID",
+    "Mijoz",
+    "Telefon",
+    "Model",
+    "Kategoriya",
+    "Ball",
+    "Min ball",
+    "Natija",
+    "Manba",
+    "Davomiyligi",
+    "Baholangan vaqti"
+  ];
+  
+  const rows = data.map(item => [
+    item.id,
+    formatName(item.zayavka.fullname),
+    item.zayavka.phone || "",
+    item.scoringModel.name,
+    getCategoryName(item.scoringCategory.category),
+    item.total_score,
+    item.scoringModel.minPassScore,
+    item.passed ? "Muvaffaqiyatli" : "Rad etilgan",
+    item.source,
+    formatDuration(item.processing_time_seconds),
+    formatDate(item.evaluated_at)
+  ]);
+  
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+  ].join("\n");
+  
+  // Add BOM for UTF-8
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  const today = new Date().toISOString().split('T')[0];
+  link.setAttribute("href", url);
+  link.setAttribute("download", `skoring-tarixi-${today}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 export default function ScoringHistory() {
@@ -167,6 +216,15 @@ export default function ScoringHistory() {
               </p>
             </div>
           </div>
+          
+          {/* Export Button */}
+          <button
+            onClick={() => exportToExcel(filteredHistory)}
+            className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-green-600 active:scale-95"
+          >
+            <Download size={18} />
+            Excel yuklash
+          </button>
         </header>
 
         {/* Statistics */}
@@ -548,6 +606,53 @@ export default function ScoringHistory() {
                   </div>
                 </div>
               </div>
+
+              {/* Criteria Scores - Kriteriyalar bo'yicha balllar */}
+              {selectedItem.criteria_scores && Object.keys(selectedItem.criteria_scores).length > 0 && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                  <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-navy-700 dark:text-white">
+                    <Award className="h-4 w-4 text-indigo-600" />
+                    Kriteriyalar bo'yicha balllar
+                  </h4>
+                  <div className="space-y-3">
+                    {Object.entries(selectedItem.criteria_scores).map(([criteriaName, score]) => {
+                      // Find the criteria details from the scoring category
+                      const criteria = selectedItem.scoringCategory.criterias?.find(
+                        (c: any) => c.name === criteriaName
+                      );
+                      const maxScore = criteria?.maxScore || 100;
+                      const percentage = ((score as number) / maxScore) * 100;
+                      
+                      return (
+                        <div key={criteriaName} className="space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-medium text-navy-700 dark:text-white">
+                              {criteriaName}
+                            </span>
+                            <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                              {`${score}/${maxScore} ball`}
+                            </span>
+                          </div>
+                          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-navy-600">
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                percentage >= 80
+                                  ? "bg-green-500"
+                                  : percentage >= 60
+                                  ? "bg-blue-500"
+                                  : percentage >= 40
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                              }`}
+                              style={{ width: `${Math.min(percentage, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Vaqt ma'lumotlari */}
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">

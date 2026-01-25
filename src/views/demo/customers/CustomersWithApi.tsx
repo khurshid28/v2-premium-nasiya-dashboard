@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Card from "components/card";
-import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin } from "tabler-icons-react";
+import { Search, User, FileText, CircleCheck, Phone, Calendar, MapPin, Download } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
 import apiReal from "lib/api";
@@ -25,6 +25,68 @@ type Customer = {
   workPlace?: string; // Ishxona (kompaniya nomi) - eski field
   zayavkalar?: any[]; // Backend dan kelgan arizalar
   workplaces?: any[]; // Backend dan kelgan ishxonalar
+  myid?: {
+    id: number;
+    response_id?: string | null;
+    comparison_value?: number | null;
+    passport?: string | null;
+    profile?: any;
+    createdAt?: string;
+    updatedAt?: string;
+  } | null;
+};
+
+const exportToExcel = (data: Customer[]) => {
+  // Create CSV content
+  const headers = [
+    "ID",
+    "Mijoz",
+    "Telefon",
+    "Passport",
+    "Tug'ilgan sana",
+    "Hudud",
+    "Manzil",
+    "Ro'yxatdan o'tgan",
+    "Jami arizalar",
+    "Faol arizalar",
+    "Tugallangan",
+    "Rad etilgan",
+    "Qarz"
+  ];
+  
+  const rows = data.map(customer => [
+    customer.id,
+    customer.fullName,
+    customer.phone,
+    customer.passport,
+    customer.birthDate,
+    customer.region,
+    customer.address || "",
+    customer.registrationDate,
+    customer.totalApplications,
+    customer.activeApplications,
+    customer.completedApplications,
+    customer.rejectedApplications,
+    customer.debt
+  ]);
+  
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(","))
+  ].join("\n");
+  
+  // Add BOM for UTF-8
+  const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  
+  const today = new Date().toISOString().split('T')[0];
+  link.setAttribute("href", url);
+  link.setAttribute("download", `mijozlar-${today}.csv`);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 };
 
 export default function CustomersWithApi() {
@@ -252,6 +314,15 @@ export default function CustomersWithApi() {
               Barcha mijozlar va ularning arizalari
             </p>
           </div>
+          
+          {/* Export Button */}
+          <button
+            onClick={() => exportToExcel(filteredCustomers)}
+            className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-green-600 active:scale-95"
+          >
+            <Download size={18} />
+            Excel yuklash
+          </button>
         </div>
       </header>
 
@@ -566,6 +637,53 @@ export default function CustomersWithApi() {
                   </div>
                 </div>
               </div>
+
+              {/* MyID ma'lumotlari */}
+              {selectedCustomer.myid?.profile && (
+                <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-6">
+                  <h4 className="text-lg font-bold text-navy-700 dark:text-white mb-4">MyID ma'lumotlari</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400">PINFL</label>
+                      <p className="mt-1 text-sm font-mono font-semibold text-navy-700 dark:text-white">
+                        {selectedCustomer.myid.profile.common_data?.pinfl || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Tug'ilgan sana</label>
+                      <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                        {selectedCustomer.myid.profile.common_data?.birth_date || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Jinsi</label>
+                      <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                        {selectedCustomer.myid.profile.common_data?.gender === '1' ? 'Erkak' : selectedCustomer.myid.profile.common_data?.gender === '2' ? 'Ayol' : '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Millati</label>
+                      <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                        {selectedCustomer.myid.profile.common_data?.nationality || '—'}
+                      </p>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Doimiy manzil</label>
+                      <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                        {selectedCustomer.myid.profile.address?.permanent_registration?.address || '—'}
+                      </p>
+                    </div>
+                    {selectedCustomer.myid.profile.address?.temporary_registration && (
+                      <div className="col-span-2">
+                        <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Vaqtinchalik manzil</label>
+                        <p className="mt-1 text-sm text-navy-700 dark:text-white">
+                          {selectedCustomer.myid.profile.address.temporary_registration.address || '—'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Arizalar ro'yxati */}
               <div className="mt-6">
