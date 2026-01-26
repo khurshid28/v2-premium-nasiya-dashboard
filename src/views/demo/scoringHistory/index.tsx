@@ -3,6 +3,7 @@ import Card from "components/card";
 import { Clock, Search, CircleCheck, CircleX, Activity, User, TrendingUp, Calendar, Bolt, Award, Download } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
+import DateRangePicker from "components/DateRangePicker";
 import { scoringHistoryApi, ScoringHistoryItem } from "lib/api/scoringHistory";
 import Toast from "components/toast/ToastNew";
 
@@ -48,7 +49,7 @@ const getCategoryName = (category: string) => {
 };
 
 const exportToExcel = (data: ScoringHistoryItem[]) => {
-  // Create CSV content
+  // Create CSV content with criteria scores
   const headers = [
     "ID",
     "Mijoz",
@@ -60,22 +61,50 @@ const exportToExcel = (data: ScoringHistoryItem[]) => {
     "Natija",
     "Manba",
     "Davomiyligi",
-    "Baholangan vaqti"
+    "Baholangan vaqti",
+    "Kriteriyalar ballari"
   ];
   
-  const rows = data.map(item => [
-    item.id,
-    formatName(item.zayavka.fullname),
-    item.zayavka.phone || "",
-    item.scoringModel.name,
-    getCategoryName(item.scoringCategory.category),
-    item.total_score,
-    item.scoringModel.minPassScore,
-    item.passed ? "Muvaffaqiyatli" : "Rad etilgan",
-    item.source,
-    formatDuration(item.processing_time_seconds),
-    formatDate(item.evaluated_at)
-  ]);
+  const rows = data.map(item => {
+    // Format criteria scores as "Criteria1: 80/100, Criteria2: 90/100"
+    let criteriaScoresText = "";
+    if (item.criteria_scores && Object.keys(item.criteria_scores).length > 0) {
+      criteriaScoresText = Object.entries(item.criteria_scores).map(([key, scoreData], index) => {
+        let criteriaName = key;
+        let criteria;
+        
+        // Map criteria_1, criteria_2 to actual criteria names
+        if (key.startsWith('criteria_')) {
+          const criteriaIndex = parseInt(key.split('_')[1]) - 1;
+          criteria = item.scoringCategory.criterias?.[criteriaIndex];
+          criteriaName = criteria?.name || key;
+        } else {
+          criteria = item.scoringCategory.criterias?.find((c: any) => c.name === key);
+        }
+        
+        const actualScore = typeof scoreData === 'object' && scoreData !== null 
+          ? (scoreData as any).score || (scoreData as any).value || 0
+          : (scoreData as number);
+        const maxScore = criteria?.maxScore || 100;
+        return `${criteriaName}: ${actualScore}/${maxScore}`;
+      }).join(", ");
+    }
+    
+    return [
+      item.id,
+      formatName(item.zayavka.fullname),
+      item.zayavka.phone || "",
+      item.scoringModel.name,
+      getCategoryName(item.scoringCategory.category),
+      item.total_score,
+      item.scoringModel.minPassScore,
+      item.passed ? "Muvaffaqiyatli" : "Rad etilgan",
+      item.source,
+      formatDuration(item.processing_time_seconds),
+      formatDate(item.evaluated_at),
+      criteriaScoresText
+    ];
+  });
   
   const csvContent = [
     headers.join(","),
@@ -104,6 +133,8 @@ export default function ScoringHistory() {
   const [filterSource, setFilterSource] = useState("all");
   const [filterPassed, setFilterPassed] = useState("all");
   const [filterModel, setFilterModel] = useState("all");
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [selectedItem, setSelectedItem] = useState<ScoringHistoryItem | null>(null);
@@ -156,11 +187,28 @@ export default function ScoringHistory() {
       item.id.toString().includes(searchQuery);
 
     const matchesSource = filterSource === "all" || item.source === filterSource;
+    
+    // Check if passed based on score comparison
+    const isPassed = item.total_score >= item.scoringModel.minPassScore;
     const matchesPassed = 
       filterPassed === "all" || 
-      (filterPassed === "passed" && item.passed) ||
-      (filterPassed === "failed" && !item.passed);
+      (filterPassed === "passed" && isPassed) ||
+      (filterPassed === "failed" && !isPassed);
     const matchesModel = filterModel === "all" || item.scoringModel.name === filterModel;
+    
+    // Date range filter
+    if (startDate || endDate) {
+      const itemDate = new Date(item.evaluated_at);
+      if (startDate) {
+        const start = new Date(startDate);
+        if (itemDate < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (itemDate > end) return false;
+      }
+    }
 
     return matchesSearch && matchesSource && matchesPassed && matchesModel;
   });
@@ -168,8 +216,8 @@ export default function ScoringHistory() {
   // Calculate statistics from filtered data
   const filteredStats = {
     total: filteredHistory.length,
-    passed: filteredHistory.filter(item => item.passed).length,
-    failed: filteredHistory.filter(item => !item.passed).length,
+    passed: filteredHistory.filter(item => item.total_score >= item.scoringModel.minPassScore).length,
+    failed: filteredHistory.filter(item => item.total_score < item.scoringModel.minPassScore).length,
     avgScore: filteredHistory.length > 0 
       ? filteredHistory.reduce((sum, item) => sum + item.total_score, 0) / filteredHistory.length 
       : 0,
@@ -259,62 +307,81 @@ export default function ScoringHistory() {
         )}
 
         {/* Filters */}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="ID, Mijoz yoki telefon bo'yicha qidirish..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
+        <div className="mt-6 space-y-3">
+          {/* Date Filter Row */}
+          <div>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onStartChange={(date) => {
+                setStartDate(date);
                 setCurrentPage(1);
               }}
-              className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-navy-700 outline-none transition-colors placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-gray-500"
+              onEndChange={(date) => {
+                setEndDate(date);
+                setCurrentPage(1);
+              }}
             />
           </div>
 
-          <CustomSelect
-            value={filterSource}
-            onChange={(value) => {
-              setFilterSource(value);
-              setCurrentPage(1);
-            }}
-            options={[
-              { value: "all", label: "Barcha manbalar" },
-              { value: "mobile", label: "Mobile" },
-              { value: "web", label: "Web" },
-              { value: "api", label: "API" },
-            ]}
-            className="min-w-[180px]"
-          />
+          {/* Search and Dropdown Filters Row */}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <div className="relative lg:w-120">
+              <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="ID, Mijoz yoki telefon..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-navy-700 outline-none transition-colors placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-gray-500"
+              />
+            </div>
 
-          <CustomSelect
-            value={filterPassed}
-            onChange={(value) => {
-              setFilterPassed(value);
-              setCurrentPage(1);
-            }}
-            options={[
-              { value: "all", label: "Barcha natijalar" },
-              { value: "passed", label: "Muvaffaqiyatli" },
-              { value: "failed", label: "Rad etilgan" },
-            ]}
-            className="min-w-[180px]"
-          />
+            <CustomSelect
+              value={filterSource}
+              onChange={(value) => {
+                setFilterSource(value);
+                setCurrentPage(1);
+              }}
+              options={[
+                { value: "all", label: "Barcha manbalar" },
+                { value: "mobile", label: "Mobile" },
+                { value: "web", label: "Web" },
+                { value: "api", label: "API" },
+              ]}
+              className="min-w-[160px] flex-1 sm:flex-none"
+            />
 
-          <CustomSelect
-            value={filterModel}
-            onChange={(value) => {
-              setFilterModel(value);
-              setCurrentPage(1);
-            }}
-            options={[
-              { value: "all", label: "Barcha modellar" },
-              ...uniqueModels.map(model => ({ value: model, label: model }))
-            ]}
-            className="min-w-[180px]"
-          />
+            <CustomSelect
+              value={filterPassed}
+              onChange={(value) => {
+                setFilterPassed(value);
+                setCurrentPage(1);
+              }}
+              options={[
+                { value: "all", label: "Barcha natijalar" },
+                { value: "passed", label: "Muvaffaqiyatli" },
+                { value: "failed", label: "Rad etilgan" },
+              ]}
+              className="min-w-[160px] flex-1 sm:flex-none"
+            />
+
+            <CustomSelect
+              value={filterModel}
+              onChange={(value) => {
+                setFilterModel(value);
+                setCurrentPage(1);
+              }}
+              options={[
+                { value: "all", label: "Barcha modellar" },
+                ...uniqueModels.map(model => ({ value: model, label: model }))
+              ]}
+              className="min-w-[160px] flex-1 sm:flex-none"
+            />
+          </div>
         </div>
 
         {/* Table */}
@@ -444,7 +511,7 @@ export default function ScoringHistory() {
                       {item.passed ? (
                         <div className="flex flex-col">
                           <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                            {item.zayavka.limit?.toLocaleString() || 0} so'm
+                            {item.zayavka.limit ? item.zayavka.limit.toLocaleString() + ' so\'m' : '—'}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">Berilgan limit</span>
                         </div>
@@ -544,15 +611,9 @@ export default function ScoringHistory() {
                     <p className="text-sm font-medium text-navy-700 dark:text-white">{selectedItem.zayavka.phone}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Ariza summasi</p>
-                    <p className="text-sm font-medium text-navy-700 dark:text-white">
-                      {selectedItem.zayavka.amount?.toLocaleString()} so'm
-                    </p>
-                  </div>
-                  <div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Berilgan limit</p>
                     <p className="text-sm font-medium text-navy-700 dark:text-white">
-                      {selectedItem.zayavka.limit?.toLocaleString() || 0} so'm
+                      {selectedItem.zayavka.limit ? selectedItem.zayavka.limit.toLocaleString() + ' so\'m' : '—'}
                     </p>
                   </div>
                 </div>
@@ -584,11 +645,15 @@ export default function ScoringHistory() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Natija</p>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${getStatusBadge(selectedItem.passed)}`}>
-                      {selectedItem.passed ? (
+                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
+                      selectedItem.total_score >= selectedItem.scoringModel.minPassScore
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {selectedItem.total_score >= selectedItem.scoringModel.minPassScore ? (
                         <>
                           <CircleCheck className="h-3 w-3" />
-                          Muvaffaqiyatli
+                          O'tdi
                         </>
                       ) : (
                         <>
@@ -607,6 +672,32 @@ export default function ScoringHistory() {
                 </div>
               </div>
 
+              {/* Total Score Summary */}
+              <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-white p-4 dark:border-indigo-900/50 dark:from-indigo-900/20 dark:to-navy-800">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Kriteriyalar bo'yicha ball</p>
+                    <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">
+                      {selectedItem.category_base_score || 0}
+                    </p>
+                  </div>
+                  {selectedItem.age !== undefined && selectedItem.age_score !== undefined && (
+                    <div className="text-center">
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Yosh ({selectedItem.age} yosh)</p>
+                      <p className={`mt-1 text-2xl font-bold ${selectedItem.age_score < 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                        {selectedItem.age_score > 0 ? '+' : ''}{selectedItem.age_score}
+                      </p>
+                    </div>
+                  )}
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Jami ball</p>
+                    <p className="mt-1 text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                      {selectedItem.total_score}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Criteria Scores - Kriteriyalar bo'yicha balllar */}
               {selectedItem.criteria_scores && Object.keys(selectedItem.criteria_scores).length > 0 && (
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
@@ -615,11 +706,33 @@ export default function ScoringHistory() {
                     Kriteriyalar bo'yicha balllar
                   </h4>
                   <div className="space-y-3">
-                    {Object.entries(selectedItem.criteria_scores).map(([criteriaName, scoreData]) => {
-                      // Find the criteria details from the scoring category
-                      const criteria = selectedItem.scoringCategory.criterias?.find(
-                        (c: any) => c.name === criteriaName
-                      );
+                    {Object.entries(selectedItem.criteria_scores).map(([criteriaKey, scoreData], index) => {
+                      // Map criteria_1, criteria_2, or criteria_62 to actual criteria
+                      let criteria;
+                      let criteriaName = criteriaKey;
+                      
+                      // If key is like "criteria_1" or "criteria_62", extract ID and find by ID
+                      if (criteriaKey.startsWith('criteria_')) {
+                        const criteriaId = parseInt(criteriaKey.split('_')[1]);
+                        
+                        // First try to find by ID
+                        criteria = selectedItem.scoringCategory.criterias?.find(
+                          (c: any) => c.id === criteriaId
+                        );
+                        
+                        // If not found by ID, try by index (for backwards compatibility)
+                        if (!criteria) {
+                          const criteriaIndex = criteriaId - 1;
+                          criteria = selectedItem.scoringCategory.criterias?.[criteriaIndex];
+                        }
+                        
+                        criteriaName = criteria?.name || criteriaKey;
+                      } else {
+                        // Find by name
+                        criteria = selectedItem.scoringCategory.criterias?.find(
+                          (c: any) => c.name === criteriaKey
+                        );
+                      }
                       
                       // Extract actual score value
                       const actualScore = typeof scoreData === 'object' && scoreData !== null 
@@ -630,7 +743,7 @@ export default function ScoringHistory() {
                       const percentage = (actualScore / maxScore) * 100;
                       
                       return (
-                        <div key={criteriaName} className="space-y-1.5">
+                        <div key={criteriaKey} className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-medium text-navy-700 dark:text-white">
                               {criteriaName}

@@ -3,6 +3,7 @@ import Card from "components/card";
 import { Search, User, FileText, BuildingStore, Calendar, ShieldCheck, Phone, DeviceMobile, CircleCheck, Eye, CurrencyDollar } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
+import DateRangePicker from "components/DateRangePicker";
 import * as api from "lib/api";
 
 // Types
@@ -46,6 +47,8 @@ export default function Customers() {
   const [pageSize, setPageSize] = useState(5);
   const [loading, setLoading] = useState(false);
   const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [startDate, setStartDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
 
   // Load ALL customers from API once
   useEffect(() => {
@@ -73,16 +76,39 @@ export default function Customers() {
     }
   };
 
-  // Filter customers by search query (frontend)
+  // Filter customers by search query and date range (frontend)
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery) return allCustomers;
-    const query = searchQuery.toLowerCase();
-    return allCustomers.filter((customer) =>
-      customer.fullName.toLowerCase().includes(query) ||
-      customer.phone.toLowerCase().includes(query) ||
-      customer.passport.toLowerCase().includes(query)
-    );
-  }, [allCustomers, searchQuery]);
+    let filtered = allCustomers;
+    
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((customer) =>
+        customer.fullName.toLowerCase().includes(query) ||
+        customer.phone.toLowerCase().includes(query) ||
+        customer.passport.toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply date range filter
+    if (startDate || endDate) {
+      filtered = filtered.filter((customer) => {
+        const customerDate = new Date(customer.registrationDate);
+        if (startDate) {
+          const start = new Date(startDate);
+          if (customerDate < start) return false;
+        }
+        if (endDate) {
+          const end = new Date(endDate);
+          end.setHours(23, 59, 59, 999);
+          if (customerDate > end) return false;
+        }
+        return true;
+      });
+    }
+    
+    return filtered;
+  }, [allCustomers, searchQuery, startDate, endDate]);
 
   // Pagination (frontend)
   const totalPages = Math.ceil(filteredCustomers.length / pageSize);
@@ -101,6 +127,11 @@ export default function Customers() {
     try {
       const detail = await api.getCustomer(customer.id);
       console.log('Customer detail loaded:', detail);
+      console.log('MyID data:', detail?.myid);
+      console.log('Has MyID:', !!detail?.myid);
+      if (detail?.myid) {
+        console.log('MyID profile:', detail.myid.profile);
+      }
       setSelectedCustomerDetail(detail);
     } catch (error) {
       console.error('Error loading customer detail:', error);
@@ -135,8 +166,8 @@ export default function Customers() {
           </div>
         </header>
 
-        {/* Search */}
-        <div className="mt-6 flex items-center gap-3">
+        {/* Search and Date Filter */}
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <input
@@ -147,6 +178,12 @@ export default function Customers() {
               className="w-full rounded-lg border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-navy-700 outline-none transition-colors placeholder:text-gray-400 focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white dark:placeholder:text-gray-500"
             />
           </div>
+          <DateRangePicker
+            startDate={startDate}
+            endDate={endDate}
+            onStartChange={setStartDate}
+            onEndChange={setEndDate}
+          />
         </div>
 
         {/* Stats */}
@@ -345,7 +382,8 @@ export default function Customers() {
       {showDetailModal && selectedCustomer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl bg-white p-6 shadow-2xl dark:bg-navy-800">
-            <div className="mb-4 flex items-center justify-between">
+            <div className="space-y-4">
+            <div className="flex items-center justify-between">
               <h3 className="text-xl font-bold text-navy-700 dark:text-white">
                 Mijoz ma'lumotlari
               </h3>
@@ -365,7 +403,7 @@ export default function Customers() {
                 <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-brand-500 border-r-transparent"></div>
                 <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">Yuklanmoqda...</p>
               </div>
-            ) : (
+            ) : selectedCustomerDetail ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -401,6 +439,174 @@ export default function Customers() {
                   <p className="mt-1 text-base font-semibold text-navy-700 dark:text-white">{selectedCustomer.registrationDate ? formatDate(selectedCustomer.registrationDate) : "—"}</p>
                 </div>
               </div>
+
+              {/* MyID Information Section */}
+              {selectedCustomerDetail?.myid?.profile && (
+                <>
+                  {/* Shaxsiy ma'lumotlar */}
+                  <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                    <div className="mb-3 flex items-center gap-2">
+                      <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <h4 className="text-lg font-bold text-navy-700 dark:text-white">
+                        Shaxsiy ma'lumotlar (MyID)
+                      </h4>
+                    </div>
+                    <div className="space-y-4 rounded-lg border border-green-200 bg-gradient-to-r from-green-50 to-white p-4 dark:border-green-900/50 dark:from-green-900/20 dark:to-navy-800">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {selectedCustomerDetail.myid.profile.common_data?.pinfl && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">PINFL</p>
+                            <p className="text-base font-mono font-bold text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.pinfl}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.birth_date && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Tug'ilgan sana</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.birth_date}
+                            </p>
+                          </div>
+                        )}
+                        {(selectedCustomerDetail.myid.profile.common_data?.last_name_en || selectedCustomerDetail.myid.profile.common_data?.first_name_en) && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">F.I.O (Lotin)</p>
+                            <p className="text-base font-semibold text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.last_name_en} {selectedCustomerDetail.myid.profile.common_data.first_name_en} {selectedCustomerDetail.myid.profile.common_data.middle_name_en || ''}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.last_name && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">F.I.O (Kirill)</p>
+                            <p className="text-base font-semibold text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.last_name} {selectedCustomerDetail.myid.profile.common_data.first_name} {selectedCustomerDetail.myid.profile.common_data.middle_name}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.birth_place && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Tug'ilgan joy</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.birth_place}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.gender && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Jinsi</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.gender === '1' ? 'Erkak' : selectedCustomerDetail.myid.profile.common_data.gender === '2' ? 'Ayol' : selectedCustomerDetail.myid.profile.common_data.gender === 1 ? 'Erkak' : 'Ayol'}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.nationality && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Millati</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.nationality}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.common_data?.citizenship && (
+                          <div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Fuqaroligi</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.citizenship}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Passport ma'lumotlari */}
+                  {selectedCustomerDetail.myid.profile.doc_data && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <div className="mb-3">
+                        <h4 className="text-lg font-bold text-navy-700 dark:text-white">
+                          Pasport ma'lumotlari
+                        </h4>
+                      </div>
+                      <div className="space-y-4 rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50 to-white p-4 dark:border-indigo-900/50 dark:from-indigo-900/20 dark:to-navy-800">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {selectedCustomerDetail.myid.profile.doc_data?.pass_data && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Pasport seriya va raqami</p>
+                              <p className="text-base font-mono font-bold text-navy-700 dark:text-white">
+                                {selectedCustomerDetail.myid.profile.doc_data.pass_data}
+                              </p>
+                            </div>
+                          )}
+                          {selectedCustomerDetail.myid.profile.doc_data?.doc_type && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Hujjat turi</p>
+                              <p className="text-base font-medium text-navy-700 dark:text-white">
+                                {selectedCustomerDetail.myid.profile.doc_data.doc_type}
+                              </p>
+                            </div>
+                          )}
+                          {selectedCustomerDetail.myid.profile.doc_data?.issued_date && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Berilgan sana</p>
+                              <p className="text-base font-medium text-navy-700 dark:text-white">
+                                {selectedCustomerDetail.myid.profile.doc_data.issued_date}
+                              </p>
+                            </div>
+                          )}
+                          {selectedCustomerDetail.myid.profile.doc_data?.expiry_date && (
+                            <div>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Amal qilish muddati</p>
+                              <p className="text-base font-medium text-navy-700 dark:text-white">
+                                {selectedCustomerDetail.myid.profile.doc_data.expiry_date}
+                              </p>
+                            </div>
+                          )}
+                          {selectedCustomerDetail.myid.profile.doc_data?.issued_by && (
+                            <div className="md:col-span-2">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Kim tomonidan berilgan</p>
+                              <p className="text-base font-medium text-navy-700 dark:text-white">
+                                {selectedCustomerDetail.myid.profile.doc_data.issued_by}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manzil ma'lumotlari */}
+                  {(selectedCustomerDetail.myid.profile.address_data?.permanent_registration || 
+                    selectedCustomerDetail.myid.profile.address_data?.temporary_registration) && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <div className="mb-3">
+                        <h4 className="text-lg font-bold text-navy-700 dark:text-white">
+                          Manzil ma'lumotlari
+                        </h4>
+                      </div>
+                      <div className="space-y-3">
+                        {selectedCustomerDetail.myid.profile.address_data?.permanent_registration && (
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Doimiy ro'yxatga olish manzili</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.address_data.permanent_registration}
+                            </p>
+                          </div>
+                        )}
+                        {selectedCustomerDetail.myid.profile.address_data?.temporary_registration && (
+                          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                            <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Vaqtinchalik ro'yxatga olish manzili</p>
+                            <p className="text-base font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.address_data.temporary_registration}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Workplaces Section */}
               {selectedCustomerDetail?.workplaces && selectedCustomerDetail.workplaces.length > 0 && (
@@ -534,15 +740,16 @@ export default function Customers() {
                 )}
               </div>
             </div>
-            )}
+            ) : null}
 
-            <div className="mt-6 flex justify-end">
+            <div className="flex justify-end">
               <button
                 onClick={() => setShowDetailModal(false)}
                 className="rounded-lg bg-brand-500 px-6 py-2 font-medium text-white transition-colors hover:bg-brand-600"
               >
                 Yopish
               </button>
+            </div>
             </div>
           </div>
         </div>

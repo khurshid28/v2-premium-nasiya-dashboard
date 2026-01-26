@@ -6,6 +6,7 @@ import demoApi from "lib/demoApi";
 import { formatPhone, formatMoney, formatMoneyWithUZS, appStatusBadge, formatDateNoSeconds } from "lib/formatters";
 import Card from "components/card";
 import Toast from "components/toast/Toast";
+import { scoringHistoryApi } from "lib/api/scoringHistory";
 
 type Application = {
   id: number;
@@ -119,6 +120,18 @@ type Application = {
   } | null;
 };
 
+// Category translations
+const CATEGORY_LABELS: Record<string, string> = {
+  OFFICIAL: "Rasmiy ish joyi",
+  CARD_TURNOVER: "Karta aylanmasi",
+  PENSIONER: "Pensioner",
+  MILITARY: "Harbiy xizmatchi"
+};
+
+const getCategoryLabel = (category: string): string => {
+  return CATEGORY_LABELS[category] || category;
+};
+
 const ApplicationDetail = (): JSX.Element => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -130,7 +143,7 @@ const ApplicationDetail = (): JSX.Element => {
 
   const [application, setApplication] = React.useState<Application | null>(null);
   const [loading, setLoading] = React.useState(true);
-  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'client' | 'debt' | 'payments' | 'history' | 'operations'>('application');
+  const [activeTab, setActiveTab] = React.useState<'application' | 'merchant' | 'workplace' | 'client' | 'scoring' | 'debt' | 'payments' | 'history' | 'operations'>('application');
   const [toast, setToast] = React.useState<{ show: boolean; message: string; type: 'main' | 'success' | 'error' }>({ 
     show: false, 
     message: '', 
@@ -138,6 +151,8 @@ const ApplicationDetail = (): JSX.Element => {
   });
   const [myidImageUrl, setMyidImageUrl] = React.useState<string | null>(null);
   const [myidImageError, setMyidImageError] = React.useState(false);
+  const [scoringHistory, setScoringHistory] = React.useState<any>(null);
+  const [loadingScoring, setLoadingScoring] = React.useState(false);
 
   // Load MyID image with token
   React.useEffect(() => {
@@ -208,6 +223,30 @@ const ApplicationDetail = (): JSX.Element => {
 
     fetchApplication();
   }, [id, api]);
+
+  // Skoring ma'lumotlarini yuklash
+  React.useEffect(() => {
+    const fetchScoringHistory = async () => {
+      if (!id || activeTab !== 'scoring') return;
+      
+      try {
+        setLoadingScoring(true);
+        const response = await scoringHistoryApi.getScoringHistory({ zayavka_id: parseInt(id), limit: 1 });
+        if (response.data.data && response.data.data.length > 0) {
+          setScoringHistory(response.data.data[0]);
+        } else {
+          setScoringHistory(null);
+        }
+      } catch (error) {
+        console.error('Error fetching scoring history:', error);
+        setScoringHistory(null);
+      } finally {
+        setLoadingScoring(false);
+      }
+    };
+
+    fetchScoringHistory();
+  }, [id, activeTab]);
 
   const handleBack = () => {
     navigate(-1);
@@ -294,6 +333,16 @@ const ApplicationDetail = (): JSX.Element => {
             }`}
           >
             Mijoz ma'lumotlari
+          </button>
+          <button
+            onClick={() => setActiveTab('scoring')}
+            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+              activeTab === 'scoring'
+                ? 'border-b-2 border-brand-500 text-brand-500 dark:text-brand-400'
+                : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Skoring natijasi
           </button>
           {/* Faqat CONFIRMED va FINISHED statuslarda Qarzdorlik tabini ko'rsatish */}
           {(application.status === 'CONFIRMED' || application.status === 'FINISHED') && (
@@ -1423,6 +1472,195 @@ const ApplicationDetail = (): JSX.Element => {
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-600 dark:text-gray-400">Amaliyotlar tarixi mavjud emas</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Skoring natijasi tab */}
+          {activeTab === 'scoring' && (
+            <div className="space-y-4">
+              {loadingScoring ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-brand-500"></div>
+                </div>
+              ) : scoringHistory ? (
+                <>
+                  {/* Umumiy natija */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Skoring natijalari</h5>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Umumiy ball</p>
+                        <p className="mt-1 text-2xl font-bold text-navy-700 dark:text-white">{scoringHistory.total_score}</p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Natija</p>
+                        <p className={`mt-1 text-base font-bold ${
+                          scoringHistory.total_score >= (scoringHistory.scoringModel?.minPassScore || 0) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                        }`}>
+                          {scoringHistory.total_score >= (scoringHistory.scoringModel?.minPassScore || 0) ? 'O\'tdi' : 'O\'tmadi'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-indigo-200 bg-gradient-to-r from-indigo-50 to-white p-4 dark:border-indigo-900/50 dark:from-indigo-900/20 dark:to-navy-800">
+                        <p className="text-xs text-indigo-600 dark:text-indigo-400 font-medium">Kategoriya</p>
+                        <p className="mt-1 text-base font-bold text-indigo-700 dark:text-indigo-300">
+                          {getCategoryLabel(scoringHistory.scoringCategory?.category) || '—'}
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-navy-700">
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Manba</p>
+                        <p className="mt-1 text-base font-bold text-navy-700 dark:text-white">{scoringHistory.source}</p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Model ma'lumotlari */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Skoring modeli</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Model nomi</p>
+                        <p className="mt-1 text-base font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.scoringModel?.name || '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Versiya</p>
+                        <p className="mt-1 text-base font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.scoringModel?.version || '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">O'tish balli</p>
+                        <p className="mt-1 text-base font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.scoringModel?.minPassScore || '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Total Score Summary */}
+                  <Card extra="p-6">
+                    <div className="rounded-xl border border-indigo-200 bg-gradient-to-r from-indigo-50 to-white p-5 dark:border-indigo-900/50 dark:from-indigo-900/20 dark:to-navy-800">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Umumiy ball</p>
+                          <p className="mt-2 text-4xl font-bold text-indigo-600 dark:text-indigo-400">
+                            {scoringHistory.total_score}
+                          </p>
+                        </div>
+                        {(scoringHistory as any).age !== undefined && (scoringHistory as any).age_score !== undefined && (
+                          <div className="text-right">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Yosh</p>
+                            <p className="mt-2 text-2xl font-bold text-navy-700 dark:text-white">
+                              {(scoringHistory as any).age} yosh
+                            </p>
+                            <p className={`mt-2 text-base font-bold ${ 
+                              (scoringHistory as any).age_score === -200 
+                                ? 'text-red-600 dark:text-red-400' 
+                                : 'text-green-600 dark:text-green-400'
+                            }`}>
+                              {(scoringHistory as any).age_score === -200 
+                                ? '-200 ball' 
+                                : `+${(scoringHistory as any).age_score} ball`
+                              }
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* Kriteriyalar bo'yicha balllar */}
+                  {scoringHistory.criteria_scores && Object.keys(scoringHistory.criteria_scores).length > 0 && (
+                    <Card extra="p-6">
+                      <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Kriteriyalar bo'yicha balllar</h5>
+                      <div className="space-y-4">
+                        {Object.entries(scoringHistory.criteria_scores).map(([criteriaKey, scoreData]: [string, any], index) => {
+                          // Map criteria_1, criteria_2 to actual criteria names
+                          let criteria;
+                          let criteriaName = criteriaKey;
+                          
+                          // If key is like "criteria_1", map to actual criteria by index
+                          if (criteriaKey.startsWith('criteria_')) {
+                            const criteriaIndex = parseInt(criteriaKey.split('_')[1]) - 1;
+                            criteria = scoringHistory.scoringCategory?.criterias?.[criteriaIndex];
+                            criteriaName = criteria?.name || criteriaKey;
+                          } else {
+                            // Find by name
+                            criteria = scoringHistory.scoringCategory?.criterias?.find(
+                              (c: any) => c.name === criteriaKey
+                            );
+                          }
+                          
+                          const actualScore = typeof scoreData === 'object' && scoreData !== null 
+                            ? (scoreData.score || scoreData.value || 0)
+                            : (scoreData as number);
+                          
+                          const maxScore = criteria?.maxScore || 100;
+                          const percentage = (actualScore / maxScore) * 100;
+                          
+                          return (
+                            <div key={criteriaKey} className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-navy-700 dark:text-white">
+                                  {criteriaName}
+                                </span>
+                                <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">
+                                  {actualScore}/{maxScore} ball
+                                </span>
+                              </div>
+                              <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                <div 
+                                  className={`h-full rounded-full transition-all ${
+                                    percentage >= 70 
+                                      ? 'bg-gradient-to-r from-green-500 to-green-600' 
+                                      : percentage >= 40
+                                      ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                                      : 'bg-gradient-to-r from-red-500 to-red-600'
+                                  }`}
+                                  style={{ width: `${Math.min(percentage, 100)}%` }}
+                                ></div>
+                              </div>
+                              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                                <span>{percentage.toFixed(1)}%</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </Card>
+                  )}
+
+                  {/* Vaqt ma'lumotlari */}
+                  <Card extra="p-6">
+                    <h5 className="text-lg font-bold text-navy-700 dark:text-white mb-4">Vaqt ma'lumotlari</h5>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Boshlangan vaqt</p>
+                        <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.scoring_start ? new Date(scoringHistory.scoring_start).toLocaleString('uz-UZ') : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Tugagan vaqt</p>
+                        <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.scoring_end ? new Date(scoringHistory.scoring_end).toLocaleString('uz-UZ') : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">Davomiyligi</p>
+                        <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                          {scoringHistory.processing_time_seconds ? `${scoringHistory.processing_time_seconds} soniya` : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </Card>
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-600 dark:text-gray-400">Bu ariza uchun skoring natijasi mavjud emas</p>
                 </div>
               )}
             </div>

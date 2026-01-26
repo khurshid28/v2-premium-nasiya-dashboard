@@ -31,6 +31,10 @@ export interface ScoringHistoryItem {
   processing_time_seconds: number;
   criteria_scores: any;
   evaluated_at: string;
+  age?: number;
+  age_score?: number;
+  category_base_score?: number;
+  category_total_score?: number;
   zayavka: {
     id: number;
     fullname: string;

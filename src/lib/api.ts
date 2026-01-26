@@ -654,11 +654,11 @@ export async function listCustomers(params?: {
   page?: number;
   pageSize?: number;
 }): Promise<any> {
-  // Birinchi marta barcha ma'lumotlarni olish uchun katta pageSize
   const queryParams = {
-    ...params,
-    page: 1,
-    pageSize: 1000 // Barcha mijozlarni olish
+    page: params?.page || 1,
+    pageSize: params?.pageSize || 1000,
+    ...(params?.search && { search: params.search }),
+    ...(params?.region && { region: params.region }),
   };
   
   const res = await fetchWithRetry(`${API_BASE}/client/with-stats${qs(queryParams)}`, {
@@ -666,17 +666,8 @@ export async function listCustomers(params?: {
   });
   const result: any = await handleResponse(res);
   
-  // API response: { value: [...], Count: 141, page: 1, pageSize: 1000, totalPages: 1 }
-  // Frontend uchun barcha ma'lumotlarni qaytarish
-  if (result && result.value && Array.isArray(result.value)) {
-    return {
-      items: result.value, // Barcha mijozlar
-      total: result.Count || result.value.length,
-      page: params?.page || 1,
-      pageSize: params?.pageSize || 20
-    };
-  }
-  
+  // Backend API returns: { value: [...], Count: 141, page: 1, pageSize: 1000, totalPages: 15 }
+  // Return as-is since it already has the correct structure
   return result;
 }
 

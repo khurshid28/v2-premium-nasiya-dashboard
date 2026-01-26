@@ -98,4 +98,9 @@ export const scoringApi = {
   getCriteriaNames: () => {
     return apiClient.get<string[]>('/scoring/criteria/names');
   },
+
+  // Get model statistics
+  getModelStatistics: (modelId: number) => {
+    return apiClient.get(`/scoring/model/${modelId}/statistics`);
+  },
 };

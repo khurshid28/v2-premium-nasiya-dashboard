@@ -85,20 +85,30 @@ export default function CustomersAdmin() {
   const loadCustomers = async () => {
     try {
       setLoading(true);
+      console.log('🔵 Loading customers...');
+      
       const response = await api.listCustomers({
         page: 1,
         pageSize: 1000,
       });
       
-      console.log('API Response:', response);
-      console.log('First customer:', response?.value?.[0]);
+      console.log('✅ API Response:', response);
+      console.log('✅ Response type:', typeof response);
+      console.log('✅ Response.value exists?', !!response?.value);
+      console.log('✅ First customer:', response?.value?.[0]);
       
       if (response && response.value) {
+        console.log('✅ Total customers:', response.value.length);
         // Sort by ID descending (newest first)
         const sortedCustomers = response.value.sort((a, b) => b.id - a.id);
         setAllCustomers(sortedCustomers);
+      } else {
+        console.error('❌ Invalid response structure:', response);
       }
     } catch (error: any) {
+      console.error('❌ Error loading customers:', error);
+      console.error('❌ Error message:', error.message);
+      console.error('❌ Error status:', error.status);
       showToast(error.message || "Ma'lumotlarni yuklashda xatolik", 'error');
     } finally {
       setLoading(false);
@@ -691,6 +701,114 @@ export default function CustomersAdmin() {
                       <p className="font-medium text-navy-700 dark:text-white">{selectedCustomerDetail.address}</p>
                     </div>
                   </div>
+
+                  {/* MyID Section */}
+                  {selectedCustomerDetail?.myid?.profile && (
+                    <div className="border-t border-gray-200 pt-4 dark:border-gray-700">
+                      <h4 className="mb-3 font-bold text-navy-700 dark:text-white">MyID ma'lumotlari</h4>
+                      <div className="grid grid-cols-2 gap-4 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-4 dark:from-navy-900 dark:to-indigo-900/20">
+                        {/* PINFL */}
+                        {selectedCustomerDetail.myid.profile.common_data?.pinfl && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">PINFL</p>
+                            <p className="mt-1 text-sm font-mono font-semibold text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.pinfl}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Tug'ilgan sana */}
+                        {selectedCustomerDetail.myid.profile.common_data?.birth_date && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Tug'ilgan sana</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.birth_date}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Tug'ilgan joy */}
+                        {selectedCustomerDetail.myid.profile.common_data?.birth_place && (
+                          <div className="col-span-2">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Tug'ilgan joy</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.birth_place}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Jinsi */}
+                        {selectedCustomerDetail.myid.profile.common_data?.gender && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Jinsi</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.gender === '1' ? 'Erkak' : 'Ayol'}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Millati */}
+                        {selectedCustomerDetail.myid.profile.common_data?.nationality && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Millati</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.nationality}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Fuqaroligi */}
+                        {selectedCustomerDetail.myid.profile.common_data?.citizenship && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Fuqaroligi</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.common_data.citizenship}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Passport berilgan sana */}
+                        {selectedCustomerDetail.myid.profile.doc_data?.issued_date && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Berilgan sana</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.doc_data.issued_date}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Amal qilish muddati */}
+                        {selectedCustomerDetail.myid.profile.doc_data?.expiry_date && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Amal qilish muddati</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.doc_data.expiry_date}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Kim tomonidan berilgan */}
+                        {selectedCustomerDetail.myid.profile.doc_data?.issued_by && (
+                          <div className="col-span-2">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Kim tomonidan berilgan</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.doc_data.issued_by}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Doimiy manzil */}
+                        {selectedCustomerDetail.myid.profile.address?.permanent_registration?.full_address && (
+                          <div className="col-span-2">
+                            <p className="text-xs font-medium text-gray-500 dark:text-gray-400">Doimiy manzil</p>
+                            <p className="mt-1 text-sm font-medium text-navy-700 dark:text-white">
+                              {selectedCustomerDetail.myid.profile.address.permanent_registration.full_address}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Workplaces Section */}
                   {selectedCustomerDetail?.workplaces && selectedCustomerDetail.workplaces.length > 0 && (

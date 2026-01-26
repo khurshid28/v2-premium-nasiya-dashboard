@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import Card from "components/card";
-import { Search, Plus, Eye, Settings, Clock, Check, Trash } from "tabler-icons-react";
+import { Search, Plus, Eye, Settings, Clock, Check, Trash, Edit, TrendingUp } from "tabler-icons-react";
 import Pagination from "components/pagination";
 import CustomSelect from "components/dropdown/CustomSelect";
 import { scoringApi, ScoringModel as ApiScoringModel } from "lib/api/scoring";
@@ -36,6 +36,10 @@ type ScoringModel = {
   totalApplications?: number;
   approvedLimits?: number;
   successRate?: number;
+  minPassScore?: number;
+  minLimitAmount?: number;
+  maxLimitAmount?: number;
+  maxProcessingTime?: number;
 };
 
 const CATEGORY_LABELS: Record<ModelCategory, string> = {
@@ -97,6 +101,7 @@ export default function ScoringModels() {
   const [selectedModel, setSelectedModel] = useState<ScoringModel | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [models, setModels] = useState<ScoringModel[]>([]);
   const [availableCriteriaNames, setAvailableCriteriaNames] = useState<string[]>([]);
@@ -115,6 +120,8 @@ export default function ScoringModels() {
     message: string;
     type: 'success' | 'error' | 'info' | 'warning';
   }>({ show: false, message: '', type: 'info' });
+  const [modelStatistics, setModelStatistics] = useState<any>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   // Load scoring models and criteria names from API
   useEffect(() => {
@@ -128,6 +135,21 @@ export default function ScoringModels() {
       setAvailableCriteriaNames(response.data);
     } catch (error) {
       console.error('Error loading criteria names:', error);
+    }
+  };
+
+  const loadModelStatistics = async (modelId: number) => {
+    try {
+      setLoadingStats(true);
+      console.log('Loading statistics for model:', modelId);
+      const response = await scoringApi.getModelStatistics(modelId);
+      console.log('Statistics response:', response.data);
+      setModelStatistics(response.data);
+    } catch (error) {
+      console.error('Error loading model statistics:', error);
+      setModelStatistics(null);
+    } finally {
+      setLoadingStats(false);
     }
   };
 
@@ -151,6 +173,7 @@ export default function ScoringModels() {
     }
 
     // Validate categories have criterias
+    let totalMaxScore = 0;
     for (const category of selectedCategories) {
       const config = categoryConfigs[category];
       if (!config.criterias || config.criterias.length === 0) {
@@ -161,6 +184,14 @@ export default function ScoringModels() {
         alert(`${CATEGORY_LABELS[category]} kategoriyasi uchun yosh oralig'ini kiriting`);
         return;
       }
+      // Calculate total possible score
+      totalMaxScore += config.criterias.reduce((sum, c) => sum + (c.maxScore || 0), 0);
+    }
+
+    // Validate minPassScore is achievable
+    if (minPassScore > totalMaxScore) {
+      alert(`Minimal o'tish balli (${minPassScore}) jami maksimal balldan (${totalMaxScore}) katta bo'lolmaydi!\n\nIltimos, minimal ballni ${totalMaxScore} dan kichik qilib belgilang.`);
+      return;
     }
 
     try {
@@ -283,6 +314,126 @@ export default function ScoringModels() {
         setConfirmDialog({ show: false, title: '', message: '', onConfirm: () => {} });
       },
     });
+  };
+
+  // Handle edit model - open edit modal with current model data
+  const handleEditModel = (model: ScoringModel) => {
+    setSelectedModel(model);
+    // Pre-fill form with model data
+    setModelName(model.name);
+    setModelVersion(model.version);
+    setMinPassScore(model.minPassScore || 300);
+    setGlobalMinLimit(model.minLimitAmount || 1000000);
+    setGlobalMaxLimit(model.maxLimitAmount || 50000000);
+    setMaxProcessingTime(model.maxProcessingTime || 20);
+    
+    // Set selected categories and configs
+    const categories = model.categories.map(c => c.category);
+    setSelectedCategories(categories as ModelCategory[]);
+    
+    const configs: Record<ModelCategory, Partial<CategoryConfig>> = {
+      OFFICIAL: {},
+      CARD_TURNOVER: {},
+      PENSIONER: {},
+      MILITARY: {},
+    };
+    
+    model.categories.forEach(cat => {
+      configs[cat.category as ModelCategory] = {
+        minAge: cat.minAge,
+        maxAge: cat.maxAge,
+        criterias: cat.criterias,
+      };
+    });
+    
+    setCategoryConfigs(configs);
+    setShowDetailModal(false);
+    setShowEditModal(true);
+  };
+
+  // Execute edit model
+  const handleUpdateModel = async () => {
+    if (!selectedModel || !modelName || !modelVersion || selectedCategories.length === 0) {
+      alert("Iltimos, barcha ma'lumotlarni to'ldiring");
+      return;
+    }
+
+    // Validate categories have criterias
+    let totalMaxScore = 0;
+    for (const category of selectedCategories) {
+      const config = categoryConfigs[category];
+      if (!config.criterias || config.criterias.length === 0) {
+        alert(`${CATEGORY_LABELS[category]} kategoriyasi uchun kriteriyalar qo'shing`);
+        return;
+      }
+      if (!config.minAge || !config.maxAge) {
+        alert(`${CATEGORY_LABELS[category]} kategoriyasi uchun yosh oralig'ini kiriting`);
+        return;
+      }
+      // Calculate total possible score
+      totalMaxScore += config.criterias.reduce((sum, c) => sum + (c.maxScore || 0), 0);
+    }
+
+    // Validate minPassScore is achievable
+    if (minPassScore > totalMaxScore) {
+      alert(`Minimal o'tish balli (${minPassScore}) jami maksimal balldan (${totalMaxScore}) katta bo'lolmaydi!\n\nIltimos, minimal ballni ${totalMaxScore} dan kichik qilib belgilang.`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const updateData = {
+        name: modelName,
+        version: modelVersion,
+        minPassScore,
+        minLimitAmount: globalMinLimit,
+        maxLimitAmount: globalMaxLimit,
+        maxProcessingTime,
+        status: 'DRAFT', // Set to DRAFT when edited
+        categories: selectedCategories.map(cat => {
+          const config = categoryConfigs[cat];
+          return {
+            category: cat,
+            minAge: config.minAge!,
+            maxAge: config.maxAge!,
+            criterias: config.criterias!.map(c => ({
+              name: c.name,
+              weight: c.weight,
+              maxScore: c.maxScore,
+            })),
+          };
+        }),
+      };
+
+      await scoringApi.updateScoringModel(selectedModel.id, updateData);
+      await loadModels();
+      setShowEditModal(false);
+      // Reset form
+      setModelName("");
+      setModelVersion("");
+      setSelectedCategories([]);
+      setCategoryConfigs({
+        OFFICIAL: {},
+        CARD_TURNOVER: {},
+        PENSIONER: {},
+        MILITARY: {},
+      });
+      setSelectedModel(null);
+      setToast({
+        show: true,
+        message: "Model muvaffaqiyatli tahrirlandi!\n\nYangilanishlar ertangi kecha soat 00:00 da avtomatik faollashadi.",
+        type: 'success'
+      });
+    } catch (error: any) {
+      console.error('Update error:', error);
+      setToast({
+        show: true,
+        message: error.response?.data?.message || "Modelni yangilashda xatolik",
+        type: 'error'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const executeActivateModel = async (id: number) => {
@@ -625,6 +776,7 @@ export default function ScoringModels() {
                     onClick={() => {
                       setSelectedModel(model);
                       setShowDetailModal(true);
+                      loadModelStatistics(model.id);
                     }}
                     className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-500 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-brand-600 hover:shadow-lg"
                   >
@@ -1004,6 +1156,8 @@ export default function ScoringModels() {
                 onClick={() => {
                   setShowDetailModal(false);
                   setSelectedModel(null);
+                  setModelStatistics(null);
+                  setLoadingStats(false);
                 }}
                 className="absolute right-6 top-6 z-10 rounded-lg bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
               >
@@ -1156,6 +1310,121 @@ export default function ScoringModels() {
                     </div>
                   </div>
                 )}
+
+                {/* Advanced Statistics */}
+                {loadingStats ? (
+                  <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-5 dark:border-purple-900/50 dark:from-purple-900/20 dark:to-navy-800">
+                    <div className="flex items-center justify-center py-8">
+                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-purple-200 border-t-purple-600"></div>
+                      <span className="ml-3 text-sm text-gray-600 dark:text-gray-400">Statistika yuklanmoqda...</span>
+                    </div>
+                  </div>
+                ) : modelStatistics && (
+                  <div className="space-y-4">
+                    {/* Age Statistics */}
+                    {modelStatistics.ageStatistics && (
+                      <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-5 dark:border-purple-900/50 dark:from-purple-900/20 dark:to-navy-800">
+                        <h4 className="mb-4 flex items-center gap-2 text-base font-bold text-purple-700 dark:text-purple-400">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                          Yosh statistikasi
+                        </h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="rounded-lg border border-purple-200 bg-white p-3 dark:border-purple-800 dark:bg-navy-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">O'rtacha yosh</p>
+                            <p className="mt-1 text-xl font-bold text-purple-700 dark:text-purple-400">
+                              {modelStatistics.ageStatistics.average ? `${Math.round(modelStatistics.ageStatistics.average)} yosh` : 'N/A'}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-purple-200 bg-white p-3 dark:border-purple-800 dark:bg-navy-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Minimum yosh</p>
+                            <p className="mt-1 text-xl font-bold text-purple-700 dark:text-purple-400">
+                              {modelStatistics.ageStatistics.min || 'N/A'}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-purple-200 bg-white p-3 dark:border-purple-800 dark:bg-navy-700">
+                            <p className="text-xs text-gray-600 dark:text-gray-400">Maximum yosh</p>
+                            <p className="mt-1 text-xl font-bold text-purple-700 dark:text-purple-400">
+                              {modelStatistics.ageStatistics.max || 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Top Failed Criteria */}
+                    {modelStatistics.topFailedCriteria && modelStatistics.topFailedCriteria.length > 0 && (
+                      <div className="rounded-xl border-2 border-red-200 bg-gradient-to-r from-red-50 to-white p-5 dark:border-red-900/50 dark:from-red-900/20 dark:to-navy-800">
+                        <h4 className="mb-4 flex items-center gap-2 text-base font-bold text-red-700 dark:text-red-400">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Eng ko'p bekor qilingan mezonlar
+                        </h4>
+                        <div className="space-y-3">
+                          {modelStatistics.topFailedCriteria.map((criteria, idx) => (
+                            <div key={idx} className="rounded-lg border border-red-200 bg-white p-3 dark:border-red-800 dark:bg-navy-700">
+                              <div className="mb-2 flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                                    {idx + 1}
+                                  </span>
+                                  <span className="text-sm font-bold text-navy-700 dark:text-white">{criteria.name}</span>
+                                </div>
+                                <span className="text-lg font-bold text-red-600 dark:text-red-400">{criteria.count} ta</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="h-2 flex-1 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+                                  <div
+                                    className="h-full rounded-full bg-gradient-to-r from-red-500 to-red-600"
+                                    style={{ 
+                                      width: `${modelStatistics.topFailedCriteria.length > 0 
+                                        ? (criteria.count / modelStatistics.topFailedCriteria[0].count) * 100 
+                                        : 0}%` 
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-xs text-gray-600 dark:text-gray-400">
+                                  {((criteria.count / (selectedModel.totalApplications || 1)) * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Min Amount Rejections */}
+                    {modelStatistics.rejectedDueToMinAmount !== undefined && (
+                      <div className="rounded-xl border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-white p-5 dark:border-orange-900/50 dark:from-orange-900/20 dark:to-navy-800">
+                        <h4 className="mb-3 flex items-center gap-2 text-base font-bold text-orange-700 dark:text-orange-400">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                          </svg>
+                          Minimum summa bo'yicha rad etilganlar
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-3xl font-bold text-orange-700 dark:text-orange-400">
+                              {modelStatistics.rejectedDueToMinAmount} ta
+                            </p>
+                            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                              Jami arizalarning {selectedModel.totalApplications 
+                                ? ((modelStatistics.rejectedDueToMinAmount / selectedModel.totalApplications) * 100).toFixed(1)
+                                : '0'}%
+                            </p>
+                          </div>
+                          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
+                            <svg className="h-10 w-10 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -1173,6 +1442,14 @@ export default function ScoringModels() {
                     </button>
                   )}
                   <button
+                    onClick={() => handleEditModel(selectedModel)}
+                    disabled={loading}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
+                  >
+                    <Edit className="h-5 w-5" />
+                    Tahrirlash
+                  </button>
+                  <button
                     onClick={() => {
                       setShowDetailModal(false);
                       setSelectedModel(null);
@@ -1182,6 +1459,338 @@ export default function ScoringModels() {
                     Yopish
                   </button>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && selectedModel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-navy-800">
+            {/* Modal Header */}
+            <div className="relative bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600 px-8 py-6">
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setSelectedModel(null);
+                  setModelName("");
+                  setModelVersion("");
+                  setSelectedCategories([]);
+                  setCategoryConfigs({
+                    OFFICIAL: {},
+                    CARD_TURNOVER: {},
+                    PENSIONER: {},
+                    MILITARY: {},
+                  });
+                }}
+                className="absolute right-6 top-6 rounded-lg bg-white/20 p-2 backdrop-blur-sm transition-all hover:bg-white/30"
+              >
+                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm">
+                  <Edit className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-white">Modelni tahrirlash</h3>
+                  <p className="mt-1 text-sm text-white/80">Model parametrlarini o'zgartiring</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 sm:p-8">
+              {/* Info message about saving as draft */}
+              <div className="mb-6 rounded-lg border-2 border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                <div className="flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                      Tahrirlangan model DRAFT statusga o'tadi
+                    </p>
+                    <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                      Tahrirlashdan keyin modelni faollashtirish uchun "Faollashtirish" tugmasini bosing.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-5">
+                {/* Basic Info */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">Model nomi</label>
+                    <input
+                      type="text"
+                      placeholder="Masalan: Premium Model"
+                      value={modelName}
+                      onChange={(e) => setModelName(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">Versiya</label>
+                    <input
+                      type="text"
+                      placeholder="Masalan: v3.0"
+                      value={modelVersion}
+                      onChange={(e) => setModelVersion(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Global Parameters */}
+                <div className="rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-4 sm:p-6 dark:border-purple-900/50 dark:from-purple-900/20 dark:to-navy-800">
+                  <h5 className="mb-4 flex items-center gap-2 text-base font-bold text-purple-700 dark:text-purple-400">
+                    <Settings className="h-5 w-5" />
+                    Umumiy parametrlar
+                  </h5>
+                  
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">
+                          Minimal o'tish bali
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="300"
+                          value={minPassScore}
+                          onChange={(e) => setMinPassScore(Number(e.target.value))}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">
+                          Minimal limit (so'm)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="1000000"
+                          value={globalMinLimit}
+                          onChange={(e) => setGlobalMinLimit(Number(e.target.value))}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                        />
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          {formatCurrency(globalMinLimit)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">
+                          Maksimal limit (so'm)
+                        </label>
+                        <input
+                          type="number"
+                          placeholder="50000000"
+                          value={globalMaxLimit}
+                          onChange={(e) => setGlobalMaxLimit(Number(e.target.value))}
+                          className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                        />
+                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                          {formatCurrency(globalMaxLimit)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-navy-700 dark:text-white">
+                        Maksimal ko'rib chiqish vaqti (daqiqa)
+                      </label>
+                      <input
+                        type="number"
+                        placeholder="20"
+                        value={maxProcessingTime}
+                        onChange={(e) => setMaxProcessingTime(Number(e.target.value))}
+                        className="w-full rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                      />
+                      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                        Barcha kategoriyalar uchun
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Selection */}
+                <div>
+                  <label className="mb-3 block text-base font-bold text-navy-700 dark:text-white">Kategoriyalarni tanlang</label>
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    {(Object.keys(CATEGORY_LABELS) as ModelCategory[]).map((category) => (
+                      <button
+                        key={category}
+                        onClick={() => toggleCategory(category)}
+                        className={`flex items-center justify-center gap-2 rounded-lg border-2 p-3 text-sm font-medium transition-all ${
+                          selectedCategories.includes(category)
+                            ? "border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-900/30 dark:text-brand-400"
+                            : "border-gray-200 bg-white text-gray-700 hover:border-brand-300 dark:border-gray-700 dark:bg-navy-800 dark:text-gray-300"
+                        }`}
+                      >
+                        {selectedCategories.includes(category) && <Check className="h-4 w-4" />}
+                        {CATEGORY_LABELS[category]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category Forms */}
+                {selectedCategories.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-base font-bold text-navy-700 dark:text-white">Kategoriya sozlamalari</h4>
+                    {selectedCategories.map((category) => (
+                      <div
+                        key={category}
+                        className="rounded-xl border-2 border-brand-200 bg-gradient-to-r from-brand-50 to-white p-4 sm:p-5 dark:border-brand-900/50 dark:from-brand-900/20 dark:to-navy-800"
+                      >
+                        <h5 className="mb-4 flex items-center gap-2 font-bold text-brand-700 dark:text-brand-400">
+                          <div className="h-2 w-2 rounded-full bg-brand-500"></div>
+                          {CATEGORY_LABELS[category]}
+                        </h5>
+
+                        <div className="space-y-4">
+                          {/* Age Limits - For All Categories */}
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/20">
+                            <p className="mb-2 text-xs font-medium text-amber-800 dark:text-amber-400">Yosh chegaralari</p>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-700 dark:text-white">Min yosh</label>
+                                <input
+                                  type="number"
+                                  placeholder="21"
+                                  value={categoryConfigs[category]?.minAge || ""}
+                                  onChange={(e) => updateCategoryConfig(category, "minAge", Number(e.target.value))}
+                                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-navy-700 dark:text-white">Max yosh</label>
+                                <input
+                                  type="number"
+                                  placeholder="65"
+                                  value={categoryConfigs[category]?.maxAge || ""}
+                                  onChange={(e) => updateCategoryConfig(category, "maxAge", Number(e.target.value))}
+                                  className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-navy-700 outline-none transition-colors focus:border-brand-500 dark:border-gray-700 dark:bg-navy-700 dark:text-white"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Criterias Section */}
+                          <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-navy-700">
+                            <div className="mb-3 flex items-center justify-between">
+                              <div>
+                                <h6 className="text-sm font-bold text-navy-700 dark:text-white">Baholash mezonlari</h6>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  Jami og'irlik: {getTotalWeight(category)}%
+                                  {getTotalWeight(category) !== 100 && (
+                                    <span className="ml-2 text-red-600 dark:text-red-400">(100% bo'lishi kerak)</span>
+                                  )}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => addCriteriaToCategory(category)}
+                                className="flex items-center gap-1 rounded-lg bg-brand-500 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-brand-600"
+                              >
+                                <Plus className="h-3 w-3" />
+                                Qo'shish
+                              </button>
+                            </div>
+
+                            {categoryConfigs[category]?.criterias && categoryConfigs[category].criterias!.length > 0 ? (
+                              <div className="space-y-2">
+                                {categoryConfigs[category].criterias!.map((criteria, index) => (
+                                  <div key={criteria.id} className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-gray-600 dark:bg-gray-900/50">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-brand-500 text-xs font-bold text-white">
+                                      {index + 1}
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                      <div className="relative">
+                                        <input
+                                          type="text"
+                                          placeholder="Mezon nomi (yozishni boshlang)"
+                                          value={criteria.name}
+                                          onChange={(e) => updateCriteria(category, criteria.id, "name", e.target.value)}
+                                          list={`criteria-names-edit-${category}-${criteria.id}`}
+                                          className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                                        />
+                                        <datalist id={`criteria-names-edit-${category}-${criteria.id}`}>
+                                          {availableCriteriaNames.map((name, idx) => (
+                                            <option key={idx} value={name} />
+                                          ))}
+                                        </datalist>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <input
+                                          type="number"
+                                          placeholder="Og'irlik %"
+                                          value={criteria.weight || ""}
+                                          onChange={(e) => updateCriteria(category, criteria.id, "weight", Number(e.target.value))}
+                                          className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                                        />
+                                        <input
+                                          type="number"
+                                          placeholder="Max ball"
+                                          value={criteria.maxScore || ""}
+                                          onChange={(e) => updateCriteria(category, criteria.id, "maxScore", Number(e.target.value))}
+                                          className="w-full rounded border border-gray-200 bg-white px-2 py-1 text-sm text-navy-700 outline-none focus:border-brand-500 dark:border-gray-700 dark:bg-navy-800 dark:text-white"
+                                        />
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => removeCriteria(category, criteria.id)}
+                                      className="mt-1 flex h-6 w-6 items-center justify-center rounded bg-red-500 text-white transition-colors hover:bg-red-600"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="py-4 text-center text-xs text-gray-500">Mezon qo'shilmagan</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="mt-6 flex justify-end gap-3 border-t border-gray-200 pt-6 dark:border-gray-700">
+                <button
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setSelectedModel(null);
+                    setModelName("");
+                    setModelVersion("");
+                    setSelectedCategories([]);
+                    setCategoryConfigs({
+                      OFFICIAL: {},
+                      CARD_TURNOVER: {},
+                      PENSIONER: {},
+                      MILITARY: {},
+                    });
+                  }}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-gray-500 to-gray-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-gray-600 hover:to-gray-700"
+                >
+                  Bekor qilish
+                </button>
+                <button 
+                  onClick={handleUpdateModel}
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-3 font-bold text-white shadow-lg transition-all hover:from-blue-600 hover:to-blue-700 disabled:opacity-50"
+                >
+                  <Check className="h-5 w-5" />
+                  {loading ? 'Saqlanmoqda...' : 'O\'zgarishlarni saqlash'}
+                </button>
               </div>
             </div>
           </div>
